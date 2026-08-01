@@ -261,6 +261,14 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <div id="nameRes" style="margin-top:8px"></div>
   </div>
 
+  <div class="card">
+    <h3>Základní potraviny</h3>
+    <p class="tiny muted" style="margin:0 0 8px">Zelenina, maso, obiloviny a další nebalené věci,
+      které v databázi čárových kódů nejsou. Vestavěné, funguje offline.</p>
+    <div id="zakCats" class="row wrap2" style="gap:6px"></div>
+    <div id="zakList" style="margin-top:8px"></div>
+  </div>
+
   </div>
 
   <div class="pane" id="s-photo">
@@ -688,10 +696,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
 <div id="toast"></div>
 
+<script src="zaklad.js"></script>
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-25';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-26';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -767,7 +776,7 @@ let editingId = null;
   if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
   products = await dbAll('products');
   fillGoals();
-  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate();
+  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats();
   await renderDay();
   checkBackup();
   renderDb();
@@ -827,6 +836,7 @@ function info() {
   const bd = ('BarcodeDetector' in window) ? 'nativní BarcodeDetector' : 'ZXing (záložní)';
   $('verNow').textContent = APP_VERSION;
   $('infoTxt').innerHTML = 'Verze: ' + APP_VERSION + '<br>Skener: ' + bd + '<br>Produktů v databázi: ' + products.length +
+    '<br>Základních potravin: ' + (window.ZAKLAD ? ZAKLAD.length : 0) +
     '<br>Zdroj online dat: Open Food Facts<br>Data se nikam neodesílají kromě dotazu na čárový kód.' +
     '<br>Trvalé úložiště: ' + (persisted === true ? 'zapnuté (prohlížeč data nesmaže sám)'
       : persisted === false ? 'NEZAPNUTÉ — zálohuj častěji' : 'neznámé');
@@ -973,7 +983,7 @@ async function delLog(id) { await dbDel('log', id); renderDay(); }
 function renderDb() {
   const q = ($('dbSearch').value || '').trim().toLowerCase();
   const list = products
-    .filter(p => !q || (p.name + ' ' + (p.brand || '') + ' ' + (p.barcode || '')).toLowerCase().includes(q))
+    .filter(p => !q || norm(p.name + ' ' + (p.brand || '') + ' ' + (p.barcode || '')).includes(norm(q)))
     .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
   $('dbCount').textContent = products.length + ' položek v databázi' + (q ? ' · nalezeno ' + list.length : '');
   $('dbList').innerHTML = list.length ? list.map(p => `
@@ -981,7 +991,7 @@ function renderDb() {
       <div class="grow" onclick="openPortion('${sid(p.id)}')">
         <div class="nm">${esc(p.name)}</div>
         <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100${esc(p.unit)}
-          <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : 'ručně')}</span></div>
+          <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : (p.source === 'zaklad' ? 'základní' : 'ručně'))}</span></div>
       </div>
       <button class="btn sm" onclick="openEdit('${sid(p.id)}')">✎</button>
     </div>`).join('')
@@ -1058,12 +1068,60 @@ function onNameInput() {
   renderLocalMatches(q);                    // moje databáze okamžitě
   sugT = setTimeout(() => searchByName(true), 450);   // online až po pauze v psaní
 }
+const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function zakProduct(z) {
+  return {
+    id: 'z-' + norm(z.n).replace(/[^a-z0-9]+/g, '-'), barcode: null,
+    name: z.n, brand: 'základní potravina', unit: z.k === 'nápoje' ? 'ml' : 'g',
+    kcal: z.e, p: z.p, c: z.c, f: z.f, fib: z.v || 0, salt: z.s || 0,
+    serving: null, source: 'zaklad', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
+  };
+}
+function zakladMatches(q) {
+  if (!window.ZAKLAD) return [];
+  const t = norm(q);
+  return ZAKLAD.filter(z => norm(z.n).includes(t)).slice(0, 8).map(zakProduct);
+}
 function localMatches(q) {
-  const t = q.toLowerCase();
-  return products
-    .filter(p => (p.name + ' ' + (p.brand || '')).toLowerCase().includes(t))
+  const t = norm(q);
+  const mine = products
+    .filter(p => norm(p.name + ' ' + (p.brand || '')).includes(t))
     .sort((a, b) => (b.uses || 0) - (a.uses || 0))
     .slice(0, 6);
+  const ids = new Set(mine.map(p => p.id));
+  return mine.concat(zakladMatches(q).filter(z => !ids.has(z.id))).slice(0, 12);
+}
+
+function renderZakCats() {
+  if (!window.ZAKLAD || !$('zakCats')) return;
+  const cats = [...new Set(ZAKLAD.map(z => z.k))];
+  $('zakCats').innerHTML = cats.map(c =>
+    `<button class="btn sm" data-c="${esc(c)}" onclick="showZak('${esc(c)}')">${esc(c)}</button>`).join('');
+}
+function showZak(cat) {
+  document.querySelectorAll('#zakCats button').forEach(b => b.classList.toggle('pri', b.dataset.c === cat));
+  const list = ZAKLAD.filter(z => z.k === cat).sort((a, b) => a.n.localeCompare(b.n, 'cs'));
+  $('zakList').innerHTML = list.map(z => {
+    const pr = zakProduct(z);
+    return `<div class="item"><div class="grow" onclick="useZaklad('${sid(pr.id)}')">
+      <div class="nm">${esc(z.n)}</div>
+      <div class="sub">${r0(z.e)} kcal · B ${r1(z.p)} · S ${r1(z.c)} · T ${r1(z.f)}${
+        z.v ? ' · vl ' + r1(z.v) : ''}${z.s ? ' · sůl ' + r1(z.s) : ''}</div>
+    </div></div>`;
+  }).join('');
+}
+async function useZaklad(id) {
+  let pr = products.find(x => x.id === id);
+  if (!pr) {
+    const z = ZAKLAD.find(x => zakProduct(x).id === id);
+    if (!z) { toast('Nenalezeno'); return; }
+    pr = zakProduct(z);
+    await dbPut('products', pr);
+    products.push(pr);
+    renderDb(); info();
+  }
+  openPortion(pr.id);
 }
 function renderLocalMatches(q) {
   const mine = localMatches(q);
@@ -1071,11 +1129,14 @@ function renderLocalMatches(q) {
     + '<p class="tiny muted" style="margin:8px 0 0">Píšu dotaz…</p>';
 }
 function resCard(p, local) {
-  return `<div class="item"><div class="grow" onclick="${local
-      ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`}">
+  const act = p.source === 'zaklad' && !products.some(x => x.id === p.id)
+    ? `useZaklad('${sid(p.id)}')` : (local ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`);
+  return `<div class="item"><div class="grow" onclick="${act}">
       <div class="nm">${esc(p.name)}</div>
       <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100 ${esc(p.unit)}
-        <span class="pill ${local ? 'man' : 'off'}">${local ? 'moje' : 'OFF'}</span>${p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
+        <span class="pill ${(p.source === 'zaklad' || local) ? 'man' : 'off'}">${
+          p.source === 'zaklad' ? 'základní' : (local ? 'moje' : 'OFF')}</span>${
+          p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
     </div></div>`;
 }
 

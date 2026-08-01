@@ -1,5 +1,5 @@
-const CACHE = 'kaltrack-v25';
-const SHELL = ['./', './index.html', './manifest.json', './zxing.js'];
+const CACHE = 'kaltrack-v26';
+const SHELL = ['./', './index.html', './manifest.json', './zxing.js', './zaklad.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
