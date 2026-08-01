@@ -416,8 +416,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
   <div id="alcLimitBar"></div>
   <h3 style="margin-top:14px">Posledních 21 dní</h3>
-  <div id="alcChart" style="display:flex;align-items:flex-end;gap:3px;height:110px;margin:8px 0 4px"></div>
-  <div class="row" style="justify-content:space-between"><span class="tiny muted" id="alcFrom"></span><span class="tiny muted" id="alcTo">dnes</span></div>
+  <div id="alcChart" style="margin:8px 0 4px"></div>
   <h3 style="margin-top:16px" id="alcListHead">Dnešní záznamy</h3>
   <div id="alcList"></div>
   </div>
@@ -528,8 +527,10 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div class="card">
     <h3>Alkohol</h3>
-    <div class="fld"><label>Týdenní limit (g čistého alkoholu, 0 = vypnuto)</label>
-      <input id="gAlc" type="number" inputmode="numeric"></div>
+    <div class="fld"><label>Limit — průměr za posledních 30 dní (g čistého alkoholu na den, 0 = vypnuto)</label>
+      <input id="gAlcDay" type="number" inputmode="decimal" step="0.5"></div>
+    <p class="tiny muted" style="margin:-4px 0 10px">Aplikace pak počítá, kolik ti do limitu ještě zbývá,
+      a řekne ti to v pivech. Orientačně: 10 g/den ≈ pivo 12° obden.</p>
     <button class="btn pri full" style="margin-bottom:12px" onclick="saveGoals()">Uložit limit</button>
   </div>
 
@@ -688,7 +689,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-23';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-24';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -745,7 +746,7 @@ const dbByIdx = (s, i, v) => req(tx(s, 'readonly').index(i).getAll(v));
 
 /* ---------------- state ---------------- */
 let products = [];            // cache
-let goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, rmr: 0, fib: 30, salt: 5 };
+let goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, alcDay: 0, rmr: 0, fib: 30, salt: 5 };
 let curDate = dstr(new Date());
 let persisted = null;         // chrání IndexedDB před automatickým smazáním
 let curProduct = null;        // product open in portion sheet
@@ -756,7 +757,10 @@ let editingId = null;
 (async function init() {
   try { db = await openDB(); } catch (e) { alert('IndexedDB nedostupná: ' + e); return; }
   const g = await dbGet('meta', 'goals');
+  const hadDay = !!(g && g.v && Object.prototype.hasOwnProperty.call(g.v, 'alcDay'));
   if (g && g.v) goals = Object.assign(goals, g.v);
+  // starší verze měly týdenní limit — převeď ho na denní průměr
+  if (!hadDay && goals.alc) { goals.alcDay = r1(goals.alc / 7); await dbPut('meta', { k: 'goals', v: goals }); }
   const dk = await dbGet('meta', 'drinks');
   if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
   products = await dbAll('products');
@@ -948,12 +952,13 @@ async function renderDay() {
   const alcToday = rows.reduce((a, r) => a + (r.alc || 0), 0);
   const alcWeek = allLog.reduce((a, r) => a + ((r.alc && r.date >= wKey && r.date <= curDate) ? r.alc : 0), 0);
   $('alcToday').textContent = r1(alcToday);
-  $('alcWeek').textContent = goals.alc
-    ? '7 dní: ' + r0(alcWeek) + ' / ' + goals.alc + ' g'
-    : '7 dní: ' + r0(alcWeek) + ' g';
-  $('alcWeek').style.color = (goals.alc && alcWeek > goals.alc) ? 'var(--bad)' : 'var(--dim)';
   const asum = await alcStats();
-  $('alcMonth').textContent = 'ø 30 dní: ' + r1(asum.avg30) + ' g/den';
+  $('alcWeek').textContent = 'ø 30 dní: ' + r1(asum.avg30) +
+    (asum.lim ? ' / ' + r1(asum.lim) : '') + ' g/den';
+  $('alcWeek').style.color = (asum.lim && asum.avg30 > asum.lim) ? C_SUR : 'var(--dim)';
+  $('alcMonth').textContent = asum.budget === null ? ''
+    : (asum.budget > 0 ? 'zbývá ' + r0(asum.budget) + ' g' : 'přes limit o ' + r0(-asum.budget) + ' g');
+  $('alcMonth').style.color = (asum.budget !== null && asum.budget <= 0) ? C_SUR : 'var(--dim)';
 
   const favs = products.slice().sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).filter(p => p.uses);
   $('favList').innerHTML = favs.length ? favs.map(p =>
@@ -1206,7 +1211,6 @@ function syncAddDate() {
     c.style.borderColor = msg ? '#4a3a20' : 'var(--line)';
   });
   if ($('alcListHead')) $('alcListHead').textContent = isToday() ? 'Dnešní záznamy' : 'Záznamy — ' + dayTxt(curDate);
-  if ($('alcTo')) $('alcTo').textContent = isToday() ? 'dnes' : czd(curDate);
 }
 function addToMeal(k) {
   pendingMeal = k;
@@ -1372,7 +1376,7 @@ async function deleteProduct() {
 /* ---------------- goals ---------------- */
 function fillGoals() {
   $('gKcal').value = goals.kcal; $('gP').value = goals.p; $('gC').value = goals.c;
-  $('gF').value = goals.f; $('gAlc').value = goals.alc || 0;
+  $('gF').value = goals.f; $('gAlcDay').value = goals.alcDay || 0;
   $('gRmr').value = goals.rmr || '';
   $('gFib').value = goals.fib || 30; $('gSalt').value = goals.salt || 5;
   if ($('gProj')) $('gProj').checked = !!goals.proj;
@@ -1381,7 +1385,8 @@ function fillGoals() {
 async function saveGoals() {
   goals = {
     kcal: n($('gKcal').value) || 2000, p: n($('gP').value) || 0, c: n($('gC').value) || 0,
-    f: n($('gF').value) || 0, alc: n($('gAlc').value) || 0, rmr: n($('gRmr').value) || 0,
+    f: n($('gF').value) || 0, alc: goals.alc || 0, alcDay: n($('gAlcDay').value) || 0,
+    rmr: n($('gRmr').value) || 0,
     fib: n($('gFib').value) || 30, salt: n($('gSalt').value) || 5,
     proj: $('gProj') ? $('gProj').checked : !!goals.proj
   };
@@ -1471,7 +1476,7 @@ async function wipe() {
     t.objectStore('products').clear(); t.objectStore('log').clear();
     t.objectStore('meta').clear(); t.objectStore('daily').clear(); t.oncomplete = r;
   });
-  products = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
+  products = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, alcDay: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
   fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info(); toast('Smazáno');
 }
 
@@ -2018,6 +2023,70 @@ function svgDiverging(list, a) {
       <text x="${W}" y="${H + 11}" fill="${C_INK}" font-size="8" text-anchor="end">dnes</text>
     </svg>`;
 }
+/* Odpovídá na otázku „můžu si ještě dát?" — spočítá, kde by byl 30denní průměr
+   po jednom dalším nápoji. Rozpočet v gramech je až druhotná informace. */
+function refDrink(rows) {
+  const cnt = {};
+  (rows || []).forEach(r => { if (r.alc) cnt[r.name] = (cnt[r.name] || 0) + 1; });
+  const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+  if (top) { const d = drinks.find(x => x.nm === top[0]); if (d) return d; }
+  return drinks[1] || drinks[0];
+}
+function limitBlock(s) {
+  const pct = Math.min(100, s.avg30 / s.lim * 100), over = s.avg30 > s.lim;
+  const ref = s.ref, g = ref ? alcG(ref) : 0;
+  const po = (s.d30 + g) / 30;
+  const vejde = po <= s.lim;
+  const bar = `<div class="bar"><div class="t"><span>Průměr 30 dní vs. limit</span>
+      <span class="mono">${r1(s.avg30)} / ${r1(s.lim)} g/den</span></div>
+      <div class="track"><div class="fill" style="width:${pct}%;background:${over ? C_SUR : 'var(--ok)'}"></div></div></div>`;
+  const otazka = ref ? `<div class="card" style="margin:10px 0 0;padding:10px;background:var(--card2);
+      border-color:${vejde ? '#26483a' : '#4a2b2b'}">
+      <div class="tiny muted" style="margin-bottom:4px">Kdybys teď dal ${esc(ref.nm)} (${r1(g)} g)</div>
+      <b style="color:${vejde ? 'var(--ok)' : C_SUR}">${r1(po)} g/den — ${vejde ? 'pořád v limitu' : 'nad limitem'}</b>
+    </div>` : '';
+  const zbyva = over
+    ? `<p class="tiny" style="margin:8px 0 0;color:${C_SUR}">Průměr je nad limitem o
+        ${r1(s.avg30 - s.lim)} g/den. Klesne sám, jak budou z okna vypadávat staré dny.</p>`
+    : `<p class="tiny muted" style="margin:8px 0 0">Rezerva do limitu je ${r0(s.budget)} g
+        rozložených do 30 dnů (${r1(s.budget / 30)} g/den navíc).</p>`;
+  return bar + otazka + zbyva;
+}
+
+/* sloupce posledních 21 dní s osou a čárou limitu */
+function svgAlcBars(days, lim) {
+  const W = 320, H = 104, L = 26;
+  const mx = Math.max(10, lim * 1.6, ...days.map(d => d.g)) * 1.08;
+  const bw = (W - L) / days.length;
+  const Y = v => H - (v / mx) * H;
+  const bars = days.map((d, i) => {
+    const x = L + i * bw;
+    if (d.g <= 0)
+      return `<rect x="${r1(x + 1)}" y="${H - 2}" width="${r1(Math.max(1.5, bw - 2))}" height="2" fill="${C_GRID}"/>`;
+    const y = Y(d.g), h = Math.max(2, H - y);
+    const col = (lim && d.g > lim) ? C_SUR : C_DEF;
+    return `<rect x="${r1(x + 1)}" y="${r1(y)}" width="${r1(Math.max(1.5, bw - 2))}" height="${r1(h)}"
+      rx="2" fill="${col}"><title>${d.d}: ${r1(d.g)} g</title></rect>`;
+  }).join('');
+  const grid = [0, 0.5, 1].map(f => {
+    const v = mx * f, y = Y(v);
+    return `<line x1="${L}" y1="${r1(y)}" x2="${W}" y2="${r1(y)}" stroke="${C_GRID}" stroke-width="1"/>
+      <text x="${L - 4}" y="${r1(y) + 3}" fill="${C_INK}" font-size="8" text-anchor="end">${r0(v)}</text>`;
+  }).join('');
+  const limLine = lim ? `<line x1="${L}" y1="${r1(Y(lim))}" x2="${W}" y2="${r1(Y(lim))}"
+      stroke="${C_SUR}" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="${W}" y="${r1(Y(lim)) - 3}" fill="${C_SUR}" font-size="8" text-anchor="end">limit ø ${r1(lim)} g</text>` : '';
+  return `<svg viewBox="0 0 ${W} ${H + 13}" style="width:100%;height:auto;overflow:visible">
+      ${grid}${bars}${limLine}
+      <text x="${L}" y="${H + 11}" fill="${C_INK}" font-size="8">${czd(days[0].d)}</text>
+      <text x="${W}" y="${H + 11}" fill="${C_INK}" font-size="8" text-anchor="end">${isToday() ? 'dnes' : czd(curDate)}</text>
+    </svg>
+    <div class="tiny muted" style="margin-top:6px">
+      <span style="color:${C_DEF}">▬</span> den v limitu ·
+      <span style="color:${C_SUR}">▬</span> nad denním limitem ·
+      <span style="color:${C_GRID}">▬</span> bez alkoholu · svislá osa v gramech</div>`;
+}
+
 function svgWeight(list, a) {
   const W = 320, H = 100;
   const pts = list.map((d, i) => ({ i, w: d.weight, m: a.ma[i] })).filter(p => p.m !== null);
@@ -2607,6 +2676,8 @@ async function alcStats() {
     today: byDay[curDate] || 0,
     avg7: sum(7) / 7, avg30: sum(30) / 30,
     mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
+    lim: goals.alcDay || 0,
+    budget: goals.alcDay ? goals.alcDay * 30 - sum(30) : null,
     allSum, allDays, avgAll: allSum / allDays, first
   };
 }
@@ -2621,23 +2692,13 @@ async function renderAlc() {
   $('alcAvgNote').textContent = s.mName + ': ' + r0(s.mSum) + ' g za ' + dnu(s.mDays) +
     ' · celkem ' + r0(s.allSum) + ' g za ' + dnu(s.allDays) + ' od ' + czd(s.first) +
     ' (dny bez alkoholu se do průměru počítají)';
-  const lim = goals.alc || 0;
-  $('alcLimitBar').innerHTML = lim ? (() => {
-    const pct = Math.min(100, s.d7 / lim * 100), over = s.d7 > lim;
-    return `<div class="bar"><div class="t"><span>Týdenní limit</span>
-      <span class="mono">${r0(s.d7)} / ${lim} g</span></div>
-      <div class="track"><div class="fill" style="width:${pct}%;background:${over ? 'var(--bad)' : 'var(--ok)'}"></div></div></div>`;
-  })() : '<p class="tiny muted" style="margin:0">Týdenní limit není nastavený (Nastavení → Alkohol).</p>';
-  const last = s.days.slice(-21);
-  const mx = Math.max(10, ...last.map(x => x.g));
-  $('alcChart').innerHTML = last.map(x => {
-    const h = Math.max(2, x.g / mx * 100);
-    const col = x.g === 0 ? '#2e3542' : (x.g > 40 ? 'var(--bad)' : (x.g > 20 ? 'var(--warn)' : 'var(--acc)'));
-    return `<div title="${x.d}: ${r1(x.g)} g" style="flex:1;height:${h}%;background:${col};border-radius:3px 3px 0 0"></div>`;
-  }).join('');
-  const f = last[0] ? new Date(last[0].d + 'T12:00:00') : new Date();
-  $('alcFrom').textContent = f.getDate() + '. ' + (f.getMonth() + 1) + '.';
+  $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : '<p class="tiny muted" style="margin:0">' +
+    'Limit není nastavený (Víc → Alkohol).</p>';
+  $('alcChart').innerHTML = svgAlcBars(s.days.slice(-21), s.lim);
   syncAddDate();
+  const allLog = await dbAll('log');
+  s.ref = refDrink(allLog.filter(r => r.date > dstr(new Date(Date.now() - 60 * 86400000))));
+  $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : $('alcLimitBar').innerHTML;
   const rows = (await dbByIdx('log', 'date', curDate)).filter(r => r.alc);
   $('alcList').innerHTML = rows.length ? rows.map(r => `
     <div class="item"><div class="grow" onclick="editLog(${Number(r.id) || 0})">
