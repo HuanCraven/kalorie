@@ -775,7 +775,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-33';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-35';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1173,7 +1173,7 @@ function onNameInput() {
   clearTimeout(sugT);
   if (q.length < 2) { $('nameRes').innerHTML = ''; return; }
   renderLocalMatches(q);                    // moje databáze okamžitě
-  sugT = setTimeout(() => searchByName(true), 450);   // online až po pauze v psaní
+  sugT = setTimeout(() => searchByName(true), 700);   // online až po pauze v psaní
 }
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 /* shoda po slovech a bez ohledu na pořadí: „slunecnicovy chleb" najde „Chléb slunečnicový" */
@@ -1457,18 +1457,21 @@ async function searchByName(quiet) {
   const card = resCard;
   box.innerHTML = (mine.length ? mine.map(p => card(p, true)).join('') : '')
     + '<p class="tiny muted" style="margin:8px 0 0">Hledám v Open Food Facts…</p>';
+  if (searchCtrl) searchCtrl.abort();      // zruš dotaz, který ještě běží
+  const myCtrl = new AbortController();
+  searchCtrl = myCtrl;
   let res = null, errTxt = '';
-  try { res = await searchOFF(q, $('czOnly').checked); }
-  catch (e) { errTxt = e.message || 'neznámá chyba'; }
+  try { res = await searchOFF(q, $('czOnly').checked, myCtrl.signal); }
+  catch (e) { if (e.aborted) return; errTxt = e.message || 'neznámá chyba'; }
   if (seq !== sugSeq) return;              // mezitím přišel novější dotaz
+  if (searchCtrl === myCtrl) searchCtrl = null;
   const mineHtml = mine.map(p => card(p, true)).join('');
   if (!res) {
-    if (quiet) { box.innerHTML = mineHtml +
-      '<p class="tiny muted" style="margin:8px 0 0">Online se nepodařilo — klepni na Hledat.</p>'; return; }
     box.innerHTML = mineHtml +
       '<p class="tiny" style="margin:8px 0 0;color:var(--warn)">Online vyhledávání selhalo.</p>' +
-      '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) + '</p>' +
-      '<button class="btn sm full" style="margin-top:8px" onclick="openEdit(null)">Zadat ručně</button>';
+      '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) +
+      '</p><button class="btn sm full" style="margin-top:8px" onclick="searchByName()">Zkusit znovu</button>' +
+      '<button class="btn sm full" style="margin-top:6px" onclick="openEdit(null)">Zadat ručně</button>';
     return;
   }
   lastFound = {}; res.items.forEach(p => lastFound[p.id] = p);
@@ -1476,7 +1479,9 @@ async function searchByName(quiet) {
   box.innerHTML = mineHtml
     + (fresh.length ? fresh.map(p => card(p, false)).join('')
       : '<p class="tiny muted" style="margin:8px 0 0">Online nic dalšího. Zkus jiné slovo nebo zadej ručně.</p>')
-    + (res.note ? '<p class="tiny muted" style="margin:8px 0 0">' + res.note + '</p>' : '');
+    + (res.note ? '<p class="tiny muted" style="margin:8px 0 0">' + res.note + '</p>' : '')
+    + '<p class="tiny" style="margin:8px 0 0;color:var(--dim2)">z databází ' + mine.length +
+      ' · online ' + res.items.length + '</p>';
 }
 let lastFound = {};
 async function useFound(id) {
@@ -1486,17 +1491,30 @@ async function useFound(id) {
   renderDb(); info();
   openPortion(p.id);
 }
-async function getJson(url, ms) {
+let searchCtrl = null;          // dotaz, který právě běží — nový ho zruší
+
+async function getJson(url, ms, outer) {
   const ctrl = new AbortController();
-  const to = setTimeout(() => ctrl.abort(), ms || 12000);
+  const to = setTimeout(() => ctrl.abort('timeout'), ms || 12000);
+  const onAbort = () => ctrl.abort('superseded');
+  if (outer) outer.addEventListener('abort', onAbort);
   try {
     const res = await fetch(url, { signal: ctrl.signal, headers: { 'Accept': 'application/json' } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('vypršel čas');
-    throw new Error(e.message || 'síť');
-  } finally { clearTimeout(to); }
+    // pozor: abort(reason) zamítne fetch tím reason, ne DOMException — na e.name se nedá spolehnout
+    if (ctrl.signal.aborted || (e && e.name === 'AbortError')) {
+      const sup = !!(outer && outer.aborted);
+      const err = new Error(sup ? 'nahrazeno novějším dotazem' : 'vypršel čas');
+      err.aborted = sup;
+      throw err;
+    }
+    throw new Error((e && e.message) || 'síť');
+  } finally {
+    clearTimeout(to);
+    if (outer) outer.removeEventListener('abort', onAbort);
+  }
 }
 
 function mapOFFSearch(pr) {
@@ -1509,19 +1527,29 @@ function mapOFFSearch(pr) {
 
 /* Zkusí moderní full-textové vyhledávání, při selhání starší endpoint.
    Vrací {items, note, via} nebo vyhodí chybu s popisem, co přesně selhalo. */
-async function searchOFF(q, czOnly) {
+async function searchOFF(q, czOnly, signal) {
   const FLD = 'code,product_name,product_name_cs,brands,nutriments,serving_quantity,countries_tags';
   const problems = [];
   let raw = null, via = '';
 
+  // jeden opakovaný pokus — server občas odmítne rychlý sled dotazů
+  const tryTwice = async (url) => {
+    try { return await getJson(url, 12000, signal); }
+    catch (e) {
+      if (e.aborted) throw e;
+      await new Promise(r => setTimeout(r, 600));
+      return await getJson(url, 12000, signal);
+    }
+  };
+
   try {
     const u = 'https://search.openfoodfacts.org/search?q=' + encodeURIComponent(q) +
       '&page_size=25&fields=' + encodeURIComponent(FLD);
-    const j = await getJson(u);
+    const j = await tryTwice(u);
     const hits = j.hits || j.products || j.results || [];
     if (hits.length) { raw = hits.map(h => h._source || h); via = 'search'; }
     else problems.push('nové vyhledávání: nic nenašlo');
-  } catch (e) { problems.push('nové vyhledávání: ' + e.message); }
+  } catch (e) { if (e.aborted) throw e; problems.push('nové vyhledávání: ' + e.message); }
 
   if (!raw) {
     try {
@@ -1529,11 +1557,11 @@ async function searchOFF(q, czOnly) {
         search_terms: q, search_simple: '1', action: 'process', json: '1',
         page_size: '25', fields: FLD
       });
-      const j = await getJson('https://world.openfoodfacts.org/cgi/search.pl?' + par.toString());
+      const j = await tryTwice('https://world.openfoodfacts.org/cgi/search.pl?' + par.toString());
       const hits = j.products || [];
       if (hits.length) { raw = hits; via = 'legacy'; }
       else problems.push('starší vyhledávání: nic nenašlo');
-    } catch (e) { problems.push('starší vyhledávání: ' + e.message); }
+    } catch (e) { if (e.aborted) throw e; problems.push('starší vyhledávání: ' + e.message); }
   }
 
   if (!raw) throw new Error(problems.join(' · '));
