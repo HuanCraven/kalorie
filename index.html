@@ -205,6 +205,15 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
 <!-- ============ ZADAT ============ -->
 <section id="p-scan" class="page">
+  <div class="card compact" id="addDateCard" style="margin-bottom:12px">
+    <div class="row" style="gap:8px;align-items:center">
+      <span class="tiny muted" style="flex:0 0 auto">Zapisuji na</span>
+      <input type="date" id="addDate" class="grow" style="padding:8px 10px" onchange="setAddDate(this.value)">
+      <button class="btn sm" onclick="setAddDate(dstr(new Date()))">dnes</button>
+    </div>
+    <p class="tiny" id="addDateWarn" style="margin:8px 0 0;color:var(--warn);display:none"></p>
+  </div>
+
   <div class="seg" id="addSeg">
     <button data-s="code" class="on" onclick="setAdd('code')">Kód</button>
     <button data-s="find" onclick="setAdd('find')">Hledat</button>
@@ -318,6 +327,16 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <div class="lbl-s">Rychlý zápis</div>
     <div id="drinkBtns" class="row wrap2" style="margin-bottom:8px"></div>
     <button class="btn sm full" onclick="openCustomDrink()">+ Jiný nápoj</button>
+    <details style="margin-top:10px">
+      <summary class="tiny muted" style="cursor:pointer">Upravit přednastavené nápoje</summary>
+      <div style="margin-top:10px">
+    <div class="lbl-s">Upravit tlačítka</div>
+    <div id="drinkEdit"></div>
+    <button class="btn sm full" style="margin-top:8px" onclick="addDrinkDef()">+ Přidat nápoj</button>
+    <p class="tiny muted" style="margin:8px 0 0">Sloupce: objem (ml) · obsah alkoholu (%) · sacharidy (g/100 ml).
+      U destilátů nech sacharidy 0.</p>
+      </div>
+    </details>
   </div>
 
   <div class="card">
@@ -446,11 +465,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <div class="fld"><label>Týdenní limit (g čistého alkoholu, 0 = vypnuto)</label>
       <input id="gAlc" type="number" inputmode="numeric"></div>
     <button class="btn pri full" style="margin-bottom:12px" onclick="saveGoals()">Uložit limit</button>
-    <h3>Přednastavené nápoje</h3>
-    <div id="drinkEdit"></div>
-    <button class="btn sm full" style="margin-top:8px" onclick="addDrinkDef()">+ Přidat nápoj</button>
-    <p class="tiny muted" style="margin:8px 0 0">Sloupce: objem (ml) · obsah alkoholu (%) · sacharidy (g/100 ml).
-      U destilátů nech sacharidy 0.</p>
   </div>
 
   <div class="card">
@@ -485,7 +499,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
 <nav>
   <button class="on" data-p="day" onclick="go('day')">
-    <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Dnes</button>
+    <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Hlavní</button>
   <button data-p="scan" onclick="go('scan')">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Zadat</button>
   <button data-p="alc" onclick="go('alc')">
@@ -507,7 +521,10 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <label>Množství (<span id="poUnit">g</span>)</label>
       <input id="poAmt" type="number" inputmode="decimal" value="100" oninput="calcPortion()">
     </div>
-    <div class="fld"><label>Zařadit k jídlu</label><select id="poMeal"></select></div>
+    <div class="grid2">
+      <div class="fld"><label>Jídlo</label><select id="poMeal"></select></div>
+      <div class="fld"><label>Datum</label><input type="date" id="poDate" onchange="setAddDate(this.value)"></div>
+    </div>
     <div class="grid4" style="margin-bottom:12px">
       <button class="btn sm" onclick="setAmt(30)">30</button>
       <button class="btn sm" onclick="setAmt(50)">50</button>
@@ -576,7 +593,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <!-- custom drink -->
 <div class="mod" id="modDrink" onclick="if(event.target===this)closeMod('modDrink')">
   <div class="sheet">
-    <h2>Jiný nápoj</h2>
+    <h2 id="dkTitle">Jiný nápoj</h2>
     <div class="fld"><label>Název</label><input id="dkName" placeholder="např. Gin s tonikem"></div>
     <div class="grid2">
       <div class="fld"><label>Objem (ml)</label><input id="dkMl" type="number" inputmode="decimal" value="200" oninput="calcDrink()"></div>
@@ -584,15 +601,16 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     </div>
     <div class="fld"><label>Sacharidy (g / 100 ml) — u destilátů 0</label>
       <input id="dkC" type="number" inputmode="decimal" value="0" oninput="calcDrink()"></div>
+    <div class="fld"><label>Zařadit k jídlu</label><select id="dkMeal"></select></div>
     <div class="card" style="background:var(--card2);margin-bottom:12px">
       <div class="row" style="justify-content:space-between"><span class="muted tiny">Čistý alkohol</span><b class="mono" id="dkAlc">0 g</b></div>
       <div class="row" style="justify-content:space-between"><span class="muted tiny">Energie</span><b class="mono" id="dkK">0 kcal</b></div>
     </div>
     <div class="row">
       <button class="btn grow" onclick="closeMod('modDrink')">Zrušit</button>
-      <button class="btn pri grow" onclick="addCustomDrink(false)">Zapsat</button>
+      <button class="btn pri grow" id="dkSave" onclick="addCustomDrink(false)">Zapsat</button>
     </div>
-    <button class="btn sm full" style="margin-top:10px" onclick="addCustomDrink(true)">Zapsat a uložit mezi tlačítka</button>
+    <button class="btn sm full" id="dkKeep" style="margin-top:10px" onclick="addCustomDrink(true)">Zapsat a uložit mezi tlačítka</button>
   </div>
 </div>
 
@@ -601,7 +619,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-12';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-13';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -674,7 +692,7 @@ let editingId = null;
   if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
   products = await dbAll('products');
   fillGoals();
-  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect();
+  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate();
   await renderDay();
   checkBackup();
   renderDb();
@@ -784,6 +802,7 @@ function shiftDay(d) {
   const x = new Date(curDate + 'T12:00:00');
   x.setDate(x.getDate() + d);
   curDate = dstr(x);
+  syncAddDate();
   renderDay();
 }
 async function renderDay() {
@@ -818,7 +837,7 @@ async function renderDay() {
   $('saltTxt').textContent = r1(t.salt) + ' / ' + (goals.salt || 5) + ' g';
   $('saltTxt').style.color = t.salt > (goals.salt || 5) ? 'var(--bad)' : 'var(--fg)';
 
-  const groups = MEALS.map(m => ({ m, rows: rows.filter(r => (r.meal || 'nezar') === m.k) }));
+  const groups = MEALS.map(m => ({ m, rows: rows.filter(r => r.meal === m.k) }));
   const orphan = rows.filter(r => !MEALS.some(m => m.k === r.meal));
   if (orphan.length) groups.push({ m: { k: 'nezar', n: 'Nezařazeno' }, rows: orphan });
   const row = r => `
@@ -832,19 +851,23 @@ async function renderDay() {
       <div class="kc">${r0(r.kcal)}<span class="tiny muted"> kcal</span></div>
       <button class="btn sm dan" onclick="event.stopPropagation();delLog(${Number(r.id) || 0})">✕</button>
     </div>`;
-  $('logList').innerHTML = rows.length
-    ? groups.filter(g => g.rows.length).map(g => `
-        <div style="margin-bottom:10px">
-          <div class="mealhead">
-            <span class="n">${g.m.n}</span>
-            <span class="tiny muted mono">${r0(g.rows.reduce((a, r) => a + r.kcal, 0))} kcal
-              <button class="btn sm" style="padding:3px 7px;margin-left:6px"
-                onclick="copyMeal('${g.m.k}')" title="zkopírovat toto jídlo ze včerejška">⧉</button></span>
-          </div>
-          ${g.rows.map(row).join('')}
-        </div>`).join('')
-    : '<p class="muted tiny">Zatím nic. Naskenuj kód nebo přidej z databáze.<br>' +
-      MEALS.map(m => `<button class="btn sm" style="margin:6px 6px 0 0" onclick="copyMeal('${m.k}')">⧉ ${m.n} ze včerejška</button>`).join('') + '</p>';
+  $('logList').innerHTML = groups.map(g => {
+    const kc = g.rows.reduce((a, r) => a + r.kcal, 0);
+    return `
+      <div style="margin-bottom:10px">
+        <div class="mealhead">
+          <span class="n">${g.m.n}</span>
+          <span class="row" style="gap:6px;align-items:center">
+            <span class="tiny muted mono">${g.rows.length ? r0(kc) + ' kcal' : '—'}</span>
+            ${g.m.k === 'nezar' ? '' : `
+              <button class="btn sm" style="padding:3px 8px" onclick="copyMeal('${g.m.k}')"
+                title="zkopírovat ze včerejška">⧉</button>
+              <button class="btn sm pri" style="padding:3px 9px" onclick="addToMeal('${g.m.k}')">+</button>`}
+          </span>
+        </div>
+        ${g.rows.map(row).join('')}
+      </div>`;
+  }).join('');
 
   await loadDaily();
   await renderBalance(t.k);
@@ -1085,11 +1108,39 @@ async function searchOFF(q, czOnly) {
 
 /* ---------------- portion sheet ---------------- */
 let editLogId = null;
+let pendingMeal = null;
+
+/* datum, na které se zapisuje = prohlížený den */
+function setAddDate(v) {
+  if (!v) return;
+  curDate = v;
+  syncAddDate();
+  renderDay();
+}
+function syncAddDate() {
+  const today = dstr(new Date());
+  if ($('addDate')) $('addDate').value = curDate;
+  if ($('poDate')) $('poDate').value = curDate;
+  const w = $('addDateWarn'), c = $('addDateCard');
+  if (!w) return;
+  if (curDate !== today) {
+    const d = new Date(curDate + 'T12:00:00');
+    w.textContent = '⚠ Nezapisuješ na dnešek, ale na ' + DAYS[d.getDay()] + ' ' +
+      d.getDate() + '. ' + (d.getMonth() + 1) + '.';
+    w.style.display = ''; c.style.borderColor = '#4a3a20';
+  } else { w.style.display = 'none'; c.style.borderColor = 'var(--line)'; }
+}
+function addToMeal(k) {
+  pendingMeal = k;
+  go('scan');
+  syncAddDate();
+  toast('Zapisuji do: ' + mealName(k));
+}
 
 async function editLog(id) {
   const r = await dbGet('log', id);
   if (!r) return;
-  if (r.alc) { toast('Nápoj uprav smazáním a zadáním znovu'); return; }
+  if (r.alc) { editDrink(r); return; }
   const p = products.find(x => x.id === r.productId);
   editLogId = id;
   curProduct = p || {
@@ -1105,6 +1156,7 @@ async function editLog(id) {
   $('poAmt').value = r1(r.amount);
   fillMealSelect();
   $('poMeal').value = r.meal || defaultMeal();
+  $('poDate').value = r.date || curDate;
   $('poAdd').textContent = 'Uložit změnu';
   calcPortion();
   $('modPortion').classList.add('on');
@@ -1116,7 +1168,8 @@ function openPortion(id) {
   editLogId = null;
   $('poAdd').textContent = 'Přidat';
   fillMealSelect();
-  $('poMeal').value = defaultMeal();
+  $('poMeal').value = pendingMeal || defaultMeal();
+  $('poDate').value = curDate;
   curProduct = p;
   $('poName').textContent = p.name;
   $('poSub').textContent = (p.brand ? p.brand + ' · ' : '') + r0(p.kcal) + ' kcal / 100 ' + p.unit;
@@ -1141,14 +1194,14 @@ async function addPortion() {
   if (amt <= 0) { toast('Zadej množství'); return; }
   const a = amt / 100;
   const rec = {
-    date: curDate, productId: curProduct.id, name: curProduct.name, unit: curProduct.unit,
+    date: $('poDate').value || curDate, productId: curProduct.id, name: curProduct.name, unit: curProduct.unit,
     meal: $('poMeal').value, amount: amt,
     kcal: curProduct.kcal * a, p: curProduct.p * a, c: curProduct.c * a, f: curProduct.f * a,
     fib: (curProduct.fib || 0) * a, salt: (curProduct.salt || 0) * a, ts: Date.now()
   };
   if (editLogId) {
     const old = await dbGet('log', editLogId);
-    rec.id = editLogId; rec.date = old.date; rec.ts = old.ts;
+    rec.id = editLogId; rec.ts = old.ts;
     await dbPut('log', rec);
     editLogId = null;
     closeMod('modPortion'); toast('Upraveno'); renderDay(); return;
@@ -1158,8 +1211,11 @@ async function addPortion() {
     curProduct.uses = (curProduct.uses || 0) + 1;
     await dbPut('products', curProduct);
   }
+  pendingMeal = null;
   closeMod('modPortion');
-  toast('Přidáno do: ' + mealName(rec.meal));
+  const dd = new Date(rec.date + 'T12:00:00');
+  toast('Přidáno do: ' + mealName(rec.meal) +
+    (rec.date === dstr(new Date()) ? '' : ' · ' + dd.getDate() + '. ' + (dd.getMonth() + 1) + '.'));
   go('day');
   renderDay();
 }
@@ -1915,7 +1971,32 @@ async function logDrink(i) {
   toast(d.nm + ' · ' + r1(alcG(d)) + ' g alk.');
   renderDay(); renderAlc();
 }
-function openCustomDrink() { calcDrink(); $('modDrink').classList.add('on'); }
+let editDrinkId = null;
+function fillDrinkMeal() { $('dkMeal').innerHTML = MEALS.map(m => `<option value="${m.k}">${m.n}</option>`).join(''); }
+
+function openCustomDrink() {
+  editDrinkId = null;
+  $('dkTitle').textContent = 'Jiný nápoj';
+  $('dkSave').textContent = 'Zapsat';
+  $('dkKeep').style.display = '';
+  fillDrinkMeal(); $('dkMeal').value = defaultMeal();
+  calcDrink();
+  $('modDrink').classList.add('on');
+}
+
+function editDrink(r) {
+  editDrinkId = r.id;
+  $('dkTitle').textContent = 'Upravit nápoj';
+  $('dkSave').textContent = 'Uložit změnu';
+  $('dkKeep').style.display = 'none';
+  $('dkName').value = r.name;
+  $('dkMl').value = r1(r.amount);
+  $('dkAbv').value = r1(r.abv || 0);
+  $('dkC').value = r.amount ? r1((r.c || 0) / r.amount * 100) : 0;
+  fillDrinkMeal(); $('dkMeal').value = r.meal || defaultMeal();
+  calcDrink();
+  $('modDrink').classList.add('on');
+}
 function curDrink() {
   return { nm: $('dkName').value.trim() || 'Nápoj', ml: n($('dkMl').value), abv: n($('dkAbv').value), c: n($('dkC').value) };
 }
@@ -1927,11 +2008,19 @@ function calcDrink() {
 async function addCustomDrink(keep) {
   const d = curDrink();
   if (d.ml <= 0 || d.abv <= 0) { toast('Zadej objem a procenta'); return; }
-  if (keep) { drinks.push(d); await dbPut('meta', { k: 'drinks', v: drinks }); renderDrinkBtns(); renderDrinkEdit(); }
-  await dbPut('log', {
-    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml, meal: defaultMeal(),
+  const rec = {
+    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml, meal: $('dkMeal').value,
     kcal: alcKcal(d), p: 0, c: alcCarb(d), f: 0, alc: alcG(d), abv: d.abv, ts: Date.now()
-  });
+  };
+  if (editDrinkId) {
+    const old = await dbGet('log', editDrinkId);
+    rec.id = editDrinkId; rec.date = old.date; rec.ts = old.ts;
+    await dbPut('log', rec);
+    editDrinkId = null;
+    closeMod('modDrink'); toast('Upraveno'); renderDay(); renderAlc(); return;
+  }
+  if (keep) { drinks.push(d); await dbPut('meta', { k: 'drinks', v: drinks }); renderDrinkBtns(); renderDrinkEdit(); }
+  await dbPut('log', rec);
   closeMod('modDrink'); toast('Zapsáno'); renderDay(); renderAlc();
 }
 function renderDrinkEdit() {
