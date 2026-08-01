@@ -415,7 +415,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <div class="tiny muted">dní bez</div><b class="mono" id="alcDry" style="font-size:20px">0</b><div class="tiny muted">/30</div></div>
   </div>
   <div id="alcLimitBar"></div>
-  <h3 style="margin-top:14px">Posledních 21 dní</h3>
+  <h3 style="margin-top:16px">Vývoj 30denního průměru</h3>
+  <div id="alcTrend" style="margin:8px 0 4px"></div>
+  <h3 style="margin-top:16px">Kdy a kolik — posledních 21 dní</h3>
   <div id="alcChart" style="margin:8px 0 4px"></div>
   <h3 style="margin-top:16px" id="alcListHead">Dnešní záznamy</h3>
   <div id="alcList"></div>
@@ -689,7 +691,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-24';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-25';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -2053,10 +2055,48 @@ function limitBlock(s) {
   return bar + otazka + zbyva;
 }
 
-/* sloupce posledních 21 dní s osou a čárou limitu */
+/* Vývoj klouzavého 30denního průměru — jediné číslo srovnatelné s limitem. */
+function svgAlcTrend(long, trend, lim) {
+  const pts = [];
+  for (let i = 0; i < long.length; i++) if (trend[i] !== null) pts.push({ d: long[i].d, v: trend[i] });
+  if (pts.length < 2)
+    return '<p class="tiny muted">Na trend potřebuju aspoň 30 dní záznamů — graf naskočí sám, ' +
+      'jakmile je budeš mít.</p>';
+  const W = 320, H = 96, L = 26;
+  const mx = (Math.max(lim * 1.35 || 0, ...pts.map(p => p.v)) || 10) * 1.1;
+  const X = i => L + (i / Math.max(1, pts.length - 1)) * (W - L);
+  const Y = v => H - (v / mx) * H;
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + r1(X(i)) + ' ' + r1(Y(p.v))).join(' ');
+  const area = line + ' L ' + r1(X(pts.length - 1)) + ' ' + H + ' L ' + r1(X(0)) + ' ' + H + ' Z';
+  const grid = [0, 0.5, 1].map(f => {
+    const v = mx * f, y = Y(v);
+    return `<line x1="${L}" y1="${r1(y)}" x2="${W}" y2="${r1(y)}" stroke="${C_GRID}" stroke-width="1"/>
+      <text x="${L - 4}" y="${r1(y) + 3}" fill="${C_INK}" font-size="8" text-anchor="end">${r0(v)}</text>`;
+  }).join('');
+  const limLine = lim ? `<line x1="${L}" y1="${r1(Y(lim))}" x2="${W}" y2="${r1(Y(lim))}"
+      stroke="${C_SUR}" stroke-width="1.5" stroke-dasharray="5 3"/>
+      <text x="${W}" y="${r1(Y(lim)) - 4}" fill="${C_SUR}" font-size="8" text-anchor="end">limit ${r1(lim)} g/den</text>` : '';
+  const last = pts[pts.length - 1], prev = pts[Math.max(0, pts.length - 15)];
+  const smer = last.v - prev.v;
+  return `<svg viewBox="0 0 ${W} ${H + 13}" style="width:100%;height:auto;overflow:visible">
+      ${grid}
+      <path d="${area}" fill="${C_DEF}" opacity="0.13"/>
+      <path d="${line}" fill="none" stroke="${C_DEF}" stroke-width="2" stroke-linejoin="round"/>
+      ${limLine}
+      <circle cx="${r1(X(pts.length - 1))}" cy="${r1(Y(last.v))}" r="3.5" fill="${C_DEF}"/>
+      <text x="${L}" y="${H + 11}" fill="${C_INK}" font-size="8">${czd(pts[0].d)}</text>
+      <text x="${W}" y="${H + 11}" fill="${C_INK}" font-size="8" text-anchor="end">${isToday() ? 'dnes' : czd(curDate)}</text>
+    </svg>
+    <p class="tiny muted" style="margin:6px 0 0">Teď <b style="color:var(--fg)">${r1(last.v)} g/den</b>,
+      za posledních 14 dní ${smer > 0.3 ? 'stoupl o ' + r1(smer) + ' g' :
+        smer < -0.3 ? 'klesl o ' + r1(-smer) + ' g' : 'se drží'}.
+      Křivka klesá každý den, kdy nepiješ — dělí se vždycky třiceti.</p>`;
+}
+
+/* Denní záznamy — otázka „kdy a kolik", ne „jsem v limitu". */
 function svgAlcBars(days, lim) {
-  const W = 320, H = 104, L = 26;
-  const mx = Math.max(10, lim * 1.6, ...days.map(d => d.g)) * 1.08;
+  const W = 320, H = 92, L = 26;
+  const mx = Math.max(10, ...days.map(d => d.g)) * 1.1;
   const bw = (W - L) / days.length;
   const Y = v => H - (v / mx) * H;
   const bars = days.map((d, i) => {
@@ -2064,27 +2104,23 @@ function svgAlcBars(days, lim) {
     if (d.g <= 0)
       return `<rect x="${r1(x + 1)}" y="${H - 2}" width="${r1(Math.max(1.5, bw - 2))}" height="2" fill="${C_GRID}"/>`;
     const y = Y(d.g), h = Math.max(2, H - y);
-    const col = (lim && d.g > lim) ? C_SUR : C_DEF;
     return `<rect x="${r1(x + 1)}" y="${r1(y)}" width="${r1(Math.max(1.5, bw - 2))}" height="${r1(h)}"
-      rx="2" fill="${col}"><title>${d.d}: ${r1(d.g)} g</title></rect>`;
+      rx="2" fill="${C_DEF}"><title>${d.d}: ${r1(d.g)} g</title></rect>`;
   }).join('');
   const grid = [0, 0.5, 1].map(f => {
     const v = mx * f, y = Y(v);
     return `<line x1="${L}" y1="${r1(y)}" x2="${W}" y2="${r1(y)}" stroke="${C_GRID}" stroke-width="1"/>
       <text x="${L - 4}" y="${r1(y) + 3}" fill="${C_INK}" font-size="8" text-anchor="end">${r0(v)}</text>`;
   }).join('');
-  const limLine = lim ? `<line x1="${L}" y1="${r1(Y(lim))}" x2="${W}" y2="${r1(Y(lim))}"
-      stroke="${C_SUR}" stroke-width="1" stroke-dasharray="4 3"/>
-      <text x="${W}" y="${r1(Y(lim)) - 3}" fill="${C_SUR}" font-size="8" text-anchor="end">limit ø ${r1(lim)} g</text>` : '';
+  const dry = days.filter(d => d.g <= 0).length;
   return `<svg viewBox="0 0 ${W} ${H + 13}" style="width:100%;height:auto;overflow:visible">
-      ${grid}${bars}${limLine}
+      ${grid}${bars}
       <text x="${L}" y="${H + 11}" fill="${C_INK}" font-size="8">${czd(days[0].d)}</text>
       <text x="${W}" y="${H + 11}" fill="${C_INK}" font-size="8" text-anchor="end">${isToday() ? 'dnes' : czd(curDate)}</text>
     </svg>
-    <div class="tiny muted" style="margin-top:6px">
-      <span style="color:${C_DEF}">▬</span> den v limitu ·
-      <span style="color:${C_SUR}">▬</span> nad denním limitem ·
-      <span style="color:${C_GRID}">▬</span> bez alkoholu · svislá osa v gramech</div>`;
+    <p class="tiny muted" style="margin:6px 0 0">Osa v gramech čistého alkoholu ·
+      ${dry} z ${days.length} dnů bez alkoholu.
+      Jednotlivé dny se s limitem neporovnávají, ten platí na průměr.</p>`;
 }
 
 function svgWeight(list, a) {
@@ -2645,6 +2681,14 @@ async function alcStats() {
   const all = await dbAll('log');
   const byDay = {};
   all.forEach(r => { if (r.alc) byDay[r.date] = (byDay[r.date] || 0) + r.alc; });
+  const long = [];
+  {
+    const bs = new Date(curDate + 'T12:00:00');
+    for (let i = 149; i >= 0; i--) {
+      const x = new Date(bs); x.setDate(x.getDate() - i);
+      const k = dstr(x); long.push({ d: k, g: byDay[k] || 0 });
+    }
+  }
   const days = [];
   const base = new Date(curDate + 'T12:00:00');
   for (let i = 29; i >= 0; i--) {
@@ -2676,6 +2720,17 @@ async function alcStats() {
     today: byDay[curDate] || 0,
     avg7: sum(7) / 7, avg30: sum(30) / 30,
     mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
+    long,
+    trend: (() => {
+      const out = [];
+      for (let i = 0; i < long.length; i++) {
+        if (i < 29) { out.push(null); continue; }
+        const win = long.slice(i - 29, i + 1);
+        if (win[0].d < (dates[0] || curDate)) { out.push(null); continue; }
+        out.push(win.reduce((a, x) => a + x.g, 0) / 30);
+      }
+      return out;
+    })(),
     lim: goals.alcDay || 0,
     budget: goals.alcDay ? goals.alcDay * 30 - sum(30) : null,
     allSum, allDays, avgAll: allSum / allDays, first
@@ -2694,6 +2749,7 @@ async function renderAlc() {
     ' (dny bez alkoholu se do průměru počítají)';
   $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : '<p class="tiny muted" style="margin:0">' +
     'Limit není nastavený (Víc → Alkohol).</p>';
+  $('alcTrend').innerHTML = svgAlcTrend(s.long, s.trend, s.lim);
   $('alcChart').innerHTML = svgAlcBars(s.days.slice(-21), s.lim);
   syncAddDate();
   const allLog = await dbAll('log');
