@@ -257,6 +257,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
         onkeydown="if(event.key==='Enter'){clearTimeout(sugT);searchByName();}">
       <button class="btn pri" id="nameBtn" onclick="searchByName()">Hledat</button>
     </div>
+    <p class="tiny muted" style="margin:6px 0 0">Vlastní databáze hledají hned při psaní. Tlačítko
+      <b>Hledat</b> se navíc zeptá Open Food Facts — ten povoluje jen 10 dotazů za minutu.</p>
     <label class="row" style="margin:10px 0 0;gap:8px;align-items:center">
       <input type="checkbox" id="czOnly" style="width:auto" checked>
       <span class="tiny muted">jen české (když nic nenajde, ukážu všechny)</span></label>
@@ -775,7 +777,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-37';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-38';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -841,7 +843,46 @@ let servingAmt = 100;
 let editingId = null;
 
 /* ---------------- boot ---------------- */
+/* ---- hlídač limitu Open Food Facts: 10 dotazů/min/IP, my si necháváme rezervu ---- */
+const OFF_MAX = 6, OFF_WIN = 60000;
+let offHits = [];
+function offLoad() {
+  try { offHits = JSON.parse(localStorage.getItem('offHits') || '[]'); } catch (e) { offHits = []; }
+}
+function offTrim() { const t = Date.now(); offHits = offHits.filter(x => t - x < OFF_WIN); }
+function offSpend() {
+  offTrim(); offHits.push(Date.now());
+  try { localStorage.setItem('offHits', JSON.stringify(offHits)); } catch (e) {}
+}
+/* kolik sekund do uvolnění, nebo 0 když je volno */
+function offWait() {
+  offTrim();
+  if (offHits.length < OFF_MAX) return 0;
+  return Math.max(1, Math.ceil((OFF_WIN - (Date.now() - offHits[0])) / 1000));
+}
+
+/* ---- pamět odpovědí: stejný dotaz do 24 h už na server nejde ---- */
+const OFF_TTL = 864e5;
+function offCacheGet(k) {
+  try {
+    const c = JSON.parse(localStorage.getItem('offCache') || '{}');
+    const e = c[k];
+    if (e && Date.now() - e.t < OFF_TTL) return e.v;
+  } catch (e) {}
+  return null;
+}
+function offCachePut(k, v) {
+  try {
+    const c = JSON.parse(localStorage.getItem('offCache') || '{}');
+    c[k] = { t: Date.now(), v };
+    const ks = Object.keys(c);
+    if (ks.length > 60) ks.sort((a, b) => c[a].t - c[b].t).slice(0, ks.length - 60).forEach(k2 => delete c[k2]);
+    localStorage.setItem('offCache', JSON.stringify(c));
+  } catch (e) {}
+}
+
 (async function init() {
+  offLoad();                               // kolik dotazů na Open Food Facts padlo v poslední minutě
   try { db = await openDB(); } catch (e) { alert('IndexedDB nedostupná: ' + e); return; }
   const g = await dbGet('meta', 'goals');
   const hadDay = !!(g && g.v && Object.prototype.hasOwnProperty.call(g.v, 'alcDay'));
@@ -1170,12 +1211,14 @@ function mapOFF(code, prod) {
 
 /* --- vyhledávání podle názvu: nejdřív moje databáze, pak Open Food Facts --- */
 let sugT = null, sugSeq = 0;
+/* Open Food Facts povoluje 10 dotazů za minutu na IP a výslovně zakazuje našeptávání
+   ("search-as-you-type"). Při psaní proto hledáme jen ve vlastních databázích — offline
+   a bez limitu. Online se ptáme až na stisk tlačítka Hledat. */
 function onNameInput() {
   const q = ($('nameQ').value || '').trim();
   clearTimeout(sugT);
   if (q.length < 2) { $('nameRes').innerHTML = ''; return; }
-  renderLocalMatches(q);                    // moje databáze okamžitě
-  sugT = setTimeout(() => searchByName(true), 700);   // online až po pauze v psaní
+  renderLocalMatches(q);
 }
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 /* shoda po slovech a bez ohledu na pořadí: „slunecnicovy chleb" najde „Chléb slunečnicový" */
@@ -1433,7 +1476,10 @@ async function useZaklad(id) {
 function renderLocalMatches(q) {
   const mine = localMatches(q);
   $('nameRes').innerHTML = (mine.length ? mine.map(p => resCard(p, true)).join('') : '')
-    + '<p class="tiny muted" style="margin:8px 0 0">Píšu dotaz…</p>';
+    + '<p class="tiny muted" style="margin:8px 0 0">' + (mine.length
+      ? 'Z mých databází. Online (Open Food Facts) hledá až tlačítko <b>Hledat</b>.'
+      : 'V mých databázích nic. Zkus tlačítko <b>Hledat</b> (online) nebo zadej ručně.')
+    + '</p>';
 }
 function resCard(p, local) {
   const known = products.some(x => x.id === p.id);
@@ -1457,14 +1503,28 @@ async function searchByName(quiet) {
   const box = $('nameRes');
   const mine = localMatches(q);
   const card = resCard;
-  box.innerHTML = (mine.length ? mine.map(p => card(p, true)).join('') : '')
-    + '<p class="tiny muted" style="margin:8px 0 0">Hledám v Open Food Facts…</p>';
+  const mineHtml0 = mine.map(p => card(p, true)).join('');
+  const cacheKey = q.toLowerCase() + '|' + ($('czOnly').checked ? 'cz' : 'all');
+  const cached = offCacheGet(cacheKey);
+  const waitS = cached ? 0 : offWait();
+  if (waitS) {                              // radši počkat než dostat ban od Open Food Facts
+    box.innerHTML = mineHtml0 +
+      '<p class="tiny" style="margin:8px 0 0;color:var(--warn)">Open Food Facts povoluje jen 10 dotazů za minutu.</p>' +
+      '<p class="tiny muted" style="margin:4px 0 0">Zkus to za ' + waitS + ' s — jinak hrozí dočasné zablokování.</p>' +
+      '<button class="btn sm full" style="margin-top:8px" onclick="openEdit(null)">Zadat ručně</button>';
+    return;
+  }
+  box.innerHTML = mineHtml0
+    + '<p class="tiny muted" style="margin:8px 0 0">' + (cached ? 'Beru z paměti…' : 'Hledám v Open Food Facts…') + '</p>';
   if (searchCtrl) searchCtrl.abort();      // zruš dotaz, který ještě běží
   const myCtrl = new AbortController();
   searchCtrl = myCtrl;
   let res = null, errTxt = '', errEmpty = false;
-  try { res = await searchOFF(q, $('czOnly').checked, myCtrl.signal); }
-  catch (e) { if (e.aborted) return; errTxt = e.message || 'neznámá chyba'; errEmpty = !!e.empty; }
+  if (cached) res = cached;
+  else {
+    try { res = await searchOFF(q, $('czOnly').checked, myCtrl.signal); if (res) offCachePut(cacheKey, res); }
+    catch (e) { if (e.aborted) return; errTxt = e.message || 'neznámá chyba'; errEmpty = !!e.empty; }
+  }
   if (seq !== sugSeq) return;              // mezitím přišel novější dotaz
   if (searchCtrl === myCtrl) searchCtrl = null;
   const mineHtml = mine.map(p => card(p, true)).join('');
@@ -1473,8 +1533,14 @@ async function searchByName(quiet) {
       (errEmpty
         ? '<p class="tiny muted" style="margin:8px 0 0">Online nic použitelného. Podrobně: ' + esc(errTxt) + '</p>'
         : '<p class="tiny" style="margin:8px 0 0;color:var(--warn)">Online vyhledávání selhalo.</p>' +
-          '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) + '</p>') +
+          '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) + '</p>' +
+          (/Failed to fetch|síť/i.test(errTxt)
+            ? '<p class="tiny muted" style="margin:6px 0 0">„Failed to fetch" znamená, že odpověď vůbec nedorazila. ' +
+              'Nejčastěji: Open Food Facts dočasně zablokoval tvou IP za příliš mnoho dotazů (limit je 10/min, ' +
+              'blok sám odpadá do hodiny), případně blokuje spojení síť, VPN nebo blokátor reklam.</p>'
+            : '')) +
       '<button class="btn sm full" style="margin-top:8px" onclick="searchByName()">Zkusit znovu</button>' +
+      '<button class="btn sm full" style="margin-top:6px" onclick="offDiag()">Otestovat spojení</button>' +
       '<button class="btn sm full" style="margin-top:6px" onclick="openEdit(null)">Zadat ručně</button>';
     return;
   }
@@ -1485,7 +1551,35 @@ async function searchByName(quiet) {
       : '<p class="tiny muted" style="margin:8px 0 0">Online nic dalšího. Zkus jiné slovo nebo zadej ručně.</p>')
     + (res.note ? '<p class="tiny muted" style="margin:8px 0 0">' + res.note + '</p>' : '')
     + '<p class="tiny" style="margin:8px 0 0;color:var(--dim2)">z databází ' + mine.length +
-      ' · online ' + res.items.length + '</p>';
+      ' · online ' + res.items.length + (cached ? ' (z paměti)' : '') +
+      ' · zbývá dotazů: ' + Math.max(0, OFF_MAX - offHits.length) + '/' + OFF_MAX + '</p>';
+}
+/* Test spojení: každý endpoint zvlášť, ať je vidět, co přesně je rozbité.
+   Čárový kód má vlastní limit (15/min), vyhledávání 10/min — když projde kód a ne hledání,
+   je to vyčerpaný limit hledání, ne výpadek sítě. */
+async function offDiag() {
+  const box = $('nameRes');
+  box.innerHTML = '<p class="tiny muted">Testuji spojení…</p>';
+  const out = [];
+  const one = async (label, url) => {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const ms = Date.now() - t0;
+      out.push((r.ok ? '✓ ' : '✕ ') + label + ': HTTP ' + r.status + ' (' + ms + ' ms)');
+    } catch (e) {
+      out.push('✕ ' + label + ': ' + (e.message || 'nedorazilo') + ' (' + (Date.now() - t0) + ' ms)');
+    }
+    box.innerHTML = '<p class="tiny" style="white-space:pre-line">' + esc(out.join('\n')) + '</p>';
+  };
+  out.push(navigator.onLine ? '✓ telefon hlásí připojení' : '✕ telefon hlásí, že je offline');
+  await one('čárový kód (api/v2)', 'https://world.openfoodfacts.org/api/v2/product/3017624010701.json?fields=code&nosw=1');
+  await one('nové hledání', 'https://search.openfoodfacts.org/search?q=nutella&page_size=1');
+  await one('starší hledání', 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=nutella&search_simple=1&action=process&json=1&page_size=1');
+  offSpend(); offSpend();
+  box.innerHTML += '<p class="tiny muted" style="margin:8px 0 0">Zbývá dotazů v této minutě: ' +
+    Math.max(0, OFF_MAX - offHits.length) + '</p>' +
+    '<button class="btn sm full" style="margin-top:8px" onclick="searchByName()">Zpět na hledání</button>';
 }
 let lastFound = {};
 async function useFound(id) {
@@ -1536,14 +1630,12 @@ async function searchOFF(q, czOnly, signal) {
   const problems = [];
   let raw = null, via = '';
 
-  // jeden opakovaný pokus — server občas odmítne rychlý sled dotazů
-  const tryTwice = async (url) => {
-    try { return await getJson(url, 12000, signal); }
-    catch (e) {
-      if (e.aborted) throw e;
-      await new Promise(r => setTimeout(r, 600));
-      return await getJson(url, 12000, signal);
-    }
+  /* Každý odchozí dotaz se počítá do limitu 10/min. Automatické opakování jsme zrušili —
+     jen by limit vyčerpalo dvakrát rychleji. Opakuje uživatel tlačítkem. */
+  const ask = async (url) => {
+    if (offWait()) { const e = new Error('limit dotazů vyčerpán'); e.limited = true; throw e; }
+    offSpend();
+    return await getJson(url, 12000, signal);
   };
 
   // online index hledá celá slova; "schin" nenajde nic. Proto druhý pokus s hvězdičkou.
@@ -1556,7 +1648,7 @@ async function searchOFF(q, czOnly, signal) {
   const attempt = async (query, full) => {
     const u = 'https://search.openfoodfacts.org/search?q=' + encodeURIComponent(query) +
       '&page_size=25' + (full ? '' : '&fields=' + encodeURIComponent(FLD));
-    const j = await tryTwice(u);
+    const j = await ask(u);
     const hits = (j.hits || j.products || j.results || []).map(h => h._source || h);
     const mapped = hits.map(pr => mapOFFSearch(pr)).filter(Boolean);
     return { hits, items: mapped.filter(x => x.hasE) };
@@ -1566,8 +1658,10 @@ async function searchOFF(q, czOnly, signal) {
   const attemptPair = async (query) => {
     const a = await attempt(query, false);
     if (a.items.length || !a.hits.length) return a;
-    const b = await attempt(query, true);          // podezření: server neposlal nutriments
-    return b.items.length ? b : a;
+    try {
+      const b = await attempt(query, true);        // podezření: server neposlal nutriments
+      return b.items.length ? b : a;
+    } catch (e) { if (e.aborted) throw e; return a; }   // došel limit — beru, co mám
   };
 
   try {
@@ -1591,7 +1685,7 @@ async function searchOFF(q, czOnly, signal) {
         search_terms: q, search_simple: '1', action: 'process', json: '1',
         page_size: '25', fields: FLD
       });
-      const j = await tryTwice('https://world.openfoodfacts.org/cgi/search.pl?' + par.toString());
+      const j = await ask('https://world.openfoodfacts.org/cgi/search.pl?' + par.toString());
       const hits = j.products || [];
       const good = hits.map(pr => mapOFFSearch(pr)).filter(x => x && x.hasE);
       if (good.length) { raw = good; via = 'legacy'; gotHits = hits.length; dropped = hits.length - good.length; }
