@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12151a">
+<title>Kalorie</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2312151a'/%3E%3Cg fill='%23e8ecf3'%3E%3Crect x='6' y='9' width='2' height='14'/%3E%3Crect x='10' y='9' width='1' height='14'/%3E%3Crect x='13' y='9' width='3' height='14' fill='%234ea3ff'/%3E%3Crect x='18' y='9' width='1' height='14'/%3E%3Crect x='21' y='9' width='2' height='14'/%3E%3Crect x='25' y='9' width='1' height='14'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#12151a; --card:#1b1f27; --card2:#232936; --line:#2e3542;
+  --fg:#e8ecf3; --dim:#8b95a7; --acc:#4ea3ff; --ok:#3fbf7f; --warn:#f0a742; --bad:#e2564d;
+  --mp:#6ea8ff; --mc:#f0a742; --mf:#e2564d;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+h1,h2,h3{margin:0 0 8px;font-weight:600}
+h2{font-size:17px}h3{font-size:14px;color:var(--dim);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select{font:inherit;color:var(--fg);background:var(--card2);border:1px solid var(--line);
+  border-radius:10px;padding:11px 12px;width:100%}
+input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
+.wrap{padding:14px 14px 24px;max-width:640px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center}
+.row.wrap2{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.btn{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 14px;
+  font-weight:600;text-align:center;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{transform:scale(.98)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#04121f}
+.btn.dan{background:transparent;border-color:#4a2b2b;color:var(--bad)}
+.btn.sm{padding:7px 10px;font-size:13px;font-weight:500}
+.btn.full{width:100%}
+.muted{color:var(--dim)}
+.tiny{font-size:12px}
+.mono{font-variant-numeric:tabular-nums}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#161a21;
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:40}
+nav button{flex:1;padding:9px 0 10px;font-size:11px;color:var(--dim);display:flex;
+  flex-direction:column;align-items:center;gap:3px}
+nav button.on{color:var(--acc)}
+nav svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.page{display:none}.page.on{display:block}
+/* totals */
+.tot{display:flex;align-items:center;gap:14px}
+.ring{position:relative;width:88px;height:88px;flex:0 0 88px}
+.ring svg{transform:rotate(-90deg)}
+.ring .lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .lbl b{font-size:19px;line-height:1}
+.bars{flex:1;display:flex;flex-direction:column;gap:7px}
+.bar .t{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.bar .track{height:6px;background:var(--card2);border-radius:4px;overflow:hidden}
+.bar .fill{height:100%;border-radius:4px;transition:width .25s}
+/* list */
+.item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:none}
+.item .nm{font-weight:500}
+.item .sub{font-size:12px;color:var(--dim)}
+.item .kc{font-weight:600;text-align:right;white-space:nowrap}
+.pill{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;
+  background:var(--card2);border:1px solid var(--line);color:var(--dim)}
+.pill.off{color:var(--ok);border-color:#26483a}
+.pill.man{color:var(--warn);border-color:#4a3a20}
+/* scanner */
+#scanBox{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:4/3}
+#video{width:100%;height:100%;object-fit:cover;display:block}
+.reticle{position:absolute;inset:18% 8%;border:2px solid rgba(78,163,255,.9);border-radius:12px;
+  box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
+.scanmsg{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:13px;
+  color:#fff;text-shadow:0 1px 3px #000}
+/* modal */
+.mod{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;z-index:60}
+.mod.on{display:flex}
+.sheet{background:var(--card);width:100%;max-width:640px;margin:0 auto;border-radius:16px 16px 0 0;
+  padding:16px 14px calc(18px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
+.fld{margin-bottom:10px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;background:#2a3140;
+  border:1px solid var(--line);padding:10px 16px;border-radius:20px;z-index:80;opacity:0;
+  transition:opacity .2s;pointer-events:none;font-size:14px}
+#toast.on{opacity:1}
+.hr{height:1px;background:var(--line);margin:12px 0}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<!-- ============ DNES ============ -->
+<section id="p-day" class="page on">
+  <div class="row" style="margin-bottom:10px">
+    <button class="btn sm" onclick="shiftDay(-1)">‹</button>
+    <div class="grow" style="text-align:center"><b id="dayLabel"></b></div>
+    <button class="btn sm" onclick="shiftDay(1)">›</button>
+  </div>
+
+  <div class="card">
+    <div class="tot">
+      <div class="ring">
+        <svg width="88" height="88" viewBox="0 0 88 88">
+          <circle cx="44" cy="44" r="38" stroke="#232936" stroke-width="9" fill="none"/>
+          <circle id="ringArc" cx="44" cy="44" r="38" stroke="var(--acc)" stroke-width="9"
+                  fill="none" stroke-linecap="round" stroke-dasharray="238.8" stroke-dashoffset="238.8"/>
+        </svg>
+        <div class="lbl"><b id="kcalNow" class="mono">0</b><span class="tiny muted" id="kcalGoal">/ 0</span></div>
+      </div>
+      <div class="bars">
+        <div class="bar"><div class="t"><span>Bílkoviny</span><span class="mono" id="pTxt">0 g</span></div>
+          <div class="track"><div class="fill" id="pBar" style="background:#6ea8ff;width:0"></div></div></div>
+        <div class="bar"><div class="t"><span>Sacharidy</span><span class="mono" id="cTxt">0 g</span></div>
+          <div class="track"><div class="fill" id="cBar" style="background:#f0a742;width:0"></div></div></div>
+        <div class="bar"><div class="t"><span>Tuky</span><span class="mono" id="fTxt">0 g</span></div>
+          <div class="track"><div class="fill" id="fBar" style="background:#e2564d;width:0"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Záznam dne</h3>
+    <div id="logList"><p class="muted tiny">Zatím nic. Naskenuj kód nebo přidej z databáze.</p></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h3 style="margin:0">Alkohol</h3>
+      <button class="btn sm" onclick="openAlcOverview()">Přehled</button>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <span><b class="mono" id="alcToday" style="font-size:19px">0</b> <span class="tiny muted">g čistého alk. dnes</span></span>
+      <span class="tiny mono" id="alcWeek"></span>
+    </div>
+    <div id="drinkBtns" class="row wrap2" style="margin-bottom:8px"></div>
+    <button class="btn sm full" onclick="openCustomDrink()">+ Jiný nápoj</button>
+  </div>
+
+  <div class="card">
+    <h3>Časté</h3>
+    <div id="favList" class="row wrap2"></div>
+  </div>
+</section>
+
+<!-- ============ SKENOVAT ============ -->
+<section id="p-scan" class="page">
+  <div class="card">
+    <div id="scanBox">
+      <video id="video" playsinline muted></video>
+      <div class="reticle"></div>
+      <div class="scanmsg" id="scanMsg">Kamera vypnutá</div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn pri grow" id="camBtn" onclick="toggleCam()">Spustit kameru</button>
+      <button class="btn" id="torchBtn" onclick="toggleTorch()" style="display:none">Světlo</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Ruční zadání kódu</h3>
+    <div class="row">
+      <input class="grow mono" id="manualCode" inputmode="numeric" placeholder="8594001020304">
+      <button class="btn pri" onclick="lookup(document.getElementById('manualCode').value.trim())">Hledat</button>
+    </div>
+    <p class="tiny muted" style="margin:8px 0 0">Číslice pod čárovým kódem. Funguje i bez kamery.</p>
+  </div>
+
+  <div class="card">
+    <h3>Bez čárového kódu</h3>
+    <button class="btn full" onclick="openEdit(null)">+ Zadat potravinu ručně</button>
+  </div>
+</section>
+
+<!-- ============ FOTO ============ -->
+<section id="p-photo" class="page">
+  <div class="card">
+    <h3>1 · Vyfoť jídlo</h3>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn pri grow" onclick="document.getElementById('camFile').click()">📷 Vyfotit</button>
+      <button class="btn grow" onclick="document.getElementById('galFile').click()">Z galerie</button>
+    </div>
+    <input type="file" id="camFile" accept="image/*" capture="environment" style="display:none" onchange="gotPhoto(this)">
+    <input type="file" id="galFile" accept="image/*" style="display:none" onchange="gotPhoto(this)">
+    <img id="photoPrev" style="display:none;width:100%;border-radius:12px;margin-bottom:10px">
+    <p class="tiny muted" style="margin:0">Vyfoť talíř shora nebo pod úhlem 45°. Pomůže, když je vedle
+      něco na měřítko — příbor, sklenice, ruka.</p>
+  </div>
+
+  <div class="card">
+    <h3>2 · Pošli to Claudeovi</h3>
+    <button class="btn pri full" id="shareBtn" style="margin-bottom:8px" onclick="shareToClaude()">Odeslat fotku do Claude</button>
+    <button class="btn full" onclick="copyPrompt()">Zkopírovat jen zadání</button>
+    <p class="tiny muted" style="margin:8px 0 0">Otevře se nabídka sdílení — vyber Claude. Fotka i zadání
+      se pošlou naráz. Claude odpoví blokem, který zkopíruješ dolů.</p>
+  </div>
+
+  <div class="card">
+    <h3>3 · Vlož odpověď</h3>
+    <textarea id="aiIn" rows="4" placeholder='Sem vlož odpověď z chatu (celou, i s textem okolo)'
+      style="width:100%;font:13px/1.4 ui-monospace,monospace;color:var(--fg);background:var(--card2);
+      border:1px solid var(--line);border-radius:10px;padding:11px"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="btn pri grow" onclick="processAI()">Zpracovat</button>
+      <button class="btn" onclick="pasteAI()">Vložit ze schránky</button>
+    </div>
+  </div>
+
+  <div class="card" id="aiCard" style="display:none">
+    <h3>4 · Zkontroluj a uprav</h3>
+    <div id="aiList"></div>
+    <p class="tiny muted" id="aiNote" style="margin:10px 0 0"></p>
+    <div class="hr"></div>
+    <div class="row" style="justify-content:space-between;margin-bottom:4px">
+      <b>Celkem</b><b class="mono" id="aiTotK">0 kcal</b>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <span class="muted tiny">B / S / T</span><span class="mono" id="aiTotM">0 / 0 / 0 g</span>
+    </div>
+    <div class="fld"><label>Název jídla</label><input id="aiName" placeholder="Kuřecí s rýží"></div>
+    <button class="btn pri full" style="margin-bottom:8px" onclick="aiSave(false)">Přidat do dneška</button>
+    <button class="btn full" onclick="aiSave(true)">Přidat + uložit jako recept</button>
+    <p class="tiny muted" style="margin:8px 0 0">Recept se uloží do databáze jako jedna položka —
+      příště ho přidáš jedním klepnutím bez focení.</p>
+  </div>
+</section>
+
+<!-- ============ DATABÁZE ============ -->
+<section id="p-db" class="page">
+  <div class="card">
+    <input id="dbSearch" placeholder="Hledat v mé databázi…" oninput="renderDb()">
+    <p class="tiny muted" style="margin:8px 0 0" id="dbCount"></p>
+  </div>
+  <div class="card"><div id="dbList"></div></div>
+</section>
+
+<!-- ============ NASTAVENÍ ============ -->
+<section id="p-set" class="page">
+  <div class="card">
+    <h3>Denní cíle</h3>
+    <div class="fld"><label>Energie (kcal)</label><input id="gKcal" type="number" inputmode="numeric"></div>
+    <div class="grid2">
+      <div class="fld"><label>Bílkoviny (g)</label><input id="gP" type="number" inputmode="numeric"></div>
+      <div class="fld"><label>Sacharidy (g)</label><input id="gC" type="number" inputmode="numeric"></div>
+    </div>
+    <div class="fld"><label>Tuky (g)</label><input id="gF" type="number" inputmode="numeric"></div>
+    <button class="btn pri full" onclick="saveGoals()">Uložit cíle</button>
+  </div>
+
+  <div class="card">
+    <h3>Alkohol</h3>
+    <div class="fld"><label>Týdenní limit (g čistého alkoholu, 0 = vypnuto)</label>
+      <input id="gAlc" type="number" inputmode="numeric"></div>
+    <button class="btn pri full" style="margin-bottom:12px" onclick="saveGoals()">Uložit limit</button>
+    <h3>Přednastavené nápoje</h3>
+    <div id="drinkEdit"></div>
+    <button class="btn sm full" style="margin-top:8px" onclick="addDrinkDef()">+ Přidat nápoj</button>
+    <p class="tiny muted" style="margin:8px 0 0">Sloupce: objem (ml) · obsah alkoholu (%) · sacharidy (g/100 ml).
+      U destilátů nech sacharidy 0.</p>
+  </div>
+
+  <div class="card">
+    <h3>Data</h3>
+    <button class="btn full" style="margin-bottom:8px" onclick="exportData()">Export zálohy (JSON)</button>
+    <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('impFile').click()">Import zálohy</button>
+    <input type="file" id="impFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
+    <button class="btn full" style="margin-bottom:8px" onclick="exportCsv()">Export deníku (CSV)</button>
+    <p class="tiny muted" style="margin:8px 0 0">Všechna data jsou jen v tomhle telefonu. Zálohuj si je občas.</p>
+    <div class="hr"></div>
+    <button class="btn dan full" onclick="wipe()">Smazat všechna data</button>
+  </div>
+
+  <div class="card">
+    <h3>Info</h3>
+    <p class="tiny muted" id="infoTxt"></p>
+  </div>
+</section>
+
+</div>
+
+<nav>
+  <button class="on" data-p="day" onclick="go('day')">
+    <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Dnes</button>
+  <button data-p="scan" onclick="go('scan')">
+    <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M11 8v8M15 8v8"/></svg>Skenovat</button>
+  <button data-p="photo" onclick="go('photo')">
+    <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Foto</button>
+  <button data-p="db" onclick="go('db')">
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Databáze</button>
+  <button data-p="set" onclick="go('set')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Nastavení</button>
+</nav>
+
+<!-- portion sheet -->
+<div class="mod" id="modPortion" onclick="if(event.target===this)closeMod('modPortion')">
+  <div class="sheet">
+    <h2 id="poName">—</h2>
+    <p class="tiny muted" id="poSub" style="margin:-4px 0 12px"></p>
+    <div class="fld">
+      <label>Množství (<span id="poUnit">g</span>)</label>
+      <input id="poAmt" type="number" inputmode="decimal" value="100" oninput="calcPortion()">
+    </div>
+    <div class="grid4" style="margin-bottom:12px">
+      <button class="btn sm" onclick="setAmt(30)">30</button>
+      <button class="btn sm" onclick="setAmt(50)">50</button>
+      <button class="btn sm" onclick="setAmt(100)">100</button>
+      <button class="btn sm" id="poServ" onclick="setAmt(servingAmt)">porce</button>
+    </div>
+    <div class="card" style="margin-bottom:12px;background:var(--card2)">
+      <div class="row" style="justify-content:space-between"><span class="muted tiny">Energie</span><b class="mono" id="poK">0 kcal</b></div>
+      <div class="row" style="justify-content:space-between"><span class="muted tiny">B / S / T</span><b class="mono" id="poM">0 / 0 / 0 g</b></div>
+    </div>
+    <div class="row">
+      <button class="btn grow" onclick="closeMod('modPortion')">Zrušit</button>
+      <button class="btn pri grow" onclick="addPortion()">Přidat</button>
+    </div>
+    <button class="btn sm full" style="margin-top:10px" onclick="editCurrent()">Upravit potravinu</button>
+  </div>
+</div>
+
+<!-- edit sheet -->
+<div class="mod" id="modEdit" onclick="if(event.target===this)closeMod('modEdit')">
+  <div class="sheet">
+    <h2 id="edTitle">Nová potravina</h2>
+    <div class="fld"><label>Název</label><input id="edName" placeholder="např. Tvaroh polotučný"></div>
+    <div class="grid2">
+      <div class="fld"><label>Značka</label><input id="edBrand" placeholder="Albert"></div>
+      <div class="fld"><label>Čárový kód</label><input id="edCode" class="mono" inputmode="numeric"></div>
+    </div>
+    <div class="card" style="background:var(--card2);margin-bottom:12px">
+      <h3 style="margin-bottom:8px">Vyplnit z fotky etikety</h3>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn sm grow" onclick="document.getElementById('labFile').click()">📷 Vyfotit tabulku</button>
+        <button class="btn sm grow pri" id="labShare" onclick="shareLabel()">Poslat Claudeovi</button>
+      </div>
+      <input type="file" id="labFile" accept="image/*" capture="environment" style="display:none" onchange="gotLabel(this)">
+      <img id="labPrev" style="display:none;width:100%;border-radius:10px;margin-bottom:8px">
+      <div class="row">
+        <input id="labIn" class="grow" placeholder="Vlož sem odpověď" style="font-size:13px">
+        <button class="btn sm" onclick="pasteLabel()">📋</button>
+        <button class="btn sm pri" onclick="processLabel()">OK</button>
+      </div>
+      <p class="tiny muted" style="margin:8px 0 0">Vyfoť tabulku „Výživové údaje" na zadní straně obalu.
+        Čtu z ní přesná čísla, ne odhad.</p>
+    </div>
+    <p class="tiny muted" style="margin:2px 0 10px">Hodnoty na 100 <span id="edUnitTxt">g</span> podle etikety:</p>
+    <div class="grid2">
+      <div class="fld"><label>Energie (kcal)</label><input id="edKcal" type="number" inputmode="decimal"></div>
+      <div class="fld"><label>Bílkoviny (g)</label><input id="edP" type="number" inputmode="decimal"></div>
+      <div class="fld"><label>Sacharidy (g)</label><input id="edC" type="number" inputmode="decimal"></div>
+      <div class="fld"><label>Tuky (g)</label><input id="edF" type="number" inputmode="decimal"></div>
+      <div class="fld"><label>Vláknina (g)</label><input id="edFib" type="number" inputmode="decimal"></div>
+      <div class="fld"><label>Sůl (g)</label><input id="edSalt" type="number" inputmode="decimal"></div>
+    </div>
+    <div class="grid2">
+      <div class="fld"><label>Jednotka</label><select id="edUnit" onchange="document.getElementById('edUnitTxt').textContent=this.value">
+        <option value="g">g</option><option value="ml">ml</option></select></div>
+      <div class="fld"><label>Porce (<span class="edu">g</span>)</label><input id="edServ" type="number" inputmode="decimal" placeholder="volitelné"></div>
+    </div>
+    <div class="row">
+      <button class="btn grow" onclick="closeMod('modEdit')">Zrušit</button>
+      <button class="btn pri grow" onclick="saveProduct()">Uložit</button>
+    </div>
+    <button class="btn dan sm full" id="edDel" style="margin-top:10px" onclick="deleteProduct()">Smazat z databáze</button>
+  </div>
+</div>
+
+<!-- alcohol overview -->
+<div class="mod" id="modAlc" onclick="if(event.target===this)closeMod('modAlc')">
+  <div class="sheet">
+    <h2>Alkohol — přehled</h2>
+    <div class="row" style="gap:10px;margin:10px 0 14px">
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+        <div class="tiny muted">7 dní</div><b class="mono" id="alc7" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+        <div class="tiny muted">30 dní</div><b class="mono" id="alc30" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+        <div class="tiny muted">dní bez</div><b class="mono" id="alcDry" style="font-size:20px">0</b><div class="tiny muted">/30</div></div>
+    </div>
+    <div id="alcLimitBar"></div>
+    <h3 style="margin-top:14px">Posledních 21 dní</h3>
+    <div id="alcChart" style="display:flex;align-items:flex-end;gap:3px;height:110px;margin:8px 0 4px"></div>
+    <div class="row" style="justify-content:space-between"><span class="tiny muted" id="alcFrom"></span><span class="tiny muted">dnes</span></div>
+    <h3 style="margin-top:16px">Dnešní záznamy</h3>
+    <div id="alcList"></div>
+    <button class="btn full" style="margin-top:12px" onclick="closeMod('modAlc')">Zavřít</button>
+  </div>
+</div>
+
+<!-- custom drink -->
+<div class="mod" id="modDrink" onclick="if(event.target===this)closeMod('modDrink')">
+  <div class="sheet">
+    <h2>Jiný nápoj</h2>
+    <div class="fld"><label>Název</label><input id="dkName" placeholder="např. Gin s tonikem"></div>
+    <div class="grid2">
+      <div class="fld"><label>Objem (ml)</label><input id="dkMl" type="number" inputmode="decimal" value="200" oninput="calcDrink()"></div>
+      <div class="fld"><label>Alkohol (% obj.)</label><input id="dkAbv" type="number" inputmode="decimal" value="12" oninput="calcDrink()"></div>
+    </div>
+    <div class="fld"><label>Sacharidy (g / 100 ml) — u destilátů 0</label>
+      <input id="dkC" type="number" inputmode="decimal" value="0" oninput="calcDrink()"></div>
+    <div class="card" style="background:var(--card2);margin-bottom:12px">
+      <div class="row" style="justify-content:space-between"><span class="muted tiny">Čistý alkohol</span><b class="mono" id="dkAlc">0 g</b></div>
+      <div class="row" style="justify-content:space-between"><span class="muted tiny">Energie</span><b class="mono" id="dkK">0 kcal</b></div>
+    </div>
+    <div class="row">
+      <button class="btn grow" onclick="closeMod('modDrink')">Zrušit</button>
+      <button class="btn pri grow" onclick="addCustomDrink(false)">Zapsat</button>
+    </div>
+    <button class="btn sm full" style="margin-top:10px" onclick="addCustomDrink(true)">Zapsat a uložit mezi tlačítka</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ---------------- utils ---------------- */
+const $ = id => document.getElementById(id);
+const n = v => { const x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? x : 0; };
+const r0 = v => Math.round(v);
+const r1 = v => Math.round(v * 10) / 10;
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 2200);
+}
+function dstr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+const DAYS = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
+
+/* ---------------- IndexedDB ---------------- */
+let db = null;
+function openDB() {
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open('kaltrack', 1);
+    rq.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('products')) {
+        const s = d.createObjectStore('products', { keyPath: 'id' });
+        s.createIndex('name', 'name');
+      }
+      if (!d.objectStoreNames.contains('log')) {
+        const s = d.createObjectStore('log', { keyPath: 'id', autoIncrement: true });
+        s.createIndex('date', 'date');
+      }
+      if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'k' });
+    };
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  });
+}
+function tx(store, mode) { return db.transaction(store, mode).objectStore(store); }
+function req(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+const dbGet = (s, k) => req(tx(s, 'readonly').get(k));
+const dbAll = s => req(tx(s, 'readonly').getAll());
+const dbPut = (s, v) => req(tx(s, 'readwrite').put(v));
+const dbDel = (s, k) => req(tx(s, 'readwrite').delete(k));
+const dbByIdx = (s, i, v) => req(tx(s, 'readonly').index(i).getAll(v));
+
+/* ---------------- state ---------------- */
+let products = [];            // cache
+let goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0 };
+let curDate = dstr(new Date());
+let curProduct = null;        // product open in portion sheet
+let servingAmt = 100;
+let editingId = null;
+
+/* ---------------- boot ---------------- */
+(async function init() {
+  try { db = await openDB(); } catch (e) { alert('IndexedDB nedostupná: ' + e); return; }
+  const g = await dbGet('meta', 'goals');
+  if (g && g.v) goals = Object.assign(goals, g.v);
+  const dk = await dbGet('meta', 'drinks');
+  if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
+  products = await dbAll('products');
+  fillGoals();
+  renderDrinkBtns(); renderDrinkEdit();
+  await renderDay();
+  renderDb();
+  info();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+
+function info() {
+  const bd = ('BarcodeDetector' in window) ? 'nativní BarcodeDetector' : 'ZXing (záložní)';
+  $('infoTxt').innerHTML = 'Skener: ' + bd + '<br>Produktů v databázi: ' + products.length +
+    '<br>Zdroj online dat: Open Food Facts<br>Data se nikam neodesílají kromě dotazu na čárový kód.';
+}
+
+/* ---------------- navigation ---------------- */
+function go(p) {
+  document.querySelectorAll('.page').forEach(e => e.classList.remove('on'));
+  $('p-' + p).classList.add('on');
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  if (p !== 'scan') stopCam();
+  if (p === 'db') renderDb();
+  window.scrollTo(0, 0);
+}
+function closeMod(id) { $(id).classList.remove('on'); }
+
+/* ---------------- day view ---------------- */
+function shiftDay(d) {
+  const x = new Date(curDate + 'T12:00:00');
+  x.setDate(x.getDate() + d);
+  curDate = dstr(x);
+  renderDay();
+}
+async function renderDay() {
+  const today = dstr(new Date());
+  const d = new Date(curDate + 'T12:00:00');
+  $('dayLabel').textContent = curDate === today ? 'Dnes' :
+    (DAYS[d.getDay()] + ' ' + d.getDate() + '. ' + (d.getMonth() + 1) + '.');
+
+  const rows = await dbByIdx('log', 'date', curDate);
+  const t = rows.reduce((a, r) => ({ k: a.k + r.kcal, p: a.p + r.p, c: a.c + r.c, f: a.f + r.f }),
+    { k: 0, p: 0, c: 0, f: 0 });
+
+  $('kcalNow').textContent = r0(t.k);
+  $('kcalGoal').textContent = '/ ' + goals.kcal;
+  const frac = Math.min(1, goals.kcal ? t.k / goals.kcal : 0);
+  const C = 2 * Math.PI * 38;
+  $('ringArc').setAttribute('stroke-dashoffset', String(C * (1 - frac)));
+  $('ringArc').setAttribute('stroke', t.k > goals.kcal ? 'var(--bad)' : 'var(--acc)');
+  $('ringArc').style.opacity = frac > 0.004 ? '1' : '0';
+
+  const set = (txt, bar, val, goal) => {
+    $(txt).textContent = r0(val) + ' / ' + goal + ' g';
+    $(bar).style.width = Math.min(100, goal ? val / goal * 100 : 0) + '%';
+  };
+  set('pTxt', 'pBar', t.p, goals.p);
+  set('cTxt', 'cBar', t.c, goals.c);
+  set('fTxt', 'fBar', t.f, goals.f);
+
+  $('logList').innerHTML = rows.length ? rows.slice().reverse().map(r => `
+    <div class="item">
+      <div class="grow">
+        <div class="nm">${esc(r.name)}</div>
+        <div class="sub">${r.alc
+          ? r0(r.amount) + ' ml · ' + r1(r.abv || 0) + ' % · <b style="color:var(--warn)">' + r1(r.alc) + ' g alk.</b>'
+          : r1(r.amount) + ' ' + esc(r.unit || 'g') + ' · B ' + r1(r.p) + ' · S ' + r1(r.c) + ' · T ' + r1(r.f)}</div>
+      </div>
+      <div class="kc">${r0(r.kcal)}<span class="tiny muted"> kcal</span></div>
+      <button class="btn sm dan" onclick="delLog(${r.id})">✕</button>
+    </div>`).join('')
+    : '<p class="muted tiny">Zatím nic. Naskenuj kód nebo přidej z databáze.</p>';
+
+  // alkohol: dnes + posledních 7 dní
+  const wStart = new Date(curDate + 'T12:00:00'); wStart.setDate(wStart.getDate() - 6);
+  const wKey = dstr(wStart);
+  const allLog = await dbAll('log');
+  const alcToday = rows.reduce((a, r) => a + (r.alc || 0), 0);
+  const alcWeek = allLog.reduce((a, r) => a + ((r.alc && r.date >= wKey && r.date <= curDate) ? r.alc : 0), 0);
+  $('alcToday').textContent = r1(alcToday);
+  $('alcWeek').textContent = goals.alc
+    ? '7 dní: ' + r0(alcWeek) + ' / ' + goals.alc + ' g'
+    : '7 dní: ' + r0(alcWeek) + ' g';
+  $('alcWeek').style.color = (goals.alc && alcWeek > goals.alc) ? 'var(--bad)' : 'var(--dim)';
+
+  const favs = products.slice().sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).filter(p => p.uses);
+  $('favList').innerHTML = favs.length ? favs.map(p =>
+    `<button class="btn sm" onclick="openPortion('${p.id}')">${esc(p.name)}</button>`).join('')
+    : '<span class="tiny muted">Nejpoužívanější položky se objeví tady.</span>';
+}
+async function delLog(id) { await dbDel('log', id); renderDay(); }
+
+/* ---------------- database view ---------------- */
+function renderDb() {
+  const q = ($('dbSearch').value || '').trim().toLowerCase();
+  const list = products
+    .filter(p => !q || (p.name + ' ' + (p.brand || '') + ' ' + (p.barcode || '')).toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  $('dbCount').textContent = products.length + ' položek v databázi' + (q ? ' · nalezeno ' + list.length : '');
+  $('dbList').innerHTML = list.length ? list.map(p => `
+    <div class="item">
+      <div class="grow" onclick="openPortion('${p.id}')">
+        <div class="nm">${esc(p.name)}</div>
+        <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100${esc(p.unit)}
+          <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : 'ručně')}</span></div>
+      </div>
+      <button class="btn sm" onclick="openEdit('${p.id}')">✎</button>
+    </div>`).join('')
+    : '<p class="muted tiny">Nic tu není. Naskenuj první produkt.</p>';
+}
+
+/* ---------------- lookup ---------------- */
+async function lookup(code) {
+  code = String(code || '').replace(/\D/g, '');
+  if (code.length < 6) { toast('Neplatný kód'); return; }
+  const local = products.find(p => p.barcode === code);
+  if (local) { openPortion(local.id); return; }
+  toast('Hledám v Open Food Facts…');
+  let p = null;
+  try { p = await fetchOFF(code); } catch (e) { /* offline */ }
+  if (p) {
+    await dbPut('products', p);
+    products.push(p);
+    toast('Nalezeno: ' + p.name);
+    openPortion(p.id);
+  } else {
+    toast('Nenalezeno – zadej z etikety');
+    openEdit(null, code);
+  }
+}
+
+async function fetchOFF(code) {
+  const f = 'product_name,product_name_cs,brands,quantity,serving_quantity,serving_size,nutriments';
+  const url = 'https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(code) + '.json?fields=' + f;
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 9000);
+  let j;
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return null;
+    j = await res.json();
+  } finally { clearTimeout(to); }
+  if (!j || j.status !== 1 || !j.product) return null;
+  const q = j.product.nutriments || {};
+  const num = k => (q[k] === undefined || q[k] === null || q[k] === '') ? null : n(q[k]);
+  let kcal = num('energy-kcal_100g');
+  if (kcal === null) {
+    const kj = num('energy-kj_100g') !== null ? num('energy-kj_100g') : num('energy_100g');
+    if (kj !== null) kcal = kj / 4.184;
+  }
+  const name = (j.product.product_name_cs || j.product.product_name || '').trim();
+  if (!name && kcal === null) return null;
+  return {
+    id: code, barcode: code,
+    name: name || ('Produkt ' + code),
+    brand: (j.product.brands || '').split(',')[0].trim(),
+    unit: 'g',
+    kcal: kcal === null ? 0 : r1(kcal),
+    p: num('proteins_100g') || 0,
+    c: num('carbohydrates_100g') || 0,
+    f: num('fat_100g') || 0,
+    fib: num('fiber_100g') || 0,
+    salt: num('salt_100g') || 0,
+    serving: j.product.serving_quantity ? n(j.product.serving_quantity) : null,
+    source: 'off', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
+  };
+}
+
+/* ---------------- portion sheet ---------------- */
+function openPortion(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) { toast('Produkt nenalezen'); return; }
+  curProduct = p;
+  $('poName').textContent = p.name;
+  $('poSub').textContent = (p.brand ? p.brand + ' · ' : '') + r0(p.kcal) + ' kcal / 100 ' + p.unit;
+  $('poUnit').textContent = p.unit;
+  servingAmt = p.serving || 100;
+  $('poServ').textContent = p.serving ? 'porce ' + r0(p.serving) : 'porce';
+  $('poServ').style.display = p.serving ? '' : 'none';
+  $('poAmt').value = p.serving || 100;
+  calcPortion();
+  $('modPortion').classList.add('on');
+}
+function setAmt(v) { $('poAmt').value = v; calcPortion(); }
+function calcPortion() {
+  if (!curProduct) return;
+  const a = n($('poAmt').value) / 100;
+  $('poK').textContent = r0(curProduct.kcal * a) + ' kcal';
+  $('poM').textContent = r1(curProduct.p * a) + ' / ' + r1(curProduct.c * a) + ' / ' + r1(curProduct.f * a) + ' g';
+}
+async function addPortion() {
+  if (!curProduct) return;
+  const amt = n($('poAmt').value);
+  if (amt <= 0) { toast('Zadej množství'); return; }
+  const a = amt / 100;
+  await dbPut('log', {
+    date: curDate, productId: curProduct.id, name: curProduct.name, unit: curProduct.unit,
+    amount: amt, kcal: curProduct.kcal * a, p: curProduct.p * a, c: curProduct.c * a,
+    f: curProduct.f * a, ts: Date.now()
+  });
+  curProduct.uses = (curProduct.uses || 0) + 1;
+  await dbPut('products', curProduct);
+  closeMod('modPortion');
+  toast('Přidáno');
+  go('day');
+  renderDay();
+}
+function editCurrent() { if (curProduct) { closeMod('modPortion'); openEdit(curProduct.id); } }
+
+/* ---------------- edit sheet ---------------- */
+function openEdit(id, presetCode) {
+  editingId = id;
+  const p = id ? products.find(x => x.id === id) : null;
+  $('edTitle').textContent = p ? 'Upravit potravinu' : 'Nová potravina';
+  $('edName').value = p ? p.name : '';
+  $('edBrand').value = p ? (p.brand || '') : '';
+  $('edCode').value = p ? (p.barcode || '') : (presetCode || '');
+  $('edKcal').value = p ? p.kcal : '';
+  $('edP').value = p ? p.p : '';
+  $('edC').value = p ? p.c : '';
+  $('edF').value = p ? p.f : '';
+  $('edFib').value = p ? (p.fib || '') : '';
+  $('edSalt').value = p ? (p.salt || '') : '';
+  $('edUnit').value = p ? p.unit : 'g';
+  $('edUnitTxt').textContent = p ? p.unit : 'g';
+  $('edServ').value = p && p.serving ? p.serving : '';
+  $('edDel').style.display = p ? '' : 'none';
+  $('modEdit').classList.add('on');
+  if (!p) setTimeout(() => $('edName').focus(), 120);
+}
+async function saveProduct() {
+  const name = $('edName').value.trim();
+  if (!name) { toast('Vyplň název'); return; }
+  const code = $('edCode').value.replace(/\D/g, '');
+  const id = editingId || code || ('m' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  const old = products.find(x => x.id === editingId) || {};
+  const p = {
+    id, barcode: code || null, name,
+    brand: $('edBrand').value.trim(),
+    unit: $('edUnit').value,
+    kcal: n($('edKcal').value), p: n($('edP').value), c: n($('edC').value), f: n($('edF').value),
+    fib: n($('edFib').value), salt: n($('edSalt').value),
+    serving: n($('edServ').value) || null,
+    source: old.source === 'off' ? 'off' : 'manual',
+    uses: old.uses || 0, createdAt: old.createdAt || Date.now(), updatedAt: Date.now()
+  };
+  await dbPut('products', p);
+  const i = products.findIndex(x => x.id === p.id);
+  if (i >= 0) products[i] = p; else products.push(p);
+  closeMod('modEdit');
+  renderDb(); info();
+  toast('Uloženo');
+  openPortion(p.id);
+}
+async function deleteProduct() {
+  if (!editingId) return;
+  if (!confirm('Smazat tuhle potravinu z databáze?')) return;
+  await dbDel('products', editingId);
+  products = products.filter(x => x.id !== editingId);
+  closeMod('modEdit'); renderDb(); info(); toast('Smazáno');
+}
+
+/* ---------------- goals ---------------- */
+function fillGoals() {
+  $('gKcal').value = goals.kcal; $('gP').value = goals.p; $('gC').value = goals.c;
+  $('gF').value = goals.f; $('gAlc').value = goals.alc || 0;
+}
+async function saveGoals() {
+  goals = {
+    kcal: n($('gKcal').value) || 2000, p: n($('gP').value) || 0, c: n($('gC').value) || 0,
+    f: n($('gF').value) || 0, alc: n($('gAlc').value) || 0
+  };
+  await dbPut('meta', { k: 'goals', v: goals });
+  renderDay(); toast('Cíle uloženy');
+}
+
+/* ---------------- export / import ---------------- */
+function dl(name, text, type) {
+  const b = new Blob([text], { type: type || 'application/json' });
+  const u = URL.createObjectURL(b);
+  const a = document.createElement('a'); a.href = u; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(u), 4000);
+}
+async function exportData() {
+  const data = { v: 2, exported: new Date().toISOString(), goals, drinks, products: await dbAll('products'), log: await dbAll('log') };
+  dl('kalorie-zaloha-' + dstr(new Date()) + '.json', JSON.stringify(data, null, 1));
+  toast('Záloha stažena');
+}
+async function exportCsv() {
+  const rows = await dbAll('log');
+  const head = 'datum;nazev;mnozstvi;jednotka;kcal;bilkoviny;sacharidy;tuky;alkohol_g\n';
+  const body = rows.sort((a, b) => a.date === b.date ? a.ts - b.ts : a.date.localeCompare(b.date))
+    .map(r => [r.date, '"' + String(r.name).replace(/"/g, '""') + '"', r1(r.amount), r.unit || 'g',
+      r1(r.kcal), r1(r.p), r1(r.c), r1(r.f), r1(r.alc || 0)].join(';')).join('\n');
+  dl('kalorie-denik-' + dstr(new Date()) + '.csv', '﻿' + head + body, 'text/csv');
+  toast('CSV staženo');
+}
+function importData(inp) {
+  const file = inp.files && inp.files[0];
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = async () => {
+    try {
+      const d = JSON.parse(fr.result);
+      let np = 0, nl = 0;
+      for (const p of (d.products || [])) { await dbPut('products', p); np++; }
+      for (const l of (d.log || [])) { const c = Object.assign({}, l); delete c.id; await dbPut('log', c); nl++; }
+      if (d.goals) { goals = Object.assign(goals, d.goals); await dbPut('meta', { k: 'goals', v: goals }); fillGoals(); }
+      if (Array.isArray(d.drinks) && d.drinks.length) {
+        drinks = d.drinks; await dbPut('meta', { k: 'drinks', v: drinks });
+        renderDrinkBtns(); renderDrinkEdit();
+      }
+      products = await dbAll('products');
+      renderDb(); renderDay(); info();
+      toast('Importováno: ' + np + ' potravin, ' + nl + ' záznamů');
+    } catch (e) { toast('Chyba importu: ' + e.message); }
+    inp.value = '';
+  };
+  fr.readAsText(file);
+}
+async function wipe() {
+  if (!confirm('Opravdu smazat úplně všechno? Nejde vrátit.')) return;
+  await new Promise(r => { const t = db.transaction(['products', 'log', 'meta'], 'readwrite'); t.objectStore('products').clear(); t.objectStore('log').clear(); t.objectStore('meta').clear(); t.oncomplete = r; });
+  products = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0 }; drinks = DEF_DRINKS.slice();
+  fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info(); toast('Smazáno');
+}
+
+/* ---------------- foto → AI odhad ---------------- */
+let photoFile = null, aiItems = [], aiNote = '';
+
+const AI_PROMPT =
+`Odhadni výživové hodnoty tohoto jídla z fotky.
+
+Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
+{"jidlo":"krátký název jídla","polozky":[{"nazev":"surovina","mn":150,"kcal":165,"b":31,"s":0,"t":3.6}],"pozn":"co je nejisté"}
+
+Pravidla:
+- mn = odhadovaná hmotnost té suroviny na talíři v gramech
+- kcal, b (bílkoviny), s (sacharidy), t (tuky) = hodnoty na 100 g SUROVINY, ne za porci
+- rozepiš jídlo na jednotlivé suroviny, ne jako jednu položku
+- nezapomeň na tuk použitý při přípravě (olej, máslo) a na omáčky/dresinky
+- do "pozn" napiš, co nejde z fotky spolehlivě určit
+- česky`;
+
+function gotPhoto(inp) {
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  photoFile = f;
+  const img = $('photoPrev');
+  img.src = URL.createObjectURL(f);
+  img.style.display = '';
+  inp.value = '';
+  toast('Fotka načtena');
+}
+
+async function copyPrompt() {
+  try { await navigator.clipboard.writeText(AI_PROMPT); toast('Zadání zkopírováno'); }
+  catch (e) {
+    const t = document.createElement('textarea');
+    t.value = AI_PROMPT; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); toast('Zadání zkopírováno'); }
+    catch (e2) { toast('Zkopíruj ručně z README'); }
+    t.remove();
+  }
+}
+
+async function shareToClaude() {
+  if (!photoFile) { toast('Nejdřív vyfoť jídlo'); return; }
+  try { await navigator.clipboard.writeText(AI_PROMPT); } catch (e) {}
+  const data = { files: [photoFile], text: AI_PROMPT, title: 'Výživové hodnoty' };
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [photoFile] })) {
+      await navigator.share(data);
+      toast('Odesláno — odpověď vlož dole');
+      return;
+    }
+    if (navigator.share) { await navigator.share({ text: AI_PROMPT }); return; }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+  }
+  toast('Sdílení nejde — zadání máš ve schránce, fotku přilož ručně');
+}
+
+async function pasteAI() {
+  try { $('aiIn').value = await navigator.clipboard.readText(); processAI(); }
+  catch (e) { toast('Vlož ručně dlouhým stiskem do pole'); }
+}
+
+function parseAI(txt) {
+  let s = String(txt || '').trim();
+  if (!s) throw new Error('Pole je prázdné');
+  s = s.replace(/```[a-z]*/gi, '');
+  const i = s.indexOf('{'), j = s.lastIndexOf('}');
+  if (i < 0 || j <= i) throw new Error('Nenašel jsem JSON blok');
+  let raw = s.slice(i, j + 1).replace(/,\s*([}\]])/g, '$1');
+  const o = JSON.parse(raw);
+  const arr = o.polozky || o.items || o.polozka || [];
+  if (!Array.isArray(arr) || !arr.length) throw new Error('JSON neobsahuje položky');
+  const pick = (x, keys) => { for (const k of keys) if (x[k] !== undefined && x[k] !== null && x[k] !== '') return n(x[k]); return 0; };
+  const items = arr.map(x => ({
+    nazev: String(x.nazev || x.name || x.surovina || 'položka'),
+    mn: pick(x, ['mn', 'mnozstvi', 'množství', 'gramy', 'amount', 'g']) || 100,
+    kcal: pick(x, ['kcal', 'energie', 'energy', 'kalorie']),
+    b: pick(x, ['b', 'bilkoviny', 'bílkoviny', 'protein', 'proteins']),
+    s: pick(x, ['s', 'sacharidy', 'carbs', 'carbohydrates']),
+    t: pick(x, ['t', 'tuky', 'fat', 'fats'])
+  }));
+  return { name: String(o.jidlo || o.nazev || o.name || ''), note: String(o.pozn || o.poznamka || o.note || ''), items };
+}
+
+function processAI() {
+  let d;
+  try { d = parseAI($('aiIn').value); }
+  catch (e) { toast('Nešlo přečíst: ' + e.message); return; }
+  aiItems = d.items; aiNote = d.note;
+  $('aiName').value = d.name || 'Jídlo z fotky';
+  $('aiNote').textContent = d.note ? '⚠ ' + d.note : '';
+  $('aiCard').style.display = '';
+  renderAI();
+  $('aiCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderAI() {
+  $('aiList').innerHTML = aiItems.map((it, i) => `
+    <div class="item" style="align-items:flex-start">
+      <div class="grow">
+        <div class="nm">${esc(it.nazev)}</div>
+        <div class="sub">${r0(it.kcal)} kcal/100 g · B ${r1(it.b)} · S ${r1(it.s)} · T ${r1(it.t)}</div>
+      </div>
+      <input type="number" inputmode="decimal" value="${r1(it.mn)}" style="width:74px;padding:7px 8px;text-align:right"
+        oninput="aiItems[${i}].mn=n(this.value);aiTot()"><span class="tiny muted" style="align-self:center">g</span>
+      <button class="btn sm dan" onclick="aiItems.splice(${i},1);renderAI()">✕</button>
+    </div>`).join('');
+  aiTot();
+}
+function aiSum() {
+  return aiItems.reduce((a, it) => {
+    const k = it.mn / 100;
+    return { g: a.g + it.mn, k: a.k + it.kcal * k, p: a.p + it.b * k, c: a.c + it.s * k, f: a.f + it.t * k };
+  }, { g: 0, k: 0, p: 0, c: 0, f: 0 });
+}
+function aiTot() {
+  const s = aiSum();
+  $('aiTotK').textContent = r0(s.k) + ' kcal';
+  $('aiTotM').textContent = r1(s.p) + ' / ' + r1(s.c) + ' / ' + r1(s.f) + ' g';
+}
+
+async function aiSave(asRecipe) {
+  if (!aiItems.length) { toast('Nejsou žádné položky'); return; }
+  const s = aiSum();
+  const name = ($('aiName').value || 'Jídlo z fotky').trim();
+  if (asRecipe) {
+    if (s.g <= 0) { toast('Nulová hmotnost'); return; }
+    const p = {
+      id: 'r' + Date.now().toString(36), barcode: null, name, brand: 'recept', unit: 'g',
+      kcal: r1(s.k / s.g * 100), p: r1(s.p / s.g * 100), c: r1(s.c / s.g * 100), f: r1(s.f / s.g * 100),
+      fib: 0, salt: 0, serving: r0(s.g), source: 'recipe',
+      ing: aiItems.slice(), uses: 1, createdAt: Date.now(), updatedAt: Date.now()
+    };
+    await dbPut('products', p);
+    const i = products.findIndex(x => x.id === p.id);
+    if (i >= 0) products[i] = p; else products.push(p);
+  }
+  await dbPut('log', {
+    date: curDate, productId: asRecipe ? 'recept' : 'foto', name, unit: 'g',
+    amount: r1(s.g), kcal: s.k, p: s.p, c: s.c, f: s.f, ts: Date.now()
+  });
+  aiItems = []; $('aiCard').style.display = 'none'; $('aiIn').value = '';
+  $('photoPrev').style.display = 'none'; photoFile = null;
+  renderDb(); info();
+  toast(asRecipe ? 'Přidáno a uloženo jako recept' : 'Přidáno do dneška');
+  go('day'); renderDay();
+}
+
+/* ---------------- foto etikety → formulář ---------------- */
+let labelFile = null;
+
+const LABEL_PROMPT =
+`Přepiš tabulku výživových údajů z této fotky obalu potraviny.
+
+Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
+{"nazev":"","znacka":"","jed":"g","kcal":0,"b":0,"s":0,"t":0,"vlaknina":0,"sul":0,"porce":0}
+
+Pravidla:
+- všechny hodnoty přepočítej na 100 g (u nápojů na 100 ml a "jed" nastav na "ml")
+- kcal: pokud je uvedeno jen kJ, vyděl 4,184
+- b = bílkoviny, s = sacharidy (celkové, ne "z toho cukry"), t = tuky (celkové)
+- porce = hmotnost jedné porce v gramech, pokud je na obalu; jinak 0
+- co na fotce není, nech 0
+- nic si nedomýšlej, jen přepiš`;
+
+function gotLabel(inp) {
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  labelFile = f;
+  const img = $('labPrev'); img.src = URL.createObjectURL(f); img.style.display = '';
+  inp.value = '';
+  toast('Etiketa načtena — pošli ji Claudeovi');
+}
+async function shareLabel() {
+  if (!labelFile) { toast('Nejdřív vyfoť tabulku'); return; }
+  try { await navigator.clipboard.writeText(LABEL_PROMPT); } catch (e) {}
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [labelFile] })) {
+      await navigator.share({ files: [labelFile], text: LABEL_PROMPT, title: 'Výživové údaje' });
+      toast('Odesláno — odpověď vlož zpět'); return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  toast('Sdílení nejde — zadání je ve schránce');
+}
+async function pasteLabel() {
+  try { $('labIn').value = await navigator.clipboard.readText(); processLabel(); }
+  catch (e) { toast('Vlož ručně dlouhým stiskem'); }
+}
+function processLabel() {
+  let o;
+  try {
+    let s = String($('labIn').value || '').replace(/```[a-z]*/gi, '');
+    const i = s.indexOf('{'), j = s.lastIndexOf('}');
+    if (i < 0 || j <= i) throw new Error('nenašel jsem JSON');
+    o = JSON.parse(s.slice(i, j + 1).replace(/,\s*([}\]])/g, '$1'));
+  } catch (e) { toast('Nešlo přečíst: ' + e.message); return; }
+  const setIf = (id, v) => { if (v !== undefined && v !== null && v !== '' && n(v) !== 0) $(id).value = n(v); };
+  if (o.nazev && !$('edName').value.trim()) $('edName').value = o.nazev;
+  if (o.znacka && !$('edBrand').value.trim()) $('edBrand').value = o.znacka;
+  if (o.jed === 'ml') { $('edUnit').value = 'ml'; $('edUnitTxt').textContent = 'ml'; }
+  setIf('edKcal', o.kcal); setIf('edP', o.b); setIf('edC', o.s); setIf('edF', o.t);
+  setIf('edFib', o.vlaknina); setIf('edSalt', o.sul); setIf('edServ', o.porce);
+  $('labIn').value = ''; $('labPrev').style.display = 'none'; labelFile = null;
+  toast('Vyplněno — zkontroluj a ulož');
+}
+
+/* ---------------- alkohol ---------------- */
+const ETH = 0.789;        // hustota etanolu g/ml
+const KCAL_ETH = 7.1;     // kcal na gram etanolu
+const DEF_DRINKS = [
+  { nm: 'Pivo 10° 0,5 l', ml: 500, abv: 4.0, c: 3.5 },
+  { nm: 'Pivo 12° 0,5 l', ml: 500, abv: 5.0, c: 4.0 },
+  { nm: 'Víno 2 dl', ml: 200, abv: 12.5, c: 0.6 },
+  { nm: 'Panák 40 ml', ml: 40, abv: 40, c: 0 },
+  { nm: 'Sekt 1 dl', ml: 100, abv: 11.5, c: 1.5 }
+];
+let drinks = DEF_DRINKS.slice();
+
+const alcG = d => d.ml * (d.abv / 100) * ETH;
+const alcCarb = d => d.ml * (d.c || 0) / 100;
+const alcKcal = d => alcG(d) * KCAL_ETH + alcCarb(d) * 4;
+
+function renderDrinkBtns() {
+  $('drinkBtns').innerHTML = drinks.map((d, i) =>
+    `<button class="btn sm" onclick="logDrink(${i})">${esc(d.nm)}
+       <span class="tiny muted">${r1(alcG(d))} g</span></button>`).join('');
+}
+async function logDrink(i) {
+  const d = drinks[i]; if (!d) return;
+  await dbPut('log', {
+    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml,
+    kcal: alcKcal(d), p: 0, c: alcCarb(d), f: 0,
+    alc: alcG(d), abv: d.abv, ts: Date.now()
+  });
+  if (navigator.vibrate) navigator.vibrate(40);
+  toast(d.nm + ' · ' + r1(alcG(d)) + ' g alk.');
+  renderDay();
+}
+function openCustomDrink() { calcDrink(); $('modDrink').classList.add('on'); }
+function curDrink() {
+  return { nm: $('dkName').value.trim() || 'Nápoj', ml: n($('dkMl').value), abv: n($('dkAbv').value), c: n($('dkC').value) };
+}
+function calcDrink() {
+  const d = curDrink();
+  $('dkAlc').textContent = r1(alcG(d)) + ' g';
+  $('dkK').textContent = r0(alcKcal(d)) + ' kcal';
+}
+async function addCustomDrink(keep) {
+  const d = curDrink();
+  if (d.ml <= 0 || d.abv <= 0) { toast('Zadej objem a procenta'); return; }
+  if (keep) { drinks.push(d); await dbPut('meta', { k: 'drinks', v: drinks }); renderDrinkBtns(); renderDrinkEdit(); }
+  await dbPut('log', {
+    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml,
+    kcal: alcKcal(d), p: 0, c: alcCarb(d), f: 0, alc: alcG(d), abv: d.abv, ts: Date.now()
+  });
+  closeMod('modDrink'); toast('Zapsáno'); renderDay();
+}
+function renderDrinkEdit() {
+  $('drinkEdit').innerHTML = drinks.map((d, i) => `
+    <div class="row" style="gap:5px;margin-bottom:6px">
+      <input value="${esc(d.nm)}" class="grow" style="padding:7px 8px;font-size:13px"
+        onchange="drinks[${i}].nm=this.value;saveDrinks()">
+      <input type="number" value="${d.ml}" style="width:58px;padding:7px 6px;font-size:13px;text-align:right"
+        onchange="drinks[${i}].ml=n(this.value);saveDrinks()">
+      <input type="number" step="0.1" value="${d.abv}" style="width:52px;padding:7px 6px;font-size:13px;text-align:right"
+        onchange="drinks[${i}].abv=n(this.value);saveDrinks()">
+      <input type="number" step="0.1" value="${d.c || 0}" style="width:50px;padding:7px 6px;font-size:13px;text-align:right"
+        onchange="drinks[${i}].c=n(this.value);saveDrinks()">
+      <button class="btn sm dan" onclick="drinks.splice(${i},1);saveDrinks();renderDrinkEdit()">✕</button>
+    </div>`).join('');
+}
+async function saveDrinks() { await dbPut('meta', { k: 'drinks', v: drinks }); renderDrinkBtns(); renderDay(); }
+function addDrinkDef() { drinks.push({ nm: 'Nový nápoj', ml: 200, abv: 12, c: 0 }); saveDrinks(); renderDrinkEdit(); }
+
+async function alcStats() {
+  const all = await dbAll('log');
+  const byDay = {};
+  all.forEach(r => { if (r.alc) byDay[r.date] = (byDay[r.date] || 0) + r.alc; });
+  const days = [];
+  const base = new Date(curDate + 'T12:00:00');
+  for (let i = 29; i >= 0; i--) {
+    const x = new Date(base); x.setDate(x.getDate() - i);
+    const k = dstr(x); days.push({ d: k, g: byDay[k] || 0 });
+  }
+  const sum = k => days.slice(-k).reduce((a, x) => a + x.g, 0);
+  return { days, d7: sum(7), d30: sum(30), dry: days.filter(x => x.g === 0).length, today: byDay[curDate] || 0 };
+}
+async function openAlcOverview() {
+  const s = await alcStats();
+  $('alc7').textContent = r0(s.d7); $('alc30').textContent = r0(s.d30); $('alcDry').textContent = s.dry;
+  const lim = goals.alc || 0;
+  $('alcLimitBar').innerHTML = lim ? (() => {
+    const pct = Math.min(100, s.d7 / lim * 100), over = s.d7 > lim;
+    return `<div class="bar"><div class="t"><span>Týdenní limit</span>
+      <span class="mono">${r0(s.d7)} / ${lim} g</span></div>
+      <div class="track"><div class="fill" style="width:${pct}%;background:${over ? 'var(--bad)' : 'var(--ok)'}"></div></div></div>`;
+  })() : '<p class="tiny muted" style="margin:0">Týdenní limit není nastavený (Nastavení → Alkohol).</p>';
+  const last = s.days.slice(-21);
+  const mx = Math.max(10, ...last.map(x => x.g));
+  $('alcChart').innerHTML = last.map(x => {
+    const h = Math.max(2, x.g / mx * 100);
+    const col = x.g === 0 ? '#2e3542' : (x.g > 40 ? 'var(--bad)' : (x.g > 20 ? 'var(--warn)' : 'var(--acc)'));
+    return `<div title="${x.d}: ${r1(x.g)} g" style="flex:1;height:${h}%;background:${col};border-radius:3px 3px 0 0"></div>`;
+  }).join('');
+  const f = last[0] ? new Date(last[0].d + 'T12:00:00') : new Date();
+  $('alcFrom').textContent = f.getDate() + '. ' + (f.getMonth() + 1) + '.';
+  const rows = (await dbByIdx('log', 'date', curDate)).filter(r => r.alc);
+  $('alcList').innerHTML = rows.length ? rows.map(r => `
+    <div class="item"><div class="grow"><div class="nm">${esc(r.name)}</div>
+      <div class="sub">${r0(r.amount)} ml · ${r1(r.abv || 0)} % · ${r0(r.kcal)} kcal</div></div>
+    <div class="kc">${r1(r.alc)}<span class="tiny muted"> g</span></div>
+    <button class="btn sm dan" onclick="delLog(${r.id});closeMod('modAlc')">✕</button></div>`).join('')
+    : '<p class="tiny muted">Dnes nic.</p>';
+  $('modAlc').classList.add('on');
+}
+
+/* ---------------- camera scanner ---------------- */
+let stream = null, detector = null, zxing = null, scanning = false, lastCode = '', lastTime = 0;
+const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf'];
+
+async function toggleCam() { if (stream) stopCam(); else await startCam(); }
+
+async function startCam() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    $('scanMsg').textContent = 'Kamera nedostupná (je stránka na https?)'; return;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
+    });
+  } catch (e) {
+    $('scanMsg').textContent = 'Kamera odmítnuta: ' + e.name; return;
+  }
+  const v = $('video'); v.srcObject = stream; await v.play().catch(() => {});
+  $('camBtn').textContent = 'Zastavit kameru';
+  const track = stream.getVideoTracks()[0];
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  $('torchBtn').style.display = caps && caps.torch ? '' : 'none';
+  scanning = true;
+  $('scanMsg').textContent = 'Namiř na čárový kód';
+  if ('BarcodeDetector' in window) {
+    try { detector = new window.BarcodeDetector({ formats: FORMATS }); } catch (e) { detector = new window.BarcodeDetector(); }
+    loopNative();
+  } else {
+    await loadZXing();
+    if (zxing) loopZXing(); else $('scanMsg').textContent = 'Skener nedostupný – zadej kód ručně';
+  }
+}
+function stopCam() {
+  scanning = false;
+  if (zxing && zxing.reset) { try { zxing.reset(); } catch (e) {} }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  $('video').srcObject = null;
+  $('camBtn').textContent = 'Spustit kameru';
+  $('torchBtn').style.display = 'none';
+  $('scanMsg').textContent = 'Kamera vypnutá';
+}
+async function toggleTorch() {
+  if (!stream) return;
+  const t = stream.getVideoTracks()[0];
+  const on = !(t._torch);
+  try { await t.applyConstraints({ advanced: [{ torch: on }] }); t._torch = on; } catch (e) { toast('Světlo nejde zapnout'); }
+}
+async function loopNative() {
+  const v = $('video');
+  while (scanning && stream) {
+    try {
+      const codes = await detector.detect(v);
+      if (codes && codes.length) { hit(codes[0].rawValue); }
+    } catch (e) { /* ignore frame errors */ }
+    await new Promise(r => setTimeout(r, 180));
+  }
+}
+async function loadZXing() {
+  if (zxing) return;
+  try {
+    if (!window.ZXing) {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+        s.onload = res; s.onerror = rej; document.head.appendChild(s);
+      });
+    }
+    zxing = new window.ZXing.BrowserMultiFormatReader();
+  } catch (e) { zxing = null; }
+}
+function loopZXing() {
+  zxing.decodeFromVideoElement($('video'), (result) => { if (result && scanning) hit(result.getText()); })
+    .catch(() => { $('scanMsg').textContent = 'Skener selhal – zadej kód ručně'; });
+}
+function hit(code) {
+  const t = Date.now();
+  if (code === lastCode && t - lastTime < 3000) return;
+  lastCode = code; lastTime = t;
+  if (navigator.vibrate) navigator.vibrate(60);
+  $('scanMsg').textContent = 'Kód: ' + code;
+  stopCam();
+  lookup(code);
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopCam(); });
+</script>
+</body>
+</html>
