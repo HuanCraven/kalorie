@@ -587,6 +587,13 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('impFile').click()">Import zálohy</button>
     <input type="file" id="impFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
     <button class="btn full" style="margin-bottom:8px" onclick="exportCsv()">Export deníku (CSV)</button>
+    <div class="hr"></div>
+    <h3>Externí databáze potravin</h3>
+    <p class="tiny muted" style="margin:0 0 8px" id="extInfo"></p>
+    <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('extFile').click()">
+      Načíst databázi z CSV</button>
+    <input type="file" id="extFile" accept=".csv,.txt,*/*" style="display:none" onchange="readExt(this)">
+    <div id="extRes" class="tiny muted"></div>
     <p class="tiny muted" style="margin:8px 0 0">Všechna data jsou jen v tomhle telefonu. Zálohuj si je občas.</p>
     <div class="hr"></div>
     <button class="btn dan full" onclick="wipe()">Smazat všechna data</button>
@@ -737,7 +744,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-27';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-28';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -766,9 +773,10 @@ const pctTxt = v => v > 0 && v < 0.5 ? '<1 %' : r0(v) + ' %';
 let db = null;
 function openDB() {
   return new Promise((res, rej) => {
-    const rq = indexedDB.open('kaltrack', 2);
+    const rq = indexedDB.open('kaltrack', 3);
     rq.onupgradeneeded = e => {
       const d = e.target.result;
+      if (!d.objectStoreNames.contains('ext')) d.createObjectStore('ext', { keyPath: 'id' });
       if (!d.objectStoreNames.contains('daily')) d.createObjectStore('daily', { keyPath: 'date' });
       if (!d.objectStoreNames.contains('products')) {
         const s = d.createObjectStore('products', { keyPath: 'id' });
@@ -812,8 +820,9 @@ let editingId = null;
   const dk = await dbGet('meta', 'drinks');
   if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
   products = await dbAll('products');
+  try { extFoods = await dbAll('ext'); } catch (e) { extFoods = []; }
   fillGoals();
-  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats();
+  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); extInfoTxt();
   await renderDay();
   checkBackup();
   renderDb();
@@ -874,6 +883,7 @@ function info() {
   $('verNow').textContent = APP_VERSION;
   $('infoTxt').innerHTML = 'Verze: ' + APP_VERSION + '<br>Skener: ' + bd + '<br>Produktů v databázi: ' + products.length +
     '<br>Základních potravin: ' + (window.ZAKLAD ? ZAKLAD.length : 0) +
+    (extFoods.length ? '<br>Externí databáze: ' + extFoods.length + ' potravin' : '') +
     '<br>Zdroj online dat: Open Food Facts<br>Data se nikam neodesílají kromě dotazu na čárový kód.' +
     '<br>Trvalé úložiště: ' + (persisted === true ? 'zapnuté (prohlížeč data nesmaže sám)'
       : persisted === false ? 'NEZAPNUTÉ — zálohuj častěji' : 'neznámé');
@@ -1028,7 +1038,7 @@ function renderDb() {
       <div class="grow" onclick="openPortion('${sid(p.id)}')">
         <div class="nm">${esc(p.name)}</div>
         <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100${esc(p.unit)}
-          <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : (p.source === 'zaklad' ? 'základní' : 'ručně'))}</span></div>
+          <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : (p.source === 'zaklad' ? 'základní' : (p.source === 'ext' ? 'ČR' : 'ručně')))}</span></div>
       </div>
       <button class="btn sm" onclick="openEdit('${sid(p.id)}')">✎</button>
     </div>`).join('')
@@ -1127,7 +1137,10 @@ function localMatches(q) {
     .sort((a, b) => (b.uses || 0) - (a.uses || 0))
     .slice(0, 6);
   const ids = new Set(mine.map(p => p.id));
-  return mine.concat(zakladMatches(q).filter(z => !ids.has(z.id))).slice(0, 12);
+  const zak = zakladMatches(q).filter(z => !ids.has(z.id));
+  zak.forEach(z => ids.add(z.id));
+  const ext = extMatches(q).filter(z => !ids.has(z.id));
+  return mine.concat(zak, ext).slice(0, 16);
 }
 
 function renderZakCats() {
@@ -1150,6 +1163,101 @@ function showZak(cat) {
 }
 /* ---------------- recepturník ---------------- */
 let recIngs = [];
+let extFoods = [];
+
+function extProduct(x) {
+  return {
+    id: x.id, barcode: null, name: x.n, brand: x.z || 'externí databáze', unit: 'g',
+    kcal: x.e, p: x.p, c: x.c, f: x.f, fib: x.v || 0, salt: x.s || 0,
+    serving: null, source: 'ext', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
+  };
+}
+function extMatches(q) {
+  if (!extFoods.length) return [];
+  const t = norm(q); const out = [];
+  for (const x of extFoods) { if (norm(x.n).includes(t)) { out.push(extProduct(x)); if (out.length >= 10) break; } }
+  return out;
+}
+async function useExt(id) {
+  let pr = products.find(x => x.id === id);
+  if (!pr) {
+    const x = extFoods.find(y => y.id === id);
+    if (!x) { toast('Nenalezeno'); return; }
+    pr = extProduct(x);
+    await dbPut('products', pr); products.push(pr); renderDb(); info();
+  }
+  openPortion(pr.id);
+}
+function extInfoTxt() {
+  if (!$('extInfo')) return;
+  $('extInfo').textContent = extFoods.length
+    ? 'Načteno ' + extFoods.length + ' potravin' + (extFoods[0].z ? ' — ' + extFoods[0].z : '') +
+      '. Zůstávají jen v tomhle telefonu.'
+    : 'Nic načteného. Podporuje export z NutriDatabaze.cz (registrace zdarma) i obecné CSV ' +
+      'se sloupci název / kcal / bílkoviny / sacharidy / tuky.';
+}
+function readExt(inp) {
+  const f = inp.files && inp.files[0]; if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    const u8 = new Uint8Array(fr.result);
+    let txt;
+    try { txt = new TextDecoder('utf-8', { fatal: true }).decode(u8); }
+    catch (e) { txt = new TextDecoder('windows-1250').decode(u8); }
+    parseExt(txt); inp.value = '';
+  };
+  fr.readAsArrayBuffer(f);
+}
+async function parseExt(txt) {
+  const box = $('extRes');
+  const lines = txt.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) { box.textContent = 'Soubor je prázdný.'; return; }
+  const sep = [';', '\t', ','].map(c => ({ c, n: lines[0].split(c).length })).sort((a, b) => b.n - a.n)[0].c;
+  const head = lines[0].split(sep).map(x => x.trim());
+  const H = head.map(x => x.toLowerCase().replace(/\s|\[|\]/g, ''));
+  const find = (...re) => H.findIndex(h => re.some(r => r.test(h)));
+  const iN = find(/^origfdnm$/, /nazev|název|potravina|^name$|surovina/),
+        iK = find(/^enerckcal$/, /kcal|energie/),
+        iP = find(/^protg?$/, /bilkovin|bílkovin|protein/),
+        iC = find(/^chog$/, /^cho$/, /sacharid|carb/),
+        iF = find(/^fatg$/, /^fat$/, /tuk/),
+        iV = find(/^fibtg?$/, /vlaknin|vláknin|fiber/),
+        iS = find(/^naclg?$/, /^sul$/, /sůl|salt/);
+  if (iN < 0 || iK < 0) {
+    box.innerHTML = '<span style="color:var(--warn)">Nepoznal jsem sloupce.</span><br>Záhlaví: <code>' +
+      esc(head.join(' | ').slice(0, 160)) + '</code><br>Pošli soubor Claudeovi, doladí to.';
+    return;
+  }
+  const zdroj = /origfdnm/.test(H.join(' ')) ? 'NutriDatabaze.cz' : 'CSV';
+  const num = v => { const x = parseFloat(String(v).replace(',', '.').replace(/[^0-9.\-]/g, '')); return isFinite(x) ? x : 0; };
+  const rows = [], seen = new Set();
+  for (let i = 1; i < lines.length; i++) {
+    const c = lines[i].split(sep).map(x => x.trim());
+    if (c.length <= iK) continue;
+    const nm = (c[iN] || '').replace(/\u00a0/g, ' ').trim();
+    if (!nm || String(c[iK]).trim() === '') continue;   // sůl a voda mají 0 kcal, přesto patří dovnitř
+    const e = num(c[iK]);
+    if (!(e >= 0)) continue;
+    let id = 'x-' + norm(nm).replace(/[^a-z0-9]+/g, '-').slice(0, 48);
+    while (seen.has(id)) id += '2';
+    seen.add(id);
+    rows.push({ id, n: nm, z: zdroj, e,
+      p: iP >= 0 ? num(c[iP]) : 0, c: iC >= 0 ? num(c[iC]) : 0, f: iF >= 0 ? num(c[iF]) : 0,
+      v: iV >= 0 ? num(c[iV]) : 0, s: iS >= 0 ? num(c[iS]) : 0 });
+  }
+  if (!rows.length) { box.textContent = 'Sloupce jsem našel, ale žádný použitelný řádek.'; return; }
+  await new Promise(res => { const t = db.transaction('ext', 'readwrite'); t.objectStore('ext').clear(); t.oncomplete = res; });
+  for (const r of rows) await dbPut('ext', r);
+  extFoods = rows; extInfoTxt(); info();
+  box.innerHTML = '<b style="color:var(--ok)">Načteno ' + rows.length + ' potravin</b> ze zdroje ' +
+    esc(zdroj) + '.<br>Sloupce: název=' + esc(head[iN]) + ', kcal=' + esc(head[iK]) +
+    (iP >= 0 ? ', B=' + esc(head[iP]) : '') + (iC >= 0 ? ', S=' + esc(head[iC]) : '') +
+    (iF >= 0 ? ', T=' + esc(head[iF]) : '') + (iV >= 0 ? ', vláknina=' + esc(head[iV]) : '') +
+    (iS >= 0 ? ', sůl=' + esc(head[iS]) : '') +
+    '<br>Ukázka: ' + esc(rows[0].n) + ' — ' + r0(rows[0].e) + ' kcal, B ' + r1(rows[0].p) +
+    ' S ' + r1(rows[0].c) + ' T ' + r1(rows[0].f);
+  toast('Načteno ' + rows.length + ' potravin');
+}
 
 function recSearch() {
   const q = ($('recQ').value || '').trim();
@@ -1251,13 +1359,15 @@ function renderLocalMatches(q) {
     + '<p class="tiny muted" style="margin:8px 0 0">Píšu dotaz…</p>';
 }
 function resCard(p, local) {
-  const act = p.source === 'zaklad' && !products.some(x => x.id === p.id)
-    ? `useZaklad('${sid(p.id)}')` : (local ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`);
+  const known = products.some(x => x.id === p.id);
+  const act = (p.source === 'zaklad' && !known) ? `useZaklad('${sid(p.id)}')`
+    : (p.source === 'ext' && !known) ? `useExt('${sid(p.id)}')`
+    : (local ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`);
   return `<div class="item"><div class="grow" onclick="${act}">
       <div class="nm">${esc(p.name)}</div>
       <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100 ${esc(p.unit)}
-        <span class="pill ${(p.source === 'zaklad' || local) ? 'man' : 'off'}">${
-          p.source === 'zaklad' ? 'základní' : (local ? 'moje' : 'OFF')}</span>${
+        <span class="pill ${(p.source === 'zaklad' || p.source === 'ext' || local) ? 'man' : 'off'}">${
+          p.source === 'zaklad' ? 'základní' : p.source === 'ext' ? 'ČR' : (local ? 'moje' : 'OFF')}</span>${
           p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
     </div></div>`;
 }
@@ -1605,7 +1715,8 @@ async function checkBackup() {
 async function exportData() {
   const data = {
     v: 3, exported: new Date().toISOString(), goals, drinks,
-    products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily')
+    products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily'),
+    ext: await dbAll('ext')
   };
   dl('kalorie-zaloha-' + dstr(new Date()) + '.json', JSON.stringify(data, null, 1));
   await dbPut('meta', { k: 'lastBackup', v: Date.now() });
@@ -1640,6 +1751,10 @@ function importData(inp) {
         await dbPut('log', c); nl++;
       }
       for (const x of (d.daily || [])) await dbPut('daily', x);
+      if (Array.isArray(d.ext) && d.ext.length) {
+        for (const x of d.ext) await dbPut('ext', x);
+        extFoods = await dbAll('ext'); extInfoTxt();
+      }
       if (d.goals) { goals = Object.assign(goals, d.goals); await dbPut('meta', { k: 'goals', v: goals }); fillGoals(); }
       if (Array.isArray(d.drinks) && d.drinks.length) {
         drinks = d.drinks; await dbPut('meta', { k: 'drinks', v: drinks });
@@ -1657,12 +1772,14 @@ function importData(inp) {
 async function wipe() {
   if (!confirm('Opravdu smazat úplně všechno? Nejde vrátit.')) return;
   await new Promise(r => {
-    const t = db.transaction(['products', 'log', 'meta', 'daily'], 'readwrite');
+    const t = db.transaction(['products', 'log', 'meta', 'daily', 'ext'], 'readwrite');
     t.objectStore('products').clear(); t.objectStore('log').clear();
-    t.objectStore('meta').clear(); t.objectStore('daily').clear(); t.oncomplete = r;
+    t.objectStore('meta').clear(); t.objectStore('daily').clear();
+    t.objectStore('ext').clear(); t.oncomplete = r;
   });
-  products = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, alcDay: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
-  fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info(); toast('Smazáno');
+  products = []; extFoods = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, alcDay: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
+  fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info();
+  extInfoTxt(); toast('Smazáno');
 }
 
 /* ---------------- foto → AI odhad ---------------- */
