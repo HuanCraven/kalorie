@@ -280,8 +280,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <h3>2 · Pošli to Claudeovi</h3>
     <button class="btn pri full" id="shareBtn" style="margin-bottom:8px" onclick="shareToClaude()">Odeslat fotku do Claude</button>
     <button class="btn full" onclick="copyPrompt()">Zkopírovat jen zadání</button>
-    <p class="tiny muted" style="margin:8px 0 0">Otevře se nabídka sdílení — vyber Claude. Fotka i zadání
-      se pošlou naráz. Claude odpoví blokem, který zkopíruješ dolů.</p>
+    <div class="card" style="background:var(--card2);margin:10px 0 0;padding:10px">
+      <p class="tiny" style="margin:0 0 6px;color:var(--warn)">⚠ Důležité</p>
+      <p class="tiny muted" style="margin:0">Android u sdílení často zahodí přiložený text a pošle jen fotku.
+        Zadání se proto vždycky kopíruje i do schránky — <b style="color:var(--fg)">v Claude ho dlouhým
+        stiskem vlož do zprávy k fotce</b>, teprve pak odešli. Bez zadání odpoví větou místo dat.</p>
+    </div>
   </div>
 
   <div class="card">
@@ -631,7 +635,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-15';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-17';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1211,6 +1215,7 @@ async function addPortion() {
   if (!curProduct) return;
   const amt = n($('poAmt').value);
   if (amt <= 0) { toast('Zadej množství'); return; }
+  if (amt > 20000) { toast('Množství přes 20 kg? Zkontroluj to.'); return; }
   const a = amt / 100;
   const rec = {
     date: $('poDate').value || curDate, productId: curProduct.id, name: curProduct.name, unit: curProduct.unit,
@@ -1280,13 +1285,16 @@ async function saveProduct() {
   const code = $('edCode').value.replace(/\D/g, '');
   const id = editingId || code || ('m' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
   const old = products.find(x => x.id === editingId) || {};
+  const pos = v => Math.max(0, n(v));                  // záporné hodnoty nedávají smysl
+  const anyNeg = ['edKcal', 'edP', 'edC', 'edF', 'edFib', 'edSalt', 'edServ']
+    .some(k => n($(k).value) < 0);
   const p = {
     id, barcode: code || null, name,
     brand: $('edBrand').value.trim(),
     unit: $('edUnit').value,
-    kcal: n($('edKcal').value), p: n($('edP').value), c: n($('edC').value), f: n($('edF').value),
-    fib: n($('edFib').value), salt: n($('edSalt').value),
-    serving: n($('edServ').value) || null,
+    kcal: pos($('edKcal').value), p: pos($('edP').value), c: pos($('edC').value), f: pos($('edF').value),
+    fib: pos($('edFib').value), salt: pos($('edSalt').value),
+    serving: pos($('edServ').value) || null,
     source: old.source === 'off' ? 'off' : 'manual',
     uses: old.uses || 0, createdAt: old.createdAt || Date.now(), updatedAt: Date.now()
   };
@@ -1295,7 +1303,7 @@ async function saveProduct() {
   if (i >= 0) products[i] = p; else products.push(p);
   closeMod('modEdit');
   renderDb(); info();
-  toast('Uloženo');
+  toast(anyNeg ? 'Uloženo — záporné hodnoty jsem nahradil nulou' : 'Uloženo');
   openPortion(p.id);
 }
 async function deleteProduct() {
@@ -1372,9 +1380,17 @@ function importData(inp) {
   fr.onload = async () => {
     try {
       const d = JSON.parse(fr.result);
-      let np = 0, nl = 0;
+      let np = 0, nl = 0, skip = 0;
       for (const p of (d.products || [])) { await dbPut('products', p); np++; }
-      for (const l of (d.log || [])) { const c = Object.assign({}, l); delete c.id; await dbPut('log', c); nl++; }
+      // otisk záznamu — brání zdvojení při opakovaném importu téže zálohy
+      const sig = r => [r.date, r.ts, r.name, r1(r.amount), r0(r.kcal)].join('|');
+      const have = new Set((await dbAll('log')).map(sig));
+      for (const l of (d.log || [])) {
+        const c = Object.assign({}, l); delete c.id;
+        if (have.has(sig(c))) { skip++; continue; }
+        have.add(sig(c));
+        await dbPut('log', c); nl++;
+      }
       for (const x of (d.daily || [])) await dbPut('daily', x);
       if (d.goals) { goals = Object.assign(goals, d.goals); await dbPut('meta', { k: 'goals', v: goals }); fillGoals(); }
       if (Array.isArray(d.drinks) && d.drinks.length) {
@@ -1383,7 +1399,8 @@ function importData(inp) {
       }
       products = await dbAll('products');
       renderDb(); renderDay(); info();
-      toast('Importováno: ' + np + ' potravin, ' + nl + ' záznamů');
+      toast('Importováno: ' + np + ' potravin, ' + nl + ' záznamů' +
+        (skip ? ' · ' + skip + ' už tam bylo' : ''));
     } catch (e) { toast('Chyba importu: ' + e.message); }
     inp.value = '';
   };
@@ -1447,7 +1464,7 @@ async function shareToClaude() {
   try {
     if (navigator.canShare && navigator.canShare({ files: [photoFile] })) {
       await navigator.share(data);
-      toast('Odesláno — odpověď vlož dole');
+      toast('Zadání máš ve schránce — vlož ho v Claude k fotce');
       return;
     }
     if (navigator.share) { await navigator.share({ text: AI_PROMPT }); return; }
@@ -2033,7 +2050,7 @@ async function shareLabel() {
   try {
     if (navigator.canShare && navigator.canShare({ files: [labelFile] })) {
       await navigator.share({ files: [labelFile], text: LABEL_PROMPT, title: 'Výživové údaje' });
-      toast('Odesláno — odpověď vlož zpět'); return;
+      toast('Zadání máš ve schránce — vlož ho v Claude k fotce'); return;
     }
   } catch (e) { if (e && e.name === 'AbortError') return; }
   toast('Sdílení nejde — zadání je ve schránce');
@@ -2042,14 +2059,39 @@ async function pasteLabel() {
   try { $('labIn').value = await navigator.clipboard.readText(); processLabel(); }
   catch (e) { toast('Vlož ručně dlouhým stiskem'); }
 }
+/* nouzové čtení tabulky z volného textu: "Energie 1550 kJ / 370 kcal", "Bílkoviny 8,2 g" */
+function labelFromText(src) {
+  const num = re => { const m = src.match(re); return m ? n(String(m[1]).replace(',', '.')) : null; };
+  let kcal = num(/(\d+[.,]?\d*)\s*kcal/i);
+  if (kcal === null) { const kj = num(/(\d+[.,]?\d*)\s*kJ/i); if (kj !== null) kcal = r1(kj / 4.184); }
+  const o = {
+    kcal: kcal || 0,
+    b: num(/b[ií]lkoviny\D{0,12}(\d+[.,]?\d*)/i) || 0,
+    s: num(/sacharidy\D{0,12}(\d+[.,]?\d*)/i) || 0,
+    t: num(/tuky\D{0,12}(\d+[.,]?\d*)/i) || 0,
+    vlaknina: num(/vl[áa]knina\D{0,12}(\d+[.,]?\d*)/i) || 0,
+    sul: num(/s[ůu]l\D{0,12}(\d+[.,]?\d*)/i) || 0
+  };
+  return (o.kcal || o.b || o.s || o.t) ? o : null;
+}
+
 function processLabel() {
   let o;
+  const src = String($('labIn').value || '').trim();
+  if (!src) { toast('Nejdřív vlož odpověď'); return; }
   try {
-    let s = String($('labIn').value || '').replace(/```[a-z]*/gi, '');
+    let s = src.replace(/```[a-z]*/gi, '')
+      .replace(/[\u201C\u201D\u201E]/g, '"').replace(/[\u2018\u2019]/g, "'");
     const i = s.indexOf('{'), j = s.lastIndexOf('}');
-    if (i < 0 || j <= i) throw new Error('nenašel jsem JSON');
-    o = JSON.parse(s.slice(i, j + 1).replace(/,\s*([}\]])/g, '$1'));
-  } catch (e) { toast('Nešlo přečíst: ' + e.message); return; }
+    if (i < 0 || j <= i) throw new Error('x');
+    o = JSON.parse(s.slice(i, j + 1).replace(/,\s*([}\]])/g, '$1').replace(/(\d),(\d)/g, '$1.$2'));
+  } catch (e) { o = labelFromText(src); }
+  if (!o) {
+    toast('Nešlo přečíst — zkus to znovu');
+    $('labIn').value = '';
+    $('labIn').placeholder = 'Nerozpoznáno. Napiš Claudeovi „vrať jen ten JSON" a vlož znovu.';
+    return;
+  }
   const setIf = (id, v) => { if (v !== undefined && v !== null && v !== '' && n(v) !== 0) $(id).value = n(v); };
   if (o.nazev && !$('edName').value.trim()) $('edName').value = o.nazev;
   if (o.znacka && !$('edBrand').value.trim()) $('edBrand').value = o.znacka;
@@ -2131,6 +2173,7 @@ function calcDrink() {
 async function addCustomDrink(keep) {
   const d = curDrink();
   if (d.ml <= 0 || d.abv <= 0) { toast('Zadej objem a procenta'); return; }
+  if (d.ml > 10000 || d.abv > 100) { toast('Zkontroluj objem a procenta'); return; }
   const rec = {
     date: $('dkDate').value || curDate, productId: 'alk', name: d.nm, unit: 'ml',
     amount: d.ml, meal: $('dkMeal').value,
