@@ -631,7 +631,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-14';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-15';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1415,7 +1415,8 @@ Pravidla:
 - rozepiš jídlo na jednotlivé suroviny, ne jako jednu položku
 - nezapomeň na tuk použitý při přípravě (olej, máslo) a na omáčky/dresinky
 - do "pozn" napiš, co nejde z fotky spolehlivě určit
-- česky`;
+- česky, ale ČÍSLA PIŠ S TEČKOU (3.6), ne s čárkou
+- žádný text před ani za JSON blokem`;
 
 function gotPhoto(inp) {
   const f = inp.files && inp.files[0];
@@ -1461,32 +1462,133 @@ async function pasteAI() {
   catch (e) { toast('Vlož ručně dlouhým stiskem do pole'); }
 }
 
-function parseAI(txt) {
-  let s = String(txt || '').trim();
-  if (!s) throw new Error('Pole je prázdné');
-  s = s.replace(/```[a-z]*/gi, '');
+function cleanNum(t) { return String(t).replace(/\s/g, '').replace(',', '.'); }
+
+/* 1) JSON blok – hlavní formát */
+function tryJson(src) {
+  let s = src.replace(/```[a-z]*/gi, '');
   const i = s.indexOf('{'), j = s.lastIndexOf('}');
-  if (i < 0 || j <= i) throw new Error('Nenašel jsem JSON blok');
-  let raw = s.slice(i, j + 1).replace(/,\s*([}\]])/g, '$1');
-  const o = JSON.parse(raw);
-  const arr = o.polozky || o.items || o.polozka || [];
-  if (!Array.isArray(arr) || !arr.length) throw new Error('JSON neobsahuje položky');
+  if (i < 0 || j <= i) return null;
+  let raw = s.slice(i, j + 1)
+    .replace(/[\u201C\u201D\u201E]/g, '"').replace(/[\u2018\u2019]/g, "'")
+    .replace(/,\s*([}\]])/g, '$1')
+    .replace(/(\d),(\d)/g, '$1.$2');        // desetinná čárka uvnitř čísel
+  let o;
+  try { o = JSON.parse(raw); } catch (e) { return null; }
+  const arr = o.polozky || o.items || o.suroviny || [];
+  if (!Array.isArray(arr) || !arr.length) return null;
   const pick = (x, keys) => { for (const k of keys) if (x[k] !== undefined && x[k] !== null && x[k] !== '') return n(x[k]); return 0; };
-  const items = arr.map(x => ({
-    nazev: String(x.nazev || x.name || x.surovina || 'položka'),
-    mn: pick(x, ['mn', 'mnozstvi', 'množství', 'gramy', 'amount', 'g']) || 100,
-    kcal: pick(x, ['kcal', 'energie', 'energy', 'kalorie']),
-    b: pick(x, ['b', 'bilkoviny', 'bílkoviny', 'protein', 'proteins']),
-    s: pick(x, ['s', 'sacharidy', 'carbs', 'carbohydrates']),
-    t: pick(x, ['t', 'tuky', 'fat', 'fats'])
-  }));
-  return { name: String(o.jidlo || o.nazev || o.name || ''), note: String(o.pozn || o.poznamka || o.note || ''), items };
+  return {
+    name: String(o.jidlo || o.nazev || o.name || ''),
+    note: String(o.pozn || o.poznamka || o.note || ''),
+    perPortion: false,
+    items: arr.map(x => ({
+      nazev: String(x.nazev || x.name || x.surovina || 'položka'),
+      mn: pick(x, ['mn', 'mnozstvi', 'množství', 'gramy', 'amount', 'g']) || 100,
+      kcal: pick(x, ['kcal', 'energie', 'energy', 'kalorie']),
+      b: pick(x, ['b', 'bilkoviny', 'bílkoviny', 'protein', 'proteins']),
+      s: pick(x, ['s', 'sacharidy', 'carbs', 'carbohydrates']),
+      t: pick(x, ['t', 'tuky', 'fat', 'fats'])
+    }))
+  };
+}
+
+/* 2) markdownová tabulka */
+function tryTable(src) {
+  const lines = src.split('\n').filter(l => (l.match(/\|/g) || []).length >= 2);
+  if (lines.length < 2) return null;
+  const cells = l => l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim());
+  let head = null, rows = [];
+  for (const l of lines) {
+    const c = cells(l);
+    if (/^[\s:\-|]+$/.test(l)) continue;
+    if (!head && c.some(x => /kcal|energ/i.test(x))) { head = c.map(x => x.toLowerCase()); continue; }
+    if (head) rows.push(c);
+  }
+  if (!head || !rows.length) return null;
+  const col = (...re) => head.findIndex(h => re.some(r => r.test(h)));
+  const iN = Math.max(0, col(/surovin|potravin|název|nazev|polož/)),
+        iG = col(/gram|množ|mnoz|^g$|porce|hmot/), iK = col(/kcal|energ/),
+        iB = col(/bílk|bilk|proteni|protein|^b$/), iS = col(/sachar|^s$/), iT = col(/tuk|^t$/);
+  if (iK < 0) return null;
+  const items = rows.map(c => ({
+    nazev: (c[iN] || 'položka').replace(/\*\*/g, ''),
+    mn: iG >= 0 ? n(cleanNum(c[iG])) || 100 : 100,
+    kcal: n(cleanNum(c[iK])),
+    b: iB >= 0 ? n(cleanNum(c[iB])) : 0,
+    s: iS >= 0 ? n(cleanNum(c[iS])) : 0,
+    t: iT >= 0 ? n(cleanNum(c[iT])) : 0
+  })).filter(x => x.kcal > 0);
+  if (!items.length) return null;
+  return { name: '', note: '', items, perPortion: true };
+}
+
+/* 3) volný text po řádcích: "Kuřecí prsa 150 g – 248 kcal, B 46 g, S 0 g, T 5 g" */
+function tryLines(src) {
+  const items = [];
+  src.split('\n').forEach(line => {
+    if (!/kcal/i.test(line)) return;
+    // souhrnné řádky nejsou položky
+    if (/celkem|dohromady|sou[čc]et|se[čc]teno|suma|total|energie celkem/i.test(line)) return;
+    const g = line.match(/(\d+[.,]?\d*)\s*(?:g|gram\w*|ml)\b/i);
+    const k = line.match(/(\d+[.,]?\d*)\s*kcal/i);
+    if (!k) return;
+    const macro = re => { const m = line.match(re); return m ? n(cleanNum(m[1])) : 0; };
+    // bez gramáže i bez maker to není položka, ale věta
+    if (!g && !macro(/(?:b[ií]lkoviny|protein|\bB)\D{0,3}(\d+[.,]?\d*)/i)
+          && !macro(/(?:sacharidy|carbs|\bS)\D{0,3}(\d+[.,]?\d*)/i)
+          && !macro(/(?:tuky|\bfat|\bT)\D{0,3}(\d+[.,]?\d*)/i)) return;
+    let nm = line.split(/[:—–-]|\d/)[0].replace(/^[\s*•\-–—\d.)]+/, '').replace(/\*\*/g, '').trim();
+    if (!nm) nm = 'položka';
+    items.push({
+      nazev: nm,
+      mn: g ? n(cleanNum(g[1])) : 100,
+      kcal: n(cleanNum(k[1])),
+      b: macro(/(?:b[ií]lkoviny|protein|\bB)\D{0,3}(\d+[.,]?\d*)/i),
+      s: macro(/(?:sacharidy|carbs|\bS)\D{0,3}(\d+[.,]?\d*)/i),
+      t: macro(/(?:tuky|\bfat|\bT)\D{0,3}(\d+[.,]?\d*)/i)
+    });
+  });
+  if (!items.length) return null;
+  return { name: '', note: '', items, perPortion: true };
+}
+
+function parseAI(txt) {
+  const src = String(txt || '').trim();
+  if (!src) throw new Error('Pole je prázdné — nejdřív vlož odpověď.');
+  let d = tryJson(src) || tryTable(src) || tryLines(src);
+  if (!d) {
+    const e = new Error('nerozpoznaný formát');
+    e.preview = src.slice(0, 140);
+    throw e;
+  }
+  // tabulka i volný text uvádějí hodnoty za porci → přepočet na 100 g
+  if (d.perPortion) {
+    d.items = d.items.map(x => {
+      const f = x.mn > 0 ? 100 / x.mn : 1;
+      return { nazev: x.nazev, mn: x.mn, kcal: x.kcal * f, b: x.b * f, s: x.s * f, t: x.t * f };
+    });
+    d.note = (d.note ? d.note + ' · ' : '') + 'Přečteno z tabulky/textu, ne z JSON — zkontroluj čísla.';
+  }
+  return d;
 }
 
 function processAI() {
   let d;
   try { d = parseAI($('aiIn').value); }
-  catch (e) { toast('Nešlo přečíst: ' + e.message); return; }
+  catch (e) {
+    toast('Nešlo přečíst: ' + e.message);
+    $('aiCard').style.display = '';
+    aiItems = [];
+    $('aiList').innerHTML =
+      '<p class="tiny" style="color:var(--warn);margin:0 0 6px">Nerozpoznal jsem formát odpovědi.</p>' +
+      (e.preview ? '<p class="tiny muted" style="margin:0 0 8px;word-break:break-word">Začátek toho, co jsi vložil:<br><code>'
+        + esc(e.preview) + '…</code></p>' : '') +
+      '<p class="tiny muted" style="margin:0">Napiš Claudeovi „vrať to znovu jen jako ten JSON blok" ' +
+      'a vlož odpověď znovu. Zvládnu i tabulku nebo seznam s kcal a makry.</p>';
+    $('aiNote').textContent = ''; $('aiTotK').textContent = '—'; $('aiTotM').textContent = '—';
+    return;
+  }
   aiItems = d.items; aiNote = d.note;
   $('aiName').value = d.name || 'Jídlo z fotky';
   $('aiNote').textContent = d.note ? '⚠ ' + d.note : '';
