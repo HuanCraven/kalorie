@@ -94,10 +94,16 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 
 <!-- ============ DNES ============ -->
 <section id="p-day" class="page on">
+  <div class="card" id="bakWarn" style="display:none;border-color:#4a3a20;background:#241f14">
+    <div class="row" style="justify-content:space-between;gap:10px">
+      <span class="tiny" id="bakTxt"></span>
+      <button class="btn sm pri" onclick="exportData()">Zálohovat</button>
+    </div>
+  </div>
   <div class="row" style="margin-bottom:10px">
-    <button class="btn sm" onclick="shiftDay(-1)">‹</button>
+    <button class="btn sm" id="dayPrev" onclick="shiftDay(-1)">‹</button>
     <div class="grow" style="text-align:center"><b id="dayLabel"></b></div>
-    <button class="btn sm" onclick="shiftDay(1)">›</button>
+    <button class="btn sm" id="dayNext" onclick="shiftDay(1)">›</button>
   </div>
 
   <div class="card">
@@ -118,6 +124,10 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
         <div class="bar"><div class="t"><span>Tuky</span><span class="mono" id="fTxt">0 g</span></div>
           <div class="track"><div class="fill" id="fBar" style="background:#e2564d;width:0"></div></div></div>
       </div>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+      <span class="tiny muted">Vláknina <b class="mono" id="fibTxt">0</b></span>
+      <span class="tiny muted">Sůl <b class="mono" id="saltTxt">0</b></span>
     </div>
   </div>
 
@@ -181,6 +191,19 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
       <button class="btn pri" onclick="lookup(document.getElementById('manualCode').value.trim())">Hledat</button>
     </div>
     <p class="tiny muted" style="margin:8px 0 0">Číslice pod čárovým kódem. Funguje i bez kamery.</p>
+  </div>
+
+  <div class="card">
+    <h3>Hledat podle názvu</h3>
+    <div class="row">
+      <input class="grow" id="nameQ" placeholder="rajče, rohlík, kuřecí prsa…"
+        onkeydown="if(event.key==='Enter')searchByName()">
+      <button class="btn pri" id="nameBtn" onclick="searchByName()">Hledat</button>
+    </div>
+    <label class="row" style="margin:10px 0 0;gap:8px;align-items:center">
+      <input type="checkbox" id="czOnly" style="width:auto" checked>
+      <span class="tiny muted">jen produkty prodávané v Česku</span></label>
+    <div id="nameRes" style="margin-top:8px"></div>
   </div>
 
   <div class="card">
@@ -325,6 +348,10 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
       <div class="fld"><label>Sacharidy (g)</label><input id="gC" type="number" inputmode="numeric"></div>
     </div>
     <div class="fld"><label>Tuky (g)</label><input id="gF" type="number" inputmode="numeric"></div>
+    <div class="grid2">
+      <div class="fld"><label>Vláknina — cíl (g)</label><input id="gFib" type="number" inputmode="numeric"></div>
+      <div class="fld"><label>Sůl — strop (g)</label><input id="gSalt" type="number" inputmode="decimal"></div>
+    </div>
     <div class="fld"><label>Klidový výdej — bazální metabolismus (kcal/den)</label>
       <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750"></div>
     <button class="btn pri full" onclick="saveGoals()">Uložit cíle</button>
@@ -396,6 +423,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
       <label>Množství (<span id="poUnit">g</span>)</label>
       <input id="poAmt" type="number" inputmode="decimal" value="100" oninput="calcPortion()">
     </div>
+    <div class="fld"><label>Zařadit k jídlu</label><select id="poMeal"></select></div>
     <div class="grid4" style="margin-bottom:12px">
       <button class="btn sm" onclick="setAmt(30)">30</button>
       <button class="btn sm" onclick="setAmt(50)">50</button>
@@ -408,7 +436,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
     </div>
     <div class="row">
       <button class="btn grow" onclick="closeMod('modPortion')">Zrušit</button>
-      <button class="btn pri grow" onclick="addPortion()">Přidat</button>
+      <button class="btn pri grow" id="poAdd" onclick="addPortion()">Přidat</button>
     </div>
     <button class="btn sm full" style="margin-top:10px" onclick="editCurrent()">Upravit potravinu</button>
   </div>
@@ -530,6 +558,8 @@ const DAYS = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek'
 const plur = (k, a, b, c) => k === 1 ? a : (k >= 2 && k <= 4 ? b : c);
 const dnu = k => k + ' ' + plur(k, 'den', 'dny', 'dnů');
 // procenta, která by se zaokrouhlila na nulu, ať nevypadají jako nula
+// id do onclick: povol jen bezpečné znaky (obrana proti podvrženému importu zálohy)
+const sid = s => String(s == null ? '' : s).replace(/[^A-Za-z0-9_.-]/g, '');
 const pctTxt = v => v > 0 && v < 0.5 ? '<1 %' : r0(v) + ' %';
 
 /* ---------------- IndexedDB ---------------- */
@@ -564,8 +594,9 @@ const dbByIdx = (s, i, v) => req(tx(s, 'readonly').index(i).getAll(v));
 
 /* ---------------- state ---------------- */
 let products = [];            // cache
-let goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, rmr: 0 };
+let goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, rmr: 0, fib: 30, salt: 5 };
 let curDate = dstr(new Date());
+let persisted = null;         // chrání IndexedDB před automatickým smazáním
 let curProduct = null;        // product open in portion sheet
 let servingAmt = 100;
 let editingId = null;
@@ -579,17 +610,29 @@ let editingId = null;
   if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
   products = await dbAll('products');
   fillGoals();
-  renderDrinkBtns(); renderDrinkEdit();
+  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect();
   await renderDay();
+  checkBackup();
   renderDb();
   info();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // požádej prohlížeč, ať úložiště nemaže při nedostatku místa
+  if (navigator.storage && navigator.storage.persist) {
+    try {
+      const already = await navigator.storage.persisted();
+      if (!already) await navigator.storage.persist();
+      persisted = await navigator.storage.persisted();
+    } catch (e) { persisted = null; }
+    info();
+  }
 })();
 
 function info() {
   const bd = ('BarcodeDetector' in window) ? 'nativní BarcodeDetector' : 'ZXing (záložní)';
   $('infoTxt').innerHTML = 'Skener: ' + bd + '<br>Produktů v databázi: ' + products.length +
-    '<br>Zdroj online dat: Open Food Facts<br>Data se nikam neodesílají kromě dotazu na čárový kód.';
+    '<br>Zdroj online dat: Open Food Facts<br>Data se nikam neodesílají kromě dotazu na čárový kód.' +
+    '<br>Trvalé úložiště: ' + (persisted === true ? 'zapnuté (prohlížeč data nesmaže sám)'
+      : persisted === false ? 'NEZAPNUTÉ — zálohuj častěji' : 'neznámé');
 }
 
 /* ---------------- navigation ---------------- */
@@ -603,6 +646,25 @@ function go(p) {
   window.scrollTo(0, 0);
 }
 function closeMod(id) { $(id).classList.remove('on'); }
+
+/* ---------------- jídla dne ---------------- */
+const MEALS = [
+  { k: 'snidane', n: 'Snídaně', to: 10 },
+  { k: 'svacina', n: 'Svačina', to: 11.5 },
+  { k: 'obed', n: 'Oběd', to: 14.5 },
+  { k: 'odpsvac', n: 'Odpolední svačina', to: 17.5 },
+  { k: 'vecere', n: 'Večeře', to: 20.5 },
+  { k: 'vecsvac', n: 'Večerní svačina', to: 99 }
+];
+const mealName = k => (MEALS.find(m => m.k === k) || { n: 'Nezařazeno' }).n;
+function defaultMeal() {
+  const d = new Date(), h = d.getHours() + d.getMinutes() / 60;
+  if (h < 4) return 'vecsvac';
+  return (MEALS.find(m => h < m.to) || MEALS[5]).k;
+}
+function fillMealSelect() {
+  $('poMeal').innerHTML = MEALS.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
+}
 
 /* ---------------- day view ---------------- */
 function shiftDay(d) {
@@ -618,8 +680,10 @@ async function renderDay() {
     (DAYS[d.getDay()] + ' ' + d.getDate() + '. ' + (d.getMonth() + 1) + '.');
 
   const rows = await dbByIdx('log', 'date', curDate);
-  const t = rows.reduce((a, r) => ({ k: a.k + r.kcal, p: a.p + r.p, c: a.c + r.c, f: a.f + r.f }),
-    { k: 0, p: 0, c: 0, f: 0 });
+  const t = rows.reduce((a, r) => ({
+    k: a.k + r.kcal, p: a.p + r.p, c: a.c + r.c, f: a.f + r.f,
+    fib: a.fib + (r.fib || 0), salt: a.salt + (r.salt || 0)
+  }), { k: 0, p: 0, c: 0, f: 0, fib: 0, salt: 0 });
 
   $('kcalNow').textContent = r0(t.k);
   $('kcalGoal').textContent = '/ ' + goals.kcal;
@@ -636,19 +700,40 @@ async function renderDay() {
   set('pTxt', 'pBar', t.p, goals.p);
   set('cTxt', 'cBar', t.c, goals.c);
   set('fTxt', 'fBar', t.f, goals.f);
+  $('fibTxt').textContent = r1(t.fib) + ' / ' + (goals.fib || 30) + ' g';
+  $('fibTxt').style.color = t.fib >= (goals.fib || 30) ? 'var(--ok)' : 'var(--fg)';
+  $('saltTxt').textContent = r1(t.salt) + ' / ' + (goals.salt || 5) + ' g';
+  $('saltTxt').style.color = t.salt > (goals.salt || 5) ? 'var(--bad)' : 'var(--fg)';
 
-  $('logList').innerHTML = rows.length ? rows.slice().reverse().map(r => `
+  const groups = MEALS.map(m => ({ m, rows: rows.filter(r => (r.meal || 'nezar') === m.k) }));
+  const orphan = rows.filter(r => !MEALS.some(m => m.k === r.meal));
+  if (orphan.length) groups.push({ m: { k: 'nezar', n: 'Nezařazeno' }, rows: orphan });
+  const row = r => `
     <div class="item">
-      <div class="grow">
+      <div class="grow" onclick="editLog(${Number(r.id) || 0})">
         <div class="nm">${esc(r.name)}</div>
         <div class="sub">${r.alc
           ? r0(r.amount) + ' ml · ' + r1(r.abv || 0) + ' % · <b style="color:var(--warn)">' + r1(r.alc) + ' g alk.</b>'
           : r1(r.amount) + ' ' + esc(r.unit || 'g') + ' · B ' + r1(r.p) + ' · S ' + r1(r.c) + ' · T ' + r1(r.f)}</div>
       </div>
       <div class="kc">${r0(r.kcal)}<span class="tiny muted"> kcal</span></div>
-      <button class="btn sm dan" onclick="delLog(${r.id})">✕</button>
-    </div>`).join('')
-    : '<p class="muted tiny">Zatím nic. Naskenuj kód nebo přidej z databáze.</p>';
+      <button class="btn sm dan" onclick="event.stopPropagation();delLog(${Number(r.id) || 0})">✕</button>
+    </div>`;
+  $('logList').innerHTML = rows.length
+    ? groups.filter(g => g.rows.length).map(g => `
+        <div style="margin-bottom:10px">
+          <div class="row" style="justify-content:space-between;align-items:baseline;
+               border-bottom:1px solid var(--line);padding-bottom:4px">
+            <span class="tiny" style="color:var(--acc);font-weight:600;text-transform:uppercase;
+              letter-spacing:.04em">${g.m.n}</span>
+            <span class="tiny muted mono">${r0(g.rows.reduce((a, r) => a + r.kcal, 0))} kcal
+              <button class="btn sm" style="padding:3px 7px;margin-left:6px"
+                onclick="copyMeal('${g.m.k}')" title="zkopírovat toto jídlo ze včerejška">⧉</button></span>
+          </div>
+          ${g.rows.map(row).join('')}
+        </div>`).join('')
+    : '<p class="muted tiny">Zatím nic. Naskenuj kód nebo přidej z databáze.<br>' +
+      MEALS.map(m => `<button class="btn sm" style="margin:6px 6px 0 0" onclick="copyMeal('${m.k}')">⧉ ${m.n} ze včerejška</button>`).join('') + '</p>';
 
   await loadDaily();
   await renderBalance(t.k);
@@ -667,7 +752,7 @@ async function renderDay() {
 
   const favs = products.slice().sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).filter(p => p.uses);
   $('favList').innerHTML = favs.length ? favs.map(p =>
-    `<button class="btn sm" onclick="openPortion('${p.id}')">${esc(p.name)}</button>`).join('')
+    `<button class="btn sm" onclick="openPortion('${sid(p.id)}')">${esc(p.name)}</button>`).join('')
     : '<span class="tiny muted">Nejpoužívanější položky se objeví tady.</span>';
 }
 async function delLog(id) { await dbDel('log', id); renderDay(); }
@@ -681,12 +766,12 @@ function renderDb() {
   $('dbCount').textContent = products.length + ' položek v databázi' + (q ? ' · nalezeno ' + list.length : '');
   $('dbList').innerHTML = list.length ? list.map(p => `
     <div class="item">
-      <div class="grow" onclick="openPortion('${p.id}')">
+      <div class="grow" onclick="openPortion('${sid(p.id)}')">
         <div class="nm">${esc(p.name)}</div>
         <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100${esc(p.unit)}
           <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : 'ručně')}</span></div>
       </div>
-      <button class="btn sm" onclick="openEdit('${p.id}')">✎</button>
+      <button class="btn sm" onclick="openEdit('${sid(p.id)}')">✎</button>
     </div>`).join('')
     : '<p class="muted tiny">Nic tu není. Naskenuj první produkt.</p>';
 }
@@ -723,19 +808,23 @@ async function fetchOFF(code) {
     j = await res.json();
   } finally { clearTimeout(to); }
   if (!j || j.status !== 1 || !j.product) return null;
-  const q = j.product.nutriments || {};
+  return mapOFF(code, j.product);
+}
+
+function mapOFF(code, prod) {
+  const q = prod.nutriments || {};
   const num = k => (q[k] === undefined || q[k] === null || q[k] === '') ? null : n(q[k]);
   let kcal = num('energy-kcal_100g');
   if (kcal === null) {
     const kj = num('energy-kj_100g') !== null ? num('energy-kj_100g') : num('energy_100g');
     if (kj !== null) kcal = kj / 4.184;
   }
-  const name = (j.product.product_name_cs || j.product.product_name || '').trim();
+  const name = (prod.product_name_cs || prod.product_name || '').trim();
   if (!name && kcal === null) return null;
   return {
     id: code, barcode: code,
     name: name || ('Produkt ' + code),
-    brand: (j.product.brands || '').split(',')[0].trim(),
+    brand: (prod.brands || '').split(',')[0].trim(),
     unit: 'g',
     kcal: kcal === null ? 0 : r1(kcal),
     p: num('proteins_100g') || 0,
@@ -743,15 +832,105 @@ async function fetchOFF(code) {
     f: num('fat_100g') || 0,
     fib: num('fiber_100g') || 0,
     salt: num('salt_100g') || 0,
-    serving: j.product.serving_quantity ? n(j.product.serving_quantity) : null,
+    serving: prod.serving_quantity ? n(prod.serving_quantity) : null,
     source: 'off', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
   };
 }
 
+/* --- vyhledávání podle názvu: nejdřív moje databáze, pak Open Food Facts --- */
+async function searchByName() {
+  const q = ($('nameQ').value || '').trim();
+  if (q.length < 2) { toast('Zadej aspoň dvě písmena'); return; }
+  const box = $('nameRes');
+  const mine = products.filter(p =>
+    (p.name + ' ' + (p.brand || '')).toLowerCase().includes(q.toLowerCase())).slice(0, 6);
+  const card = (p, local) => `
+    <div class="item"><div class="grow" onclick="${local
+      ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`}">
+      <div class="nm">${esc(p.name)}</div>
+      <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100 ${esc(p.unit)}
+        <span class="pill ${local ? 'man' : 'off'}">${local ? 'moje' : 'OFF'}</span></div>
+    </div></div>`;
+  box.innerHTML = (mine.length ? mine.map(p => card(p, true)).join('') : '')
+    + '<p class="tiny muted" style="margin:8px 0 0">Hledám v Open Food Facts…</p>';
+  let found = [];
+  try { found = await searchOFF(q, $('czOnly').checked); }
+  catch (e) { found = null; }
+  if (found === null) {
+    box.innerHTML = (mine.length ? mine.map(p => card(p, true)).join('') : '')
+      + '<p class="tiny muted" style="margin:8px 0 0">Online vyhledávání se nepovedlo (jsi offline?).</p>';
+    return;
+  }
+  lastFound = {}; found.forEach(p => lastFound[p.id] = p);
+  const fresh = found.filter(p => !products.some(x => x.id === p.id));
+  box.innerHTML = (mine.map(p => card(p, true)).join(''))
+    + (fresh.length ? fresh.map(p => card(p, false)).join('')
+      : '<p class="tiny muted" style="margin:8px 0 0">Online nic dalšího. Zkus jiné slovo nebo zadej ručně.</p>');
+}
+let lastFound = {};
+async function useFound(id) {
+  const p = lastFound[id]; if (!p) { toast('Nenalezeno'); return; }
+  await dbPut('products', p);
+  if (!products.some(x => x.id === p.id)) products.push(p);
+  renderDb(); info();
+  openPortion(p.id);
+}
+async function searchOFF(q, czOnly) {
+  const par = new URLSearchParams({
+    search_terms: q, search_simple: '1', action: 'process', json: '1', page_size: '20',
+    fields: 'code,product_name,product_name_cs,brands,nutriments,serving_quantity'
+  });
+  if (czOnly) {
+    par.set('tagtype_0', 'countries'); par.set('tag_contains_0', 'contains');
+    par.set('tag_0', 'czech-republic');
+  }
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 12000);
+  let j;
+  try {
+    const res = await fetch('https://world.openfoodfacts.org/cgi/search.pl?' + par.toString(),
+      { signal: ctrl.signal, headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('http ' + res.status);
+    j = await res.json();
+  } finally { clearTimeout(to); }
+  return (j.products || []).map(pr => mapOFF(String(pr.code || ''), pr))
+    .filter(x => x && x.kcal > 0).slice(0, 12);
+}
+
 /* ---------------- portion sheet ---------------- */
+let editLogId = null;
+
+async function editLog(id) {
+  const r = await dbGet('log', id);
+  if (!r) return;
+  if (r.alc) { toast('Nápoj uprav smazáním a zadáním znovu'); return; }
+  const p = products.find(x => x.id === r.productId);
+  editLogId = id;
+  curProduct = p || {
+    id: r.productId, name: r.name, unit: r.unit || 'g', serving: null,
+    kcal: r.amount ? r.kcal / r.amount * 100 : 0, p: r.amount ? r.p / r.amount * 100 : 0,
+    c: r.amount ? r.c / r.amount * 100 : 0, f: r.amount ? r.f / r.amount * 100 : 0,
+    fib: r.amount ? (r.fib || 0) / r.amount * 100 : 0, salt: r.amount ? (r.salt || 0) / r.amount * 100 : 0
+  };
+  $('poName').textContent = curProduct.name;
+  $('poSub').textContent = 'úprava záznamu · ' + r0(curProduct.kcal) + ' kcal / 100 ' + curProduct.unit;
+  $('poUnit').textContent = curProduct.unit;
+  $('poServ').style.display = 'none';
+  $('poAmt').value = r1(r.amount);
+  fillMealSelect();
+  $('poMeal').value = r.meal || defaultMeal();
+  $('poAdd').textContent = 'Uložit změnu';
+  calcPortion();
+  $('modPortion').classList.add('on');
+}
+
 function openPortion(id) {
   const p = products.find(x => x.id === id);
   if (!p) { toast('Produkt nenalezen'); return; }
+  editLogId = null;
+  $('poAdd').textContent = 'Přidat';
+  fillMealSelect();
+  $('poMeal').value = defaultMeal();
   curProduct = p;
   $('poName').textContent = p.name;
   $('poSub').textContent = (p.brand ? p.brand + ' · ' : '') + r0(p.kcal) + ' kcal / 100 ' + p.unit;
@@ -775,16 +954,40 @@ async function addPortion() {
   const amt = n($('poAmt').value);
   if (amt <= 0) { toast('Zadej množství'); return; }
   const a = amt / 100;
-  await dbPut('log', {
+  const rec = {
     date: curDate, productId: curProduct.id, name: curProduct.name, unit: curProduct.unit,
-    amount: amt, kcal: curProduct.kcal * a, p: curProduct.p * a, c: curProduct.c * a,
-    f: curProduct.f * a, ts: Date.now()
-  });
-  curProduct.uses = (curProduct.uses || 0) + 1;
-  await dbPut('products', curProduct);
+    meal: $('poMeal').value, amount: amt,
+    kcal: curProduct.kcal * a, p: curProduct.p * a, c: curProduct.c * a, f: curProduct.f * a,
+    fib: (curProduct.fib || 0) * a, salt: (curProduct.salt || 0) * a, ts: Date.now()
+  };
+  if (editLogId) {
+    const old = await dbGet('log', editLogId);
+    rec.id = editLogId; rec.date = old.date; rec.ts = old.ts;
+    await dbPut('log', rec);
+    editLogId = null;
+    closeMod('modPortion'); toast('Upraveno'); renderDay(); return;
+  }
+  await dbPut('log', rec);
+  if (products.some(x => x.id === curProduct.id)) {
+    curProduct.uses = (curProduct.uses || 0) + 1;
+    await dbPut('products', curProduct);
+  }
   closeMod('modPortion');
-  toast('Přidáno');
+  toast('Přidáno do: ' + mealName(rec.meal));
   go('day');
+  renderDay();
+}
+
+/* kopie jednoho jídla ze včerejška */
+async function copyMeal(mealKey) {
+  const y = new Date(curDate + 'T12:00:00'); y.setDate(y.getDate() - 1);
+  const src = (await dbByIdx('log', 'date', dstr(y))).filter(r => (r.meal || '') === mealKey);
+  if (!src.length) { toast('Včera v tomhle jídle nic nebylo'); return; }
+  for (const r of src) {
+    const c = Object.assign({}, r); delete c.id; c.date = curDate; c.ts = Date.now();
+    await dbPut('log', c);
+  }
+  toast('Zkopírováno: ' + src.length + ' ' + plur(src.length, 'položka', 'položky', 'položek'));
   renderDay();
 }
 function editCurrent() { if (curProduct) { closeMod('modPortion'); openEdit(curProduct.id); } }
@@ -847,11 +1050,13 @@ function fillGoals() {
   $('gKcal').value = goals.kcal; $('gP').value = goals.p; $('gC').value = goals.c;
   $('gF').value = goals.f; $('gAlc').value = goals.alc || 0;
   $('gRmr').value = goals.rmr || '';
+  $('gFib').value = goals.fib || 30; $('gSalt').value = goals.salt || 5;
 }
 async function saveGoals() {
   goals = {
     kcal: n($('gKcal').value) || 2000, p: n($('gP').value) || 0, c: n($('gC').value) || 0,
-    f: n($('gF').value) || 0, alc: n($('gAlc').value) || 0, rmr: n($('gRmr').value) || 0
+    f: n($('gF').value) || 0, alc: n($('gAlc').value) || 0, rmr: n($('gRmr').value) || 0,
+    fib: n($('gFib').value) || 30, salt: n($('gSalt').value) || 5
   };
   await dbPut('meta', { k: 'goals', v: goals });
   renderDay(); toast('Cíle uloženy');
@@ -864,12 +1069,30 @@ function dl(name, text, type) {
   const a = document.createElement('a'); a.href = u; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(u), 4000);
 }
+async function checkBackup() {
+  const b = await dbGet('meta', 'lastBackup');
+  const logs = await dbAll('log');
+  if (!logs.length) { $('bakWarn').style.display = 'none'; return; }
+  const last = b && b.v ? b.v : 0;
+  const dayMs = 86400000;
+  const age = last ? Math.floor((Date.now() - last) / dayMs) : null;
+  const firstTs = Math.min(...logs.map(r => r.ts || Date.now()));
+  const dataAge = Math.floor((Date.now() - firstTs) / dayMs);
+  let msg = '';
+  if (!last && dataAge >= 7) msg = 'Zapisuješ už ' + dnu(dataAge) + ' a nikdy jsi nezálohoval. Data žijí jen tady.';
+  else if (last && age >= 30) msg = 'Poslední záloha před ' + dnu(age) + '. Nezapomeň — jinou kopii dat nemáš.';
+  if (msg) { $('bakTxt').textContent = msg; $('bakWarn').style.display = ''; }
+  else $('bakWarn').style.display = 'none';
+}
+
 async function exportData() {
   const data = {
     v: 3, exported: new Date().toISOString(), goals, drinks,
     products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily')
   };
   dl('kalorie-zaloha-' + dstr(new Date()) + '.json', JSON.stringify(data, null, 1));
+  await dbPut('meta', { k: 'lastBackup', v: Date.now() });
+  checkBackup();
   toast('Záloha stažena');
 }
 async function exportCsv() {
@@ -912,7 +1135,7 @@ async function wipe() {
     t.objectStore('products').clear(); t.objectStore('log').clear();
     t.objectStore('meta').clear(); t.objectStore('daily').clear(); t.oncomplete = r;
   });
-  products = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, rmr: 0 }; drinks = DEF_DRINKS.slice();
+  products = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
   fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info(); toast('Smazáno');
 }
 
@@ -1053,7 +1276,7 @@ async function aiSave(asRecipe) {
     if (i >= 0) products[i] = p; else products.push(p);
   }
   await dbPut('log', {
-    date: curDate, productId: asRecipe ? 'recept' : 'foto', name, unit: 'g',
+    date: curDate, productId: asRecipe ? 'recept' : 'foto', name, unit: 'g', meal: defaultMeal(),
     amount: r1(s.g), kcal: s.k, p: s.p, c: s.c, f: s.f, ts: Date.now()
   });
   aiItems = []; $('aiCard').style.display = 'none'; $('aiIn').value = '';
@@ -1498,7 +1721,7 @@ function renderDrinkBtns() {
 async function logDrink(i) {
   const d = drinks[i]; if (!d) return;
   await dbPut('log', {
-    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml,
+    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml, meal: defaultMeal(),
     kcal: alcKcal(d), p: 0, c: alcCarb(d), f: 0,
     alc: alcG(d), abv: d.abv, ts: Date.now()
   });
@@ -1520,7 +1743,7 @@ async function addCustomDrink(keep) {
   if (d.ml <= 0 || d.abv <= 0) { toast('Zadej objem a procenta'); return; }
   if (keep) { drinks.push(d); await dbPut('meta', { k: 'drinks', v: drinks }); renderDrinkBtns(); renderDrinkEdit(); }
   await dbPut('log', {
-    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml,
+    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml, meal: defaultMeal(),
     kcal: alcKcal(d), p: 0, c: alcCarb(d), f: 0, alc: alcG(d), abv: d.abv, ts: Date.now()
   });
   closeMod('modDrink'); toast('Zapsáno'); renderDay();
@@ -1579,7 +1802,7 @@ async function openAlcOverview() {
     <div class="item"><div class="grow"><div class="nm">${esc(r.name)}</div>
       <div class="sub">${r0(r.amount)} ml · ${r1(r.abv || 0)} % · ${r0(r.kcal)} kcal</div></div>
     <div class="kc">${r1(r.alc)}<span class="tiny muted"> g</span></div>
-    <button class="btn sm dan" onclick="delLog(${r.id});closeMod('modAlc')">✕</button></div>`).join('')
+    <button class="btn sm dan" onclick="delLog(${Number(r.id) || 0});closeMod('modAlc')">✕</button></div>`).join('')
     : '<p class="tiny muted">Dnes nic.</p>';
   $('modAlc').classList.add('on');
 }
