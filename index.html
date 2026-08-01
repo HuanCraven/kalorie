@@ -220,6 +220,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button data-s="find" onclick="setAdd('find')">Hledat</button>
     <button data-s="photo" onclick="setAdd('photo')">Foto</button>
     <button data-s="man" onclick="setAdd('man')">Ručně</button>
+    <button data-s="rec" onclick="setAdd('rec')">Recept</button>
   </div>
 
   <div class="pane on" id="s-code">
@@ -348,6 +349,42 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <p class="tiny muted" style="margin:8px 0 0">Recept se uloží do databáze jako jedna položka —
       příště ho přidáš jedním klepnutím bez focení.</p>
   </div>
+  </div>
+
+  <div class="pane" id="s-rec">
+    <div class="card">
+      <h3>Vlastní recept</h3>
+      <p class="tiny muted" style="margin:0 0 10px">Slož jídlo ze surovin a aplikace dopočte hodnoty
+        na 100 g. Uloží se jako běžná potravina — příště ho přidáš jedním klepnutím.</p>
+      <div class="fld"><label>Název jídla</label>
+        <input id="recName" placeholder="např. Guláš s knedlíkem"></div>
+      <div class="row">
+        <input class="grow" id="recQ" placeholder="přidat surovinu…" autocomplete="off"
+          oninput="recSearch()" onkeydown="if(event.key==='Enter')recSearch()">
+      </div>
+      <div id="recRes" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <h3>Suroviny</h3>
+      <div id="recList"></div>
+      <div class="hr"></div>
+      <div class="fld"><label>Hmotnost hotového jídla (g) — po uvaření</label>
+        <input id="recW" type="number" inputmode="decimal" placeholder="nech prázdné = součet surovin"
+          oninput="recTotals()"></div>
+      <p class="tiny muted" style="margin:-4px 0 10px">Vařením se hmotnost mění — maso se srazí,
+        těstoviny nabobtnají. Když hotové jídlo zvážíš, hodnoty na 100 g budou sedět.</p>
+      <div class="card" style="background:var(--card2);margin-bottom:12px">
+        <div class="row" style="justify-content:space-between"><span class="muted tiny">Celkem</span>
+          <b class="mono" id="recTotK">0 kcal</b></div>
+        <div class="row" style="justify-content:space-between"><span class="muted tiny">B / S / T</span>
+          <span class="mono" id="recTotM">0 / 0 / 0 g</span></div>
+        <div class="row" style="justify-content:space-between"><span class="muted tiny">Na 100 g</span>
+          <b class="mono" id="rec100">—</b></div>
+      </div>
+      <button class="btn pri full" style="margin-bottom:8px" onclick="saveRecipe(true)">Uložit a přidat do dneška</button>
+      <button class="btn full" onclick="saveRecipe(false)">Jen uložit do databáze</button>
+    </div>
   </div>
 
   <div class="pane" id="s-man">
@@ -700,7 +737,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-26';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-27';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1111,6 +1148,91 @@ function showZak(cat) {
     </div></div>`;
   }).join('');
 }
+/* ---------------- recepturník ---------------- */
+let recIngs = [];
+
+function recSearch() {
+  const q = ($('recQ').value || '').trim();
+  if (q.length < 2) { $('recRes').innerHTML = ''; return; }
+  const hits = localMatches(q).slice(0, 8);
+  $('recRes').innerHTML = hits.length ? hits.map(p => `
+    <div class="item" style="padding:8px 0"><div class="grow" onclick="recAdd('${sid(p.id)}')">
+      <div class="nm">${esc(p.name)}</div>
+      <div class="sub">${r0(p.kcal)} kcal/100 ${esc(p.unit)} · B ${r1(p.p)} · S ${r1(p.c)} · T ${r1(p.f)}</div>
+    </div></div>`).join('')
+    : '<p class="tiny muted" style="margin:6px 0 0">Nic. Zkus jiné slovo, nebo potravinu nejdřív ' +
+      'ulož přes Ručně či Hledat.</p>';
+}
+function findAny(id) {
+  const p = products.find(x => x.id === id);
+  if (p) return p;
+  if (window.ZAKLAD) { const z = ZAKLAD.find(x => zakProduct(x).id === id); if (z) return zakProduct(z); }
+  return null;
+}
+function recAdd(id) {
+  const p = findAny(id);
+  if (!p) { toast('Nenalezeno'); return; }
+  recIngs.push({
+    id: p.id, nazev: p.name, mn: p.serving || 100,
+    kcal: p.kcal, b: p.p, s: p.c, t: p.f, fib: p.fib || 0, salt: p.salt || 0
+  });
+  $('recQ').value = ''; $('recRes').innerHTML = '';
+  renderRec();
+  toast('Přidáno: ' + p.name);
+}
+function renderRec() {
+  $('recList').innerHTML = recIngs.length ? recIngs.map((it, i) => `
+    <div class="item">
+      <div class="grow"><div class="nm">${esc(it.nazev)}</div>
+        <div class="sub">${r0(it.kcal)} kcal/100 g · celkem ${r0(it.kcal * it.mn / 100)} kcal</div></div>
+      <input type="number" inputmode="decimal" value="${r1(it.mn)}" style="width:74px;padding:7px 8px;text-align:right"
+        oninput="recIngs[${i}].mn=n(this.value);recTotals()"><span class="tiny muted" style="align-self:center">g</span>
+      <button class="btn sm dan" onclick="recIngs.splice(${i},1);renderRec()">✕</button>
+    </div>`).join('')
+    : '<p class="tiny muted">Zatím žádné suroviny. Přidej je vyhledáním nahoře.</p>';
+  recTotals();
+}
+function recSum() {
+  return recIngs.reduce((a, it) => {
+    const k = it.mn / 100;
+    return {
+      g: a.g + it.mn, kcal: a.kcal + it.kcal * k, p: a.p + it.b * k, c: a.c + it.s * k,
+      f: a.f + it.t * k, fib: a.fib + it.fib * k, salt: a.salt + it.salt * k
+    };
+  }, { g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0, salt: 0 });
+}
+function recTotals() {
+  const t = recSum();
+  const w = n($('recW').value) || t.g;
+  $('recTotK').textContent = r0(t.kcal) + ' kcal';
+  $('recTotM').textContent = r1(t.p) + ' / ' + r1(t.c) + ' / ' + r1(t.f) + ' g';
+  $('rec100').textContent = w > 0
+    ? r0(t.kcal / w * 100) + ' kcal · B ' + r1(t.p / w * 100) + ' S ' + r1(t.c / w * 100) +
+      ' T ' + r1(t.f / w * 100)
+    : '—';
+}
+async function saveRecipe(alsoAdd) {
+  if (!recIngs.length) { toast('Přidej aspoň jednu surovinu'); return; }
+  const name = ($('recName').value || '').trim();
+  if (!name) { toast('Pojmenuj recept'); return; }
+  const t = recSum();
+  const w = n($('recW').value) || t.g;
+  if (w <= 0) { toast('Nulová hmotnost'); return; }
+  const p = {
+    id: 'r' + Date.now().toString(36), barcode: null, name, brand: 'recept', unit: 'g',
+    kcal: r1(t.kcal / w * 100), p: r1(t.p / w * 100), c: r1(t.c / w * 100), f: r1(t.f / w * 100),
+    fib: r1(t.fib / w * 100), salt: r1(t.salt / w * 100), serving: r0(w), source: 'recipe',
+    ing: recIngs.map(x => ({ nazev: x.nazev, mn: x.mn })),
+    uses: 0, createdAt: Date.now(), updatedAt: Date.now()
+  };
+  await dbPut('products', p);
+  products.push(p);
+  recIngs = []; $('recName').value = ''; $('recW').value = '';
+  renderRec(); renderDb(); info();
+  toast('Recept uložen (' + r0(w) + ' g, ' + r0(p.kcal) + ' kcal/100 g)');
+  if (alsoAdd) openPortion(p.id); else setAdd('rec');
+}
+
 async function useZaklad(id) {
   let pr = products.find(x => x.id === id);
   if (!pr) {
