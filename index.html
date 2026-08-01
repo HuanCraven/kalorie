@@ -365,6 +365,19 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <div id="drinkBtns" class="row wrap2" style="margin-bottom:8px"></div>
     <button class="btn sm full" onclick="openCustomDrink()">+ Jiný nápoj</button>
     <details style="margin-top:10px">
+      <summary class="tiny muted" style="cursor:pointer">Načíst historii z jiné aplikace (CSV)</summary>
+      <div style="margin-top:10px">
+        <button class="btn sm full" onclick="document.getElementById('alcCsv').click()">Vybrat soubor</button>
+        <input type="file" id="alcCsv" accept=".backup,.csv,.txt,.bak,*/*" style="display:none"
+          onchange="readAlcCsv(this)">
+        <p class="tiny muted" style="margin:8px 0 0">Bere zálohu z AlcoDroidu
+          (<code>all_data.backup</code>) i běžné CSV. Zálohu najdeš v telefonu ve složce
+          <code>AlcoDroid</code> nebo ji vyexportuj přes ⋮ → Zálohovat.</p>
+        <div id="alcImpRes" class="tiny muted" style="margin-top:8px"></div>
+      </div>
+    </details>
+
+    <details style="margin-top:10px">
       <summary class="tiny muted" style="cursor:pointer">Upravit přednastavené nápoje</summary>
       <div style="margin-top:10px">
     <div class="lbl-s">Upravit tlačítka</div>
@@ -380,11 +393,15 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <div class="lbl-s">Denní průměr</div>
   <div class="row" style="gap:10px;margin:0 0 14px">
     <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted">7 dní</div><b class="mono" id="alcA7" style="font-size:20px">0</b><div class="tiny muted">g/den</div></div>
+      <div class="tiny muted">7 dní</div><b class="mono" id="alcA7" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
+    <div class="card grow" style="margin:0;background:#22303f;text-align:center;padding:10px;border-color:#33405a">
+      <div class="tiny muted">30 dní</div><b class="mono" id="alcA30" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
+  </div>
+  <div class="row" style="gap:10px;margin:0 0 8px">
     <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted" id="alcMName">měsíc</div><b class="mono" id="alcAM" style="font-size:20px">0</b><div class="tiny muted">g/den</div></div>
+      <div class="tiny muted" id="alcMName">měsíc</div><b class="mono" id="alcAM" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
     <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted">celkem</div><b class="mono" id="alcAAll" style="font-size:20px">0</b><div class="tiny muted">g/den</div></div>
+      <div class="tiny muted">celkem</div><b class="mono" id="alcAAll" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
   </div>
   <p class="tiny muted" id="alcAvgNote" style="margin:-8px 0 14px"></p>
 
@@ -671,7 +688,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-21';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-23';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -936,7 +953,7 @@ async function renderDay() {
     : '7 dní: ' + r0(alcWeek) + ' g';
   $('alcWeek').style.color = (goals.alc && alcWeek > goals.alc) ? 'var(--bad)' : 'var(--dim)';
   const asum = await alcStats();
-  $('alcMonth').textContent = 'ø ' + asum.mName + ': ' + r1(asum.avgM) + ' g/den';
+  $('alcMonth').textContent = 'ø 30 dní: ' + r1(asum.avg30) + ' g/den';
 
   const favs = products.slice().sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).filter(p => p.uses);
   $('favList').innerHTML = favs.length ? favs.map(p =>
@@ -2168,8 +2185,9 @@ function summaryText() {
   L.push('');
   L.push('ALKOHOL: ' + r0(a.alc) + ' g čistého za období, ' + dnu(a.alcDays) + ' s alkoholem, ' +
     r0(a.alcKcal) + ' kcal');
-  if (alcCache) L.push('  denní průměr: 7 dní ' + r1(alcCache.avg7) + ' g · ' + alcCache.mName + ' ' +
-    r1(alcCache.avgM) + ' g · celkem ' + r1(alcCache.avgAll) + ' g (od ' + alcCache.first + ')');
+  if (alcCache) L.push('  denní průměr: 7 dní ' + r1(alcCache.avg7) + ' g · 30 dní ' + r1(alcCache.avg30) +
+    ' g · ' + alcCache.mName + ' ' + r1(alcCache.avgM) + ' g · celkem ' + r1(alcCache.avgAll) +
+    ' g (od ' + alcCache.first + ')');
   L.push('');
   L.push('DENNÍ ŘADA (datum;kcal;B;S;T;alk_g;aktivni_kcal;vaha)');
   list.forEach(d => L.push('  ' + d.date + ';' + (d.logged ? r0(d.k) : '') + ';' + r0(d.p) + ';' +
@@ -2394,6 +2412,166 @@ function addDrinkDef() { drinks.push({ nm: 'Nový nápoj', ml: 200, abv: 12, c: 
 const MES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
   'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
 
+/* ---- import historie z CSV (AlcoDroid apod.) ---- */
+let alcPending = null;
+
+function splitLine(l, sep) {
+  const out = []; let cur = '', q = false;
+  for (let i = 0; i < l.length; i++) {
+    const ch = l[i];
+    if (ch === '"') { if (q && l[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+    else if (ch === sep && !q) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(x => x.trim().replace(/^"|"$/g, ''));
+}
+function parseDateAny(v) {
+  const t = String(v).trim();
+  let m = t.match(/(\d{4})-(\d{2})-(\d{2})/);                       // 2026-08-01
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = t.match(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);              // 1.8.2026 nebo 1/8/2026
+  if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  const d = new Date(t);
+  return isNaN(d) ? null : dstr(d);
+}
+function readAlcCsv(inp) {
+  const f = inp.files && inp.files[0]; if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    const buf = fr.result;
+    const u8 = new Uint8Array(buf);
+    // binární záloha AlcoDroidu začíná 00 00 03 E8
+    if (u8.length > 8 && u8[0] === 0 && u8[1] === 0 && u8[2] === 3 && u8[3] === 0xE8) parseAlcoDroid(buf);
+    else parseAlcCsv(new TextDecoder('utf-8').decode(u8));
+    inp.value = '';
+  };
+  fr.readAsArrayBuffer(f);
+}
+
+/* AlcoDroid all_data.backup — vlastní binární formát.
+   Záznam: značka 00 00 03 EA · délka názvu (u16) · název (UTF-8) ·
+   2 B · objem ml (double) · obsah alkoholu % (double) · 4 B · čas (long ms) */
+function parseAlcoDroid(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), dec = new TextDecoder('utf-8');
+  const marks = [];
+  for (let i = 0; i + 3 < u8.length; i++)
+    if (u8[i] === 0 && u8[i + 1] === 0 && u8[i + 2] === 3 && u8[i + 3] === 0xEA) marks.push(i);
+  const rows = [];
+  for (const a of marks) {
+    if (a + 6 > u8.length) continue;
+    const ln = dv.getUint16(a + 4);
+    if (!ln || a + 6 + ln + 26 > u8.length) continue;
+    let name;
+    try { name = dec.decode(u8.subarray(a + 6, a + 6 + ln)); } catch (e) { continue; }
+    const o = a + 6 + ln;
+    const ml = dv.getFloat64(o + 2), abv = dv.getFloat64(o + 10);
+    const ts = Number(dv.getBigInt64(o + 18));
+    if (!(ml > 0) || !(abv > 0) || !(ts > 1.4e12 && ts < 2.2e12)) continue;
+    const d = new Date(ts);
+    rows.push({ date: dstr(d), name: name.trim() || 'Nápoj', ml, abv, g: ml * (abv / 100) * ETH, ts });
+  }
+  showAlcPreview(rows, 'AlcoDroid — ' + marks.length + ' bloků, ' + rows.length + ' použitelných');
+}
+
+function mealForHour(h) {
+  if (h < 4) return 'vecsvac';
+  return (MEALS.find(m => h < m.to) || MEALS[5]).k;
+}
+function parseAlcCsv(txt) {
+  const box = $('alcImpRes');
+  const lines = txt.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) { box.innerHTML = 'Soubor je prázdný.'; return; }
+  const sep = [';', ',', '\t'].map(c => ({ c, n: (lines[0].match(new RegExp('\\' + c, 'g')) || []).length }))
+    .sort((a, b) => b.n - a.n)[0].c;
+  let head = null, start = 0;
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    const c = splitLine(lines[i], sep).map(x => x.toLowerCase());
+    if (c.some(x => /datum|date|time|čas/.test(x))) { head = c; start = i + 1; break; }
+  }
+  if (!head) {
+    box.innerHTML = '<span style="color:var(--warn)">Nenašel jsem řádek s názvy sloupců.</span><br>' +
+      'První řádek souboru:<br><code>' + esc(lines[0].slice(0, 120)) + '</code><br>' +
+      'Pošli soubor Claudeovi do chatu, doplní podporu tohohle formátu.';
+    return;
+  }
+  const col = re => head.findIndex(h => re.test(h));
+  const iD = col(/datum|date|time|čas/), iN = col(/napoj|nápoj|drink|název|name|typ/),
+        iV = col(/objem|volume|ml|amount|množ/), iA = col(/proc|%|abv|strength|obsah|alko.*%/),
+        iG = col(/gram|alcohol_g|čist|cist|units|jednot/);
+  const rows = [];
+  for (let i = start; i < lines.length; i++) {
+    const c = splitLine(lines[i], sep);
+    if (!c[iD]) continue;
+    const date = parseDateAny(c[iD]); if (!date) continue;
+    const ml = iV >= 0 ? n(String(c[iV]).replace(/[^0-9.,]/g, '')) : 0;
+    const abv = iA >= 0 ? n(String(c[iA]).replace(/[^0-9.,]/g, '')) : 0;
+    let g = (ml > 0 && abv > 0) ? ml * (abv / 100) * ETH : 0;
+    if (!g && iG >= 0) g = n(String(c[iG]).replace(/[^0-9.,]/g, ''));
+    if (!(g > 0)) continue;
+    rows.push({ date, name: (iN >= 0 ? c[iN] : '') || 'Nápoj', ml: ml || 0, abv: abv || 0, g });
+  }
+  if (!rows.length) {
+    box.innerHTML = '<span style="color:var(--warn)">Sloupce jsem našel, ale žádný použitelný řádek.</span><br>' +
+      'Nalezené sloupce: <code>' + esc(head.join(' | ').slice(0, 140)) + '</code><br>' +
+      'Pošli soubor Claudeovi, doladí to.';
+    return;
+  }
+  showAlcPreview(rows, 'Sloupce: datum=' + esc(head[iD]) + (iN >= 0 ? ', nápoj=' + esc(head[iN]) : '') +
+    (iV >= 0 ? ', objem=' + esc(head[iV]) : '') + (iA >= 0 ? ', %=' + esc(head[iA]) : '') +
+    (iG >= 0 ? ', gramy=' + esc(head[iG]) : ''));
+}
+
+function showAlcPreview(rows, detail) {
+  const box = $('alcImpRes');
+  if (!rows || !rows.length) {
+    box.innerHTML = '<span style="color:var(--warn)">Nenašel jsem žádný použitelný záznam.</span><br>' +
+      esc(detail || '') + '<br>Pošli soubor Claudeovi do chatu, doladí to.';
+    return;
+  }
+  alcPending = rows;
+  const ds = rows.map(r => r.date).sort();
+  const tot = rows.reduce((a, r) => a + r.g, 0);
+  const dnyRozsah = Math.round((new Date(ds[ds.length - 1] + 'T12:00:00') -
+    new Date(ds[0] + 'T12:00:00')) / 86400000) + 1;
+  const podle = {};
+  rows.forEach(r => { podle[r.name] = (podle[r.name] || 0) + 1; });
+  const top = Object.entries(podle).sort((a, b) => b[1] - a[1]).slice(0, 4)
+    .map(([k, v]) => esc(k) + ' ' + v + '×').join(' · ');
+  box.innerHTML = '<b style="color:var(--fg)">Načteno ' + rows.length + ' ' +
+    plur(rows.length, 'záznam', 'záznamy', 'záznamů') + '</b><br>' +
+    'Období: ' + czd(ds[0]) + ' – ' + czd(ds[ds.length - 1]) + ' (' + dnu(dnyRozsah) + ')<br>' +
+    'Celkem ' + r0(tot) + ' g čistého alkoholu · průměr ' + r1(tot / dnyRozsah) + ' g/den<br>' +
+    'Nejčastěji: ' + top + '<br>' +
+    '<span class="tiny" style="color:var(--dim2)">' + esc(detail || '') + '</span>' +
+    '<button class="btn pri full" style="margin-top:8px" onclick="importAlc()">Importovat do deníku</button>';
+}
+async function importAlc() {
+  if (!alcPending) return;
+  // čas musí být v otisku — dvě stejná piva v jeden den nejsou duplicita
+  const sig = r => [r.date, r.ts, r.name, r0(r.amount), r1(r.alc)].join('|');
+  const have = new Set((await dbAll('log')).filter(r => r.alc).map(sig));
+  let add = 0, skip = 0;
+  for (const r of alcPending) {
+    const when = r.ts ? new Date(r.ts) : new Date(r.date + 'T20:00:00');
+    const rec = {
+      date: r.date, productId: 'alk', name: r.name, unit: 'ml',
+      meal: mealForHour(when.getHours() + when.getMinutes() / 60),
+      amount: r.ml || r1(r.g / ETH), kcal: r.g * KCAL_ETH, p: 0, c: 0, f: 0,
+      alc: r.g, abv: r.abv, ts: when.getTime()
+    };
+    if (have.has(sig(rec))) { skip++; continue; }
+    have.add(sig(rec));
+    await dbPut('log', rec); add++;
+  }
+  alcPending = null;
+  $('alcImpRes').innerHTML = '<b style="color:var(--ok)">Hotovo.</b> Přidáno ' + add + ' ' +
+    plur(add, 'záznam', 'záznamy', 'záznamů') + (skip ? ', ' + skip + ' už tam bylo' : '') +
+    '.<br>Sacharidy z piva nejsou v exportu, takže se nezapočítaly — kalorie jsou jen z etanolu.';
+  toast('Importováno: ' + add);
+  renderDay(); renderAlc();
+}
+
 async function alcStats() {
   const all = await dbAll('log');
   const byDay = {};
@@ -2427,7 +2605,7 @@ async function alcStats() {
   return {
     days, d7: sum(7), d30: sum(30), dry: days.filter(x => x.g === 0).length,
     today: byDay[curDate] || 0,
-    avg7: sum(7) / 7,
+    avg7: sum(7) / 7, avg30: sum(30) / 30,
     mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
     allSum, allDays, avgAll: allSum / allDays, first
   };
@@ -2436,6 +2614,7 @@ async function renderAlc() {
   const s = await alcStats();
   $('alc7').textContent = r0(s.d7); $('alc30').textContent = r0(s.d30); $('alcDry').textContent = s.dry;
   $('alcA7').textContent = r1(s.avg7);
+  $('alcA30').textContent = r1(s.avg30);
   $('alcAM').textContent = r1(s.avgM);
   $('alcMName').textContent = s.mName;
   $('alcAAll').textContent = r1(s.avgAll);
