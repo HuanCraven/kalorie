@@ -127,6 +127,21 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
   </div>
 
   <div class="card">
+    <h3>Výdej a váha</h3>
+    <div class="grid2">
+      <div class="fld"><label>Aktivní kcal z hodinek</label>
+        <input id="dBurn" type="number" inputmode="numeric" placeholder="0" onchange="saveDaily()"></div>
+      <div class="fld"><label>Váha (kg)</label>
+        <input id="dWeight" type="number" inputmode="decimal" step="0.1" placeholder="—" onchange="saveDaily()"></div>
+    </div>
+    <div class="row" style="justify-content:space-between">
+      <span class="tiny muted" id="balExp">—</span>
+      <b class="mono" id="balVal">—</b>
+    </div>
+    <p class="tiny muted" id="balHint" style="margin:6px 0 0"></p>
+  </div>
+
+  <div class="card">
     <div class="row" style="justify-content:space-between;margin-bottom:8px">
       <h3 style="margin:0">Alkohol</h3>
       <button class="btn sm" onclick="openAlcOverview()">Přehled</button>
@@ -227,6 +242,70 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
   </div>
 </section>
 
+<!-- ============ STATISTIKY ============ -->
+<section id="p-stats" class="page">
+  <div class="row" style="margin-bottom:12px">
+    <button class="btn grow" id="per7" onclick="setPeriod(7)">7 dní</button>
+    <button class="btn grow" id="per30" onclick="setPeriod(30)">30 dní</button>
+    <button class="btn grow" id="per90" onclick="setPeriod(90)">90 dní</button>
+  </div>
+
+  <div class="card">
+    <div class="tiny muted" id="stRange"></div>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+        <div class="tiny muted">příjem ø</div><b class="mono" id="stKcal" style="font-size:19px">—</b><div class="tiny muted">kcal/den</div></div>
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+        <div class="tiny muted">výdej ø</div><b class="mono" id="stBurn" style="font-size:19px">—</b><div class="tiny muted">kcal/den</div></div>
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+        <div class="tiny muted">bilance ø</div><b class="mono" id="stBal" style="font-size:19px">—</b><div class="tiny muted">kcal/den</div></div>
+    </div>
+    <p class="tiny muted" id="stCover" style="margin:10px 0 0"></p>
+  </div>
+
+  <div class="card">
+    <h3>Denní příjem</h3>
+    <div id="chKcal"></div>
+  </div>
+
+  <div class="card">
+    <h3>Denní bilance</h3>
+    <div id="chBal"></div>
+    <p class="tiny muted" style="margin:8px 0 0">
+      <span style="color:#2f8fe6">▬</span> deficit &nbsp;
+      <span style="color:#e0574d">▬</span> přebytek</p>
+  </div>
+
+  <div class="card">
+    <h3>Váha</h3>
+    <div id="chWeight"></div>
+    <div id="stWeightTxt" class="tiny muted" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h3>Makroživiny — průměr na den</h3>
+    <div id="stMacros"></div>
+  </div>
+
+  <div class="card">
+    <h3>Postřehy</h3>
+    <div id="stInsights"></div>
+  </div>
+
+  <div class="card">
+    <h3>Nejčastější zdroje kalorií</h3>
+    <div id="stTop"></div>
+  </div>
+
+  <div class="card">
+    <h3>Rozbor od Claude</h3>
+    <button class="btn pri full" style="margin-bottom:8px" onclick="copySummary()">Zkopírovat souhrn do schránky</button>
+    <button class="btn full" onclick="dlSummary()">Stáhnout jako soubor</button>
+    <p class="tiny muted" style="margin:8px 0 0">Vlož souhrn do chatu s Claudem a napiš, na co se chceš zeptat.
+      Souhrn neobsahuje nic osobního nad rámec těchhle čísel.</p>
+  </div>
+</section>
+
 <!-- ============ DATABÁZE ============ -->
 <section id="p-db" class="page">
   <div class="card">
@@ -246,7 +325,20 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
       <div class="fld"><label>Sacharidy (g)</label><input id="gC" type="number" inputmode="numeric"></div>
     </div>
     <div class="fld"><label>Tuky (g)</label><input id="gF" type="number" inputmode="numeric"></div>
+    <div class="fld"><label>Klidový výdej — bazální metabolismus (kcal/den)</label>
+      <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750"></div>
     <button class="btn pri full" onclick="saveGoals()">Uložit cíle</button>
+    <div class="hr"></div>
+    <h3>Nevíš klidový výdej?</h3>
+    <div class="grid2">
+      <div class="fld"><label>Pohlaví</label><select id="cSex"><option value="m">muž</option><option value="f">žena</option></select></div>
+      <div class="fld"><label>Věk</label><input id="cAge" type="number" inputmode="numeric"></div>
+      <div class="fld"><label>Výška (cm)</label><input id="cH" type="number" inputmode="numeric"></div>
+      <div class="fld"><label>Váha (kg)</label><input id="cW" type="number" inputmode="decimal"></div>
+    </div>
+    <button class="btn full" onclick="calcRmr()">Spočítat a doplnit</button>
+    <p class="tiny muted" style="margin:8px 0 0">Mifflin–St Jeor. Je to odhad s chybou kolem 10 %.
+      Aplikace ho po pár týdnech porovná se skutečnou změnou váhy a ukáže ti reálné číslo.</p>
   </div>
 
   <div class="card">
@@ -288,7 +380,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
   <button data-p="photo" onclick="go('photo')">
     <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Foto</button>
   <button data-p="db" onclick="go('db')">
-    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Databáze</button>
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Jídla</button>
+  <button data-p="stats" onclick="go('stats')">
+    <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Staty</button>
   <button data-p="set" onclick="go('set')">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Nastavení</button>
 </nav>
@@ -432,14 +526,20 @@ function dstr(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 const DAYS = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
+// české skloňování: 1 den · 2–4 dny · 5+ dnů
+const plur = (k, a, b, c) => k === 1 ? a : (k >= 2 && k <= 4 ? b : c);
+const dnu = k => k + ' ' + plur(k, 'den', 'dny', 'dnů');
+// procenta, která by se zaokrouhlila na nulu, ať nevypadají jako nula
+const pctTxt = v => v > 0 && v < 0.5 ? '<1 %' : r0(v) + ' %';
 
 /* ---------------- IndexedDB ---------------- */
 let db = null;
 function openDB() {
   return new Promise((res, rej) => {
-    const rq = indexedDB.open('kaltrack', 1);
+    const rq = indexedDB.open('kaltrack', 2);
     rq.onupgradeneeded = e => {
       const d = e.target.result;
+      if (!d.objectStoreNames.contains('daily')) d.createObjectStore('daily', { keyPath: 'date' });
       if (!d.objectStoreNames.contains('products')) {
         const s = d.createObjectStore('products', { keyPath: 'id' });
         s.createIndex('name', 'name');
@@ -464,7 +564,7 @@ const dbByIdx = (s, i, v) => req(tx(s, 'readonly').index(i).getAll(v));
 
 /* ---------------- state ---------------- */
 let products = [];            // cache
-let goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0 };
+let goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, rmr: 0 };
 let curDate = dstr(new Date());
 let curProduct = null;        // product open in portion sheet
 let servingAmt = 100;
@@ -499,6 +599,7 @@ function go(p) {
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   if (p !== 'scan') stopCam();
   if (p === 'db') renderDb();
+  if (p === 'stats') renderStats();
   window.scrollTo(0, 0);
 }
 function closeMod(id) { $(id).classList.remove('on'); }
@@ -548,6 +649,9 @@ async function renderDay() {
       <button class="btn sm dan" onclick="delLog(${r.id})">✕</button>
     </div>`).join('')
     : '<p class="muted tiny">Zatím nic. Naskenuj kód nebo přidej z databáze.</p>';
+
+  await loadDaily();
+  await renderBalance(t.k);
 
   // alkohol: dnes + posledních 7 dní
   const wStart = new Date(curDate + 'T12:00:00'); wStart.setDate(wStart.getDate() - 6);
@@ -742,11 +846,12 @@ async function deleteProduct() {
 function fillGoals() {
   $('gKcal').value = goals.kcal; $('gP').value = goals.p; $('gC').value = goals.c;
   $('gF').value = goals.f; $('gAlc').value = goals.alc || 0;
+  $('gRmr').value = goals.rmr || '';
 }
 async function saveGoals() {
   goals = {
     kcal: n($('gKcal').value) || 2000, p: n($('gP').value) || 0, c: n($('gC').value) || 0,
-    f: n($('gF').value) || 0, alc: n($('gAlc').value) || 0
+    f: n($('gF').value) || 0, alc: n($('gAlc').value) || 0, rmr: n($('gRmr').value) || 0
   };
   await dbPut('meta', { k: 'goals', v: goals });
   renderDay(); toast('Cíle uloženy');
@@ -760,7 +865,10 @@ function dl(name, text, type) {
   setTimeout(() => URL.revokeObjectURL(u), 4000);
 }
 async function exportData() {
-  const data = { v: 2, exported: new Date().toISOString(), goals, drinks, products: await dbAll('products'), log: await dbAll('log') };
+  const data = {
+    v: 3, exported: new Date().toISOString(), goals, drinks,
+    products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily')
+  };
   dl('kalorie-zaloha-' + dstr(new Date()) + '.json', JSON.stringify(data, null, 1));
   toast('Záloha stažena');
 }
@@ -783,6 +891,7 @@ function importData(inp) {
       let np = 0, nl = 0;
       for (const p of (d.products || [])) { await dbPut('products', p); np++; }
       for (const l of (d.log || [])) { const c = Object.assign({}, l); delete c.id; await dbPut('log', c); nl++; }
+      for (const x of (d.daily || [])) await dbPut('daily', x);
       if (d.goals) { goals = Object.assign(goals, d.goals); await dbPut('meta', { k: 'goals', v: goals }); fillGoals(); }
       if (Array.isArray(d.drinks) && d.drinks.length) {
         drinks = d.drinks; await dbPut('meta', { k: 'drinks', v: drinks });
@@ -798,8 +907,12 @@ function importData(inp) {
 }
 async function wipe() {
   if (!confirm('Opravdu smazat úplně všechno? Nejde vrátit.')) return;
-  await new Promise(r => { const t = db.transaction(['products', 'log', 'meta'], 'readwrite'); t.objectStore('products').clear(); t.objectStore('log').clear(); t.objectStore('meta').clear(); t.oncomplete = r; });
-  products = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0 }; drinks = DEF_DRINKS.slice();
+  await new Promise(r => {
+    const t = db.transaction(['products', 'log', 'meta', 'daily'], 'readwrite');
+    t.objectStore('products').clear(); t.objectStore('log').clear();
+    t.objectStore('meta').clear(); t.objectStore('daily').clear(); t.oncomplete = r;
+  });
+  products = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, rmr: 0 }; drinks = DEF_DRINKS.slice();
   fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info(); toast('Smazáno');
 }
 
@@ -948,6 +1061,359 @@ async function aiSave(asRecipe) {
   renderDb(); info();
   toast(asRecipe ? 'Přidáno a uloženo jako recept' : 'Přidáno do dneška');
   go('day'); renderDay();
+}
+
+/* ---------------- výdej, váha, statistiky ---------------- */
+const KCAL_PER_KG = 7700;      // energie v 1 kg tělesné tkáně
+const C_DEF = '#2f8fe6';       // deficit / hlavní série  (ověřeno validátorem)
+const C_SUR = '#e0574d';       // přebytek
+const C_GRID = '#39414f', C_INK = '#8b95a7';
+let period = 7, statCache = null;
+
+async function loadDaily() {
+  const d = await dbGet('daily', curDate) || {};
+  $('dBurn').value = (typeof d.burn === 'number') ? d.burn : '';
+  $('dWeight').value = (typeof d.weight === 'number') ? d.weight : '';
+}
+async function saveDaily() {
+  const burn = $('dBurn').value.trim(), w = $('dWeight').value.trim();
+  const rec = { date: curDate };
+  if (burn !== '') rec.burn = n(burn);
+  if (w !== '') rec.weight = n(w);
+  await dbPut('daily', rec);
+  toast('Uloženo');
+  renderDay();
+}
+function calcRmr() {
+  const s = $('cSex').value, a = n($('cAge').value), h = n($('cH').value), w = n($('cW').value);
+  if (!a || !h || !w) { toast('Vyplň věk, výšku a váhu'); return; }
+  const bmr = 10 * w + 6.25 * h - 5 * a + (s === 'm' ? 5 : -161);
+  $('gRmr').value = r0(bmr);
+  toast('Doplněno: ' + r0(bmr) + ' kcal — ulož cíle');
+}
+async function renderBalance(intake) {
+  const d = await dbGet('daily', curDate) || {};
+  const burn = (typeof d.burn === 'number') ? d.burn : 0;
+  const rmr = goals.rmr || 0;
+  if (!rmr) {
+    $('balExp').textContent = 'Bilance';
+    $('balVal').textContent = '—';
+    $('balHint').textContent = 'Nastav klidový výdej v Nastavení, jinak nejde bilanci spočítat.';
+    return;
+  }
+  const out = rmr + burn, bal = intake - out;
+  $('balExp').textContent = 'Výdej ' + r0(rmr) + ' + ' + r0(burn) + ' = ' + r0(out) + ' kcal';
+  $('balVal').textContent = (bal > 0 ? '+' : '') + r0(bal) + ' kcal';
+  $('balVal').style.color = bal > 0 ? C_SUR : C_DEF;
+  $('balHint').textContent = (typeof d.burn === 'number') ? '' : 'Aktivní kalorie z hodinek zatím nezadané — počítá se s 0.';
+}
+
+/* --- sběr dat --- */
+async function statsData(days) {
+  const all = await dbAll('log');
+  const dl = await dbAll('daily');
+  const dmap = {}; dl.forEach(d => dmap[d.date] = d);
+  const byDay = {};
+  all.forEach(r => {
+    const b = byDay[r.date] || (byDay[r.date] = { k: 0, p: 0, c: 0, f: 0, alc: 0, items: [] });
+    b.k += r.kcal; b.p += r.p; b.c += r.c; b.f += r.f; b.alc += r.alc || 0;
+    b.items.push({ name: r.name, kcal: r.kcal });
+  });
+  const list = [], base = new Date(curDate + 'T12:00:00');
+  for (let i = days - 1; i >= 0; i--) {
+    const x = new Date(base); x.setDate(x.getDate() - i);
+    const key = dstr(x), b = byDay[key], dd = dmap[key] || {};
+    list.push({
+      date: key, k: b ? b.k : 0, p: b ? b.p : 0, c: b ? b.c : 0, f: b ? b.f : 0,
+      alc: b ? b.alc : 0, items: b ? b.items : [], logged: !!b,
+      burn: (typeof dd.burn === 'number') ? dd.burn : null,
+      weight: (typeof dd.weight === 'number') ? dd.weight : null
+    });
+  }
+  return list;
+}
+function agg(list) {
+  const rmr = goals.rmr || 0;
+  const lg = list.filter(d => d.logged);
+  const avg = (arr, f) => arr.length ? arr.reduce((a, x) => a + f(x), 0) / arr.length : 0;
+  const kcals = lg.map(d => d.k);
+  const withBurn = list.filter(d => d.burn !== null);
+  const outDays = rmr ? list.map(d => rmr + (d.burn || 0)) : [];
+  const balDays = rmr ? list.map(d => d.logged ? d.k - (rmr + (d.burn || 0)) : null) : [];
+  const w = list.filter(d => d.weight !== null);
+  // klouzavý 7denní průměr váhy
+  const ma = list.map((d, i) => {
+    const win = list.slice(Math.max(0, i - 6), i + 1).filter(x => x.weight !== null);
+    return win.length ? win.reduce((a, x) => a + x.weight, 0) / win.length : null;
+  });
+  let realTdee = null, wSpan = 0, dKg = 0;
+  if (w.length >= 2) {
+    const iF = list.findIndex(d => d.weight !== null);
+    let iL = -1; list.forEach((d, i) => { if (d.weight !== null) iL = i; });
+    wSpan = iL - iF;
+    if (wSpan >= 10) {
+      const seg = list.slice(iF, iL + 1).filter(d => d.logged);
+      if (seg.length >= Math.round(wSpan * 0.6)) {
+        dKg = list[iL].weight - list[iF].weight;
+        realTdee = avg(seg, d => d.k) - (dKg * KCAL_PER_KG / wSpan);
+      }
+    }
+  }
+  const sd = kcals.length > 1
+    ? Math.sqrt(kcals.reduce((a, x) => a + (x - avg(lg, d => d.k)) ** 2, 0) / kcals.length) : 0;
+  return {
+    days: list.length, logged: lg.length, rmr,
+    avgK: avg(lg, d => d.k), minK: Math.min(...(kcals.length ? kcals : [0])),
+    maxK: Math.max(...(kcals.length ? kcals : [0])), sdK: sd,
+    avgP: avg(lg, d => d.p), avgC: avg(lg, d => d.c), avgF: avg(lg, d => d.f),
+    avgBurn: withBurn.length ? avg(withBurn, d => d.burn) : 0, burnDays: withBurn.length,
+    avgOut: outDays.length ? outDays.reduce((a, x) => a + x, 0) / outDays.length : 0,
+    avgBal: balDays.filter(x => x !== null).length
+      ? balDays.filter(x => x !== null).reduce((a, x) => a + x, 0) / balDays.filter(x => x !== null).length : 0,
+    cumBal: balDays.filter(x => x !== null).reduce((a, x) => a + x, 0),
+    balDays, ma, weights: w, wFirst: w.length ? w[0].weight : null,
+    wLast: w.length ? w[w.length - 1].weight : null, wSpan, dKg, realTdee,
+    alc: list.reduce((a, d) => a + d.alc, 0), alcDays: list.filter(d => d.alc > 0).length,
+    alcKcal: list.reduce((a, d) => a + d.alc * KCAL_ETH, 0)
+  };
+}
+
+/* --- grafy (SVG) --- */
+function svgBars(list, a) {
+  const W = 320, H = 110, pad = 4;
+  const top = Math.max(goals.kcal || 0, a.maxK) * 1.12 || 100;
+  const bw = (W - pad * 2) / list.length;
+  const gy = H - (goals.kcal / top) * H;
+  const bars = list.map((d, i) => {
+    const h = d.logged ? Math.max(1.5, d.k / top * H) : 0;
+    const x = pad + i * bw, y = H - h;
+    return d.logged
+      ? `<rect x="${x + 1}" y="${y}" width="${Math.max(1.5, bw - 2)}" height="${h}" rx="${Math.min(2, bw / 3)}"
+          fill="${C_DEF}" onclick="stTip(${i})"/>`
+      : `<rect x="${x + 1}" y="${H - 2}" width="${Math.max(1.5, bw - 2)}" height="2" fill="${C_GRID}"/>`;
+  }).join('');
+  const goal = goals.kcal ? `<line x1="0" y1="${gy}" x2="${W}" y2="${gy}" stroke="${C_INK}"
+      stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="${W - 2}" y="${gy - 3}" fill="${C_INK}" font-size="8" text-anchor="end">cíl ${goals.kcal}</text>` : '';
+  return `<svg viewBox="0 0 ${W} ${H + 14}" style="width:100%;height:auto;overflow:visible">
+      ${bars}${goal}
+      <text x="0" y="${H + 11}" fill="${C_INK}" font-size="8">${czd(list[0].date)}</text>
+      <text x="${W}" y="${H + 11}" fill="${C_INK}" font-size="8" text-anchor="end">dnes</text>
+    </svg><div class="tiny muted" id="stTipTxt" style="margin-top:6px">Klepni na sloupec pro detail.</div>`;
+}
+function svgDiverging(list, a) {
+  const W = 320, H = 96;
+  const vals = a.balDays;
+  const mx = Math.max(200, ...vals.filter(v => v !== null).map(v => Math.abs(v))) * 1.1;
+  const mid = H / 2, bw = W / list.length;
+  const bars = vals.map((v, i) => {
+    if (v === null) return '';
+    const h = Math.max(1.5, Math.abs(v) / mx * (H / 2));
+    const y = v >= 0 ? mid - h : mid;
+    return `<rect x="${i * bw + 1}" y="${y}" width="${Math.max(1.5, bw - 2)}" height="${h}" rx="1.5"
+       fill="${v >= 0 ? C_SUR : C_DEF}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H + 14}" style="width:100%;height:auto;overflow:visible">
+      ${bars}<line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="${C_INK}" stroke-width="1"/>
+      <text x="0" y="${mid - 4}" fill="${C_INK}" font-size="8">+${r0(mx)}</text>
+      <text x="0" y="${H + 11}" fill="${C_INK}" font-size="8">−${r0(mx)}</text>
+      <text x="${W}" y="${H + 11}" fill="${C_INK}" font-size="8" text-anchor="end">dnes</text>
+    </svg>`;
+}
+function svgWeight(list, a) {
+  const W = 320, H = 100;
+  const pts = list.map((d, i) => ({ i, w: d.weight, m: a.ma[i] })).filter(p => p.m !== null);
+  if (pts.length < 2) return '<p class="tiny muted">Zadej váhu aspoň dvakrát a objeví se graf.</p>';
+  const ws = list.filter(d => d.weight !== null).map(d => d.weight).concat(pts.map(p => p.m));
+  const lo = Math.min(...ws), hi = Math.max(...ws), rng = Math.max(0.6, hi - lo) * 1.25;
+  const midv = (hi + lo) / 2, y0 = midv - rng / 2;
+  const X = i => (i / Math.max(1, list.length - 1)) * (W - 30);
+  const Y = v => H - ((v - y0) / rng) * H;
+  const line = pts.map((p, k) => (k ? 'L' : 'M') + r1(X(p.i)) + ' ' + r1(Y(p.m))).join(' ');
+  const dots = list.map((d, i) => d.weight === null ? '' :
+    `<circle cx="${r1(X(i))}" cy="${r1(Y(d.weight))}" r="2" fill="${C_INK}"/>`).join('');
+  const last = pts[pts.length - 1];
+  return `<svg viewBox="0 0 ${W} ${H + 14}" style="width:100%;height:auto;overflow:visible">
+      ${dots}<path d="${line}" fill="none" stroke="${C_DEF}" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${r1(X(last.i))}" cy="${r1(Y(last.m))}" r="3.5" fill="${C_DEF}"/>
+      <text x="${r1(X(last.i)) + 6}" y="${r1(Y(last.m)) + 3}" fill="#e8ecf3" font-size="9">${r1(last.m)} kg</text>
+      <text x="0" y="${H + 11}" fill="${C_INK}" font-size="8">${czd(list[0].date)}</text>
+    </svg>
+    <div class="tiny muted" style="margin-top:4px">
+      <span style="color:${C_DEF}">▬</span> klouzavý 7denní průměr &nbsp;
+      <span style="color:${C_INK}">●</span> jednotlivá vážení</div>`;
+}
+const czd = s => { const d = new Date(s + 'T12:00:00'); return d.getDate() + '. ' + (d.getMonth() + 1) + '.'; };
+function stTip(i) {
+  const d = statCache.list[i]; if (!d) return;
+  const el = $('stTipTxt'); if (!el) return;
+  el.innerHTML = '<b>' + czd(d.date) + '</b> · ' + r0(d.k) + ' kcal · B ' + r0(d.p) +
+    ' S ' + r0(d.c) + ' T ' + r0(d.f) + (d.alc ? ' · alk ' + r1(d.alc) + ' g' : '') +
+    (d.burn !== null ? ' · aktivní ' + r0(d.burn) + ' kcal' : '');
+}
+
+/* --- render --- */
+function setPeriod(p) { period = p; renderStats(); }
+async function renderStats() {
+  const list = await statsData(period), a = agg(list);
+  statCache = { list, a };
+  ['per7', 'per30', 'per90'].forEach(id =>
+    $(id).classList.toggle('pri', id === 'per' + period));
+  $('stRange').textContent = czd(list[0].date) + ' – ' + czd(list[list.length - 1].date) +
+    ' · záznam za ' + a.logged + ' z ' + dnu(a.days);
+  $('stKcal').textContent = a.logged ? r0(a.avgK) : '—';
+  $('stBurn').textContent = a.rmr ? r0(a.avgOut) : '—';
+  $('stBal').textContent = (a.rmr && a.logged) ? ((a.avgBal > 0 ? '+' : '') + r0(a.avgBal)) : '—';
+  $('stBal').style.color = a.avgBal > 0 ? C_SUR : C_DEF;
+  $('stCover').textContent = a.logged < a.days
+    ? 'Pozor: ' + dnu(a.days - a.logged) + ' bez záznamu, do průměru příjmu se ' + plur(a.days - a.logged, 'nepočítá', 'nepočítají', 'nepočítá') + '.'
+    : 'Kompletní data za celé období.';
+
+  $('chKcal').innerHTML = a.logged ? svgBars(list, a) : '<p class="tiny muted">Zatím žádná data.</p>';
+  $('chBal').innerHTML = a.rmr ? svgDiverging(list, a)
+    : '<p class="tiny muted">Nastav klidový výdej v Nastavení.</p>';
+  $('chWeight').innerHTML = svgWeight(list, a);
+  $('stWeightTxt').innerHTML = a.wFirst !== null && a.wLast !== null
+    ? 'Od ' + r1(a.wFirst) + ' na ' + r1(a.wLast) + ' kg (' + (a.dKg > 0 ? '+' : '') + r1(a.wLast - a.wFirst) + ' kg)'
+      + (a.realTdee ? '<br><b style="color:#e8ecf3">Reálný výdej podle váhy: ' + r0(a.realTdee) + ' kcal/den</b>'
+        + ' — hodinky + klid dávají ' + r0(a.avgOut) + ' kcal, rozdíl '
+        + (a.realTdee - a.avgOut > 0 ? '+' : '') + r0(a.realTdee - a.avgOut) + ' kcal.'
+        : '<br>Pro odhad reálného výdeje potřebuju vážení rozložená aspoň přes 10 dnů.')
+    : '';
+
+  const eP = a.avgP * 4, eC = a.avgC * 4, eF = a.avgF * 9, eT = eP + eC + eF || 1;
+  const mrow = (nm, v, goal, e, col) => `
+    <div class="bar" style="margin-bottom:8px"><div class="t"><span>${nm}</span>
+      <span class="mono">${r0(v)} / ${goal} g · ${r0(e / eT * 100)} %E</span></div>
+      <div class="track"><div class="fill" style="width:${Math.min(100, goal ? v / goal * 100 : 0)}%;background:${col}"></div></div></div>`;
+  $('stMacros').innerHTML = a.logged
+    ? mrow('Bílkoviny', a.avgP, goals.p, eP, '#6ea8ff') +
+      mrow('Sacharidy', a.avgC, goals.c, eC, '#f0a742') +
+      mrow('Tuky', a.avgF, goals.f, eF, '#e2564d') +
+      '<p class="tiny muted" style="margin:0">%E = podíl na energii. Součet nemusí dát 100 %, pokud část energie tvoří alkohol.</p>'
+    : '<p class="tiny muted">Zatím žádná data.</p>';
+
+  $('stInsights').innerHTML = insights(list, a).map(t => '<p style="margin:0 0 8px">' + t + '</p>').join('')
+    || '<p class="tiny muted">Zatím málo dat na postřehy.</p>';
+
+  const tot = {};
+  list.forEach(d => d.items.forEach(it => { tot[it.name] = (tot[it.name] || 0) + it.kcal; }));
+  const top = Object.entries(tot).sort((x, y) => y[1] - x[1]).slice(0, 8);
+  const sumAll = Object.values(tot).reduce((x, y) => x + y, 0) || 1;
+  $('stTop').innerHTML = top.length ? top.map(([nm, k]) => `
+    <div class="item"><div class="grow"><div class="nm">${esc(nm)}</div>
+      <div class="sub">${pctTxt(k / sumAll * 100)} celkového příjmu</div></div>
+    <div class="kc">${r0(k)}<span class="tiny muted"> kcal</span></div></div>`).join('')
+    : '<p class="tiny muted">Zatím žádná data.</p>';
+}
+
+function insights(list, a) {
+  const out = [];
+  const ok = '<span style="color:#3fbf7f">●</span> ', wr = '<span style="color:#f0a742">●</span> ',
+        bd = '<span style="color:#e0574d">●</span> ';
+  if (!a.logged) return out;
+  if (a.logged < a.days * 0.7)
+    out.push(wr + '<b>Data jsou děravá.</b> Záznam máš jen za ' + a.logged + ' z ' + a.days +
+      ' dnů, takže průměry nejspíš nesedí na realitu.');
+  if (goals.kcal) {
+    const dp = (a.avgK - goals.kcal) / goals.kcal * 100;
+    out.push((Math.abs(dp) <= 8 ? ok : wr) + 'Průměrný příjem <b>' + r0(a.avgK) + ' kcal</b>, ' +
+      (Math.abs(dp) <= 8 ? 'to je na cíli' : (dp > 0 ? 'o ' + r0(dp) + ' % nad cílem' : 'o ' + r0(-dp) + ' % pod cílem')) + '.');
+  }
+  if (a.sdK > a.avgK * 0.25 && a.logged >= 5)
+    out.push(wr + 'Příjem hodně kolísá (' + r0(a.minK) + '–' + r0(a.maxK) + ' kcal). ' +
+      'Vyrovnanější dny se snáz drží.');
+  if (goals.p && a.avgP < goals.p * 0.85)
+    out.push(wr + 'Bílkoviny <b>' + r0(a.avgP) + ' g</b> proti cíli ' + goals.p + ' g — chybí ti ' +
+      r0(goals.p - a.avgP) + ' g denně.');
+  else if (goals.p && a.avgP >= goals.p * 0.95)
+    out.push(ok + 'Bílkoviny držíš na cíli (' + r0(a.avgP) + ' g).');
+  if (a.rmr && a.logged >= 5) {
+    const wk = a.avgBal * 7 / KCAL_PER_KG;
+    out.push((Math.abs(a.avgBal) < 150 ? ok : wr) + 'Průměrná bilance <b>' +
+      (a.avgBal > 0 ? '+' : '') + r0(a.avgBal) + ' kcal/den</b> — při tomhle tempu ' +
+      (Math.abs(wk) < 0.05 ? 'by se váha držela' :
+        (wk > 0 ? 'přibývá' : 'ubývá') + ' zhruba ' + r1(Math.abs(wk)) + ' kg týdně') + '.');
+  }
+  if (a.realTdee) {
+    const d = a.realTdee - a.avgOut;
+    out.push((Math.abs(d) < 200 ? ok : bd) + 'Reálný výdej podle změny váhy je <b>' + r0(a.realTdee) +
+      ' kcal/den</b>. ' + (Math.abs(d) < 200
+        ? 'Sedí to na hodinky, tvoje čísla jsou důvěryhodná.'
+        : (d > 0 ? 'To je o ' + r0(d) + ' kcal víc, než ukazují hodinky — buď podhodnocuješ výdej, nebo přiznáváš míň jídla.'
+                 : 'To je o ' + r0(-d) + ' kcal míň, než ukazují hodinky — hodinky nejspíš výdej nadsazují.')));
+  }
+  if (a.alc > 0) {
+    const podil = a.alcKcal / (a.avgK * a.logged) * 100;
+    out.push((podil < 5 ? ok : wr) + 'Alkohol: <b>' + r0(a.alc) + ' g</b> za období (' + a.alcDays +
+      ' z ' + dnu(a.days) + '), to je ' + pctTxt(podil) + ' přijaté energie.');
+  }
+  if (a.burnDays === 0 && a.rmr)
+    out.push(wr + 'Aktivní kalorie z hodinek nezadáváš — bilance počítá jen s klidovým výdejem.');
+  return out;
+}
+
+/* --- souhrn pro Claude --- */
+function summaryText() {
+  if (!statCache) return '';
+  const { list, a } = statCache, L = [];
+  const pct = (v, t) => t ? r0(v / t * 100) + ' %' : '—';
+  L.push('KALORIE — souhrn za ' + a.days + ' dní (' + list[0].date + ' až ' + list[list.length - 1].date + ')');
+  L.push('Dnů se záznamem: ' + a.logged + '/' + a.days);
+  L.push('');
+  L.push('PŘÍJEM');
+  L.push('  průměr: ' + r0(a.avgK) + ' kcal/den (cíl ' + goals.kcal + ', ' + pct(a.avgK, goals.kcal) + ')');
+  L.push('  rozptyl: ' + r0(a.minK) + '–' + r0(a.maxK) + ' kcal, směrodatná odchylka ' + r0(a.sdK));
+  L.push('  bílkoviny: ' + r0(a.avgP) + ' g/den (cíl ' + goals.p + ')');
+  L.push('  sacharidy: ' + r0(a.avgC) + ' g/den (cíl ' + goals.c + ')');
+  L.push('  tuky: ' + r0(a.avgF) + ' g/den (cíl ' + goals.f + ')');
+  L.push('');
+  L.push('VÝDEJ');
+  L.push('  klidový: ' + (a.rmr || 'nenastaven') + ' kcal/den');
+  L.push('  aktivní z hodinek: průměr ' + r0(a.avgBurn) + ' kcal, zadáno ' + a.burnDays + '/' + a.days + ' dnů');
+  L.push('  celkem: ' + r0(a.avgOut) + ' kcal/den');
+  L.push('  bilance: ' + (a.avgBal > 0 ? '+' : '') + r0(a.avgBal) + ' kcal/den, kumulativně ' +
+    (a.cumBal > 0 ? '+' : '') + r0(a.cumBal) + ' kcal');
+  L.push('');
+  L.push('VÁHA');
+  if (a.wFirst !== null) {
+    L.push('  ' + r1(a.wFirst) + ' → ' + r1(a.wLast) + ' kg (' + (a.dKg > 0 ? '+' : '') + r1(a.wLast - a.wFirst) +
+      ' kg), vážení: ' + a.weights.length + 'x');
+    L.push('  reálný výdej dopočtený z váhy: ' + (a.realTdee ? r0(a.realTdee) + ' kcal/den (rozdíl proti hodinkám ' +
+      (a.realTdee - a.avgOut > 0 ? '+' : '') + r0(a.realTdee - a.avgOut) + ')' : 'málo dat'));
+  } else L.push('  nezadána');
+  L.push('');
+  L.push('ALKOHOL: ' + r0(a.alc) + ' g čistého za období, ' + dnu(a.alcDays) + ' s alkoholem, ' +
+    r0(a.alcKcal) + ' kcal');
+  L.push('');
+  L.push('DENNÍ ŘADA (datum;kcal;B;S;T;alk_g;aktivni_kcal;vaha)');
+  list.forEach(d => L.push('  ' + d.date + ';' + (d.logged ? r0(d.k) : '') + ';' + r0(d.p) + ';' +
+    r0(d.c) + ';' + r0(d.f) + ';' + r1(d.alc) + ';' + (d.burn === null ? '' : r0(d.burn)) + ';' +
+    (d.weight === null ? '' : r1(d.weight))));
+  const tot = {};
+  list.forEach(d => d.items.forEach(it => { tot[it.name] = (tot[it.name] || 0) + it.kcal; }));
+  const top = Object.entries(tot).sort((x, y) => y[1] - x[1]).slice(0, 10);
+  if (top.length) {
+    L.push('');
+    L.push('NEJVĚTŠÍ ZDROJE KALORIÍ');
+    top.forEach(([nm, k]) => L.push('  ' + nm + ': ' + r0(k) + ' kcal'));
+  }
+  return L.join('\n');
+}
+async function copySummary() {
+  const t = summaryText(); if (!t) { toast('Nejdřív otevři statistiky'); return; }
+  try { await navigator.clipboard.writeText(t); toast('Souhrn zkopírován'); }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); toast('Souhrn zkopírován'); }
+    catch (e2) { toast('Nešlo zkopírovat — stáhni jako soubor'); } ta.remove();
+  }
+}
+function dlSummary() {
+  const t = summaryText(); if (!t) { toast('Nejdřív otevři statistiky'); return; }
+  dl('kalorie-souhrn-' + period + 'd-' + dstr(new Date()) + '.txt', t, 'text/plain');
+  toast('Staženo');
 }
 
 /* ---------------- foto etikety → formulář ---------------- */
