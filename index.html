@@ -775,7 +775,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-36';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-37';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1155,6 +1155,8 @@ function mapOFF(code, prod) {
     name: name || ('Produkt ' + code),
     brand: (prod.brands || '').split(',')[0].trim(),
     unit: 'g',
+    // hasE: má produkt vůbec energii? 0 kcal (voda, light nápoje) je platná hodnota, chybějící ne
+    hasE: kcal !== null,
     kcal: kcal === null ? 0 : r1(kcal),
     p: num('proteins_100g') || 0,
     c: num('carbohydrates_100g') || 0,
@@ -1469,7 +1471,7 @@ async function searchByName(quiet) {
   if (!res) {
     box.innerHTML = mineHtml +
       (errEmpty
-        ? '<p class="tiny muted" style="margin:8px 0 0">Online nic nenašlo — ani přesně, ani podle začátku slova. Zkus jiné slovo nebo zadej ručně.</p>'
+        ? '<p class="tiny muted" style="margin:8px 0 0">Online nic použitelného. Podrobně: ' + esc(errTxt) + '</p>'
         : '<p class="tiny" style="margin:8px 0 0;color:var(--warn)">Online vyhledávání selhalo.</p>' +
           '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) + '</p>') +
       '<button class="btn sm full" style="margin-top:8px" onclick="searchByName()">Zkusit znovu</button>' +
@@ -1548,26 +1550,39 @@ async function searchOFF(q, czOnly, signal) {
   const wildQ = q.trim().split(/\s+/).filter(Boolean)
     .map(w => (w.length >= 3 && !/[*?:"()~^]/.test(w)) ? w + '*' : w).join(' ');
 
-  const askSearch = async (query) => {
+  let dropped = 0, gotHits = 0;
+
+  /* Jeden pokus. full = bez omezení polí — když server pole ořeže, přijdou celé produkty. */
+  const attempt = async (query, full) => {
     const u = 'https://search.openfoodfacts.org/search?q=' + encodeURIComponent(query) +
-      '&page_size=25&fields=' + encodeURIComponent(FLD);
+      '&page_size=25' + (full ? '' : '&fields=' + encodeURIComponent(FLD));
     const j = await tryTwice(u);
-    return j.hits || j.products || j.results || [];
+    const hits = (j.hits || j.products || j.results || []).map(h => h._source || h);
+    const mapped = hits.map(pr => mapOFFSearch(pr)).filter(Boolean);
+    return { hits, items: mapped.filter(x => x.hasE) };
+  };
+
+  /* Zkusí dotaz; když přijdou produkty, ale žádný nemá výživové údaje, zopakuje bez omezení polí. */
+  const attemptPair = async (query) => {
+    const a = await attempt(query, false);
+    if (a.items.length || !a.hits.length) return a;
+    const b = await attempt(query, true);          // podezření: server neposlal nutriments
+    return b.items.length ? b : a;
   };
 
   try {
-    const hits = await askSearch(q);
-    if (hits.length) { raw = hits.map(h => h._source || h); via = 'search'; }
-    else if (wildQ !== q) {
-      try {
-        const h2 = await askSearch(wildQ);
-        if (h2.length) { raw = h2.map(h => h._source || h); via = 'prefix'; }
-        else problems.push('nové vyhledávání: nic nenašlo ani podle začátku slova');
-      } catch (e) {
-        if (e.aborted) throw e;
-        problems.push('nové vyhledávání: nic nenašlo');
-      }
-    } else problems.push('nové vyhledávání: nic nenašlo');
+    let r = await attemptPair(q);
+    if (!r.items.length && !r.hits.length && wildQ !== q) {
+      try {                                        // hvězdičku nemusí server přijmout — pak zůstává původní výsledek
+        const w = await attemptPair(wildQ);
+        if (w.items.length || w.hits.length) { r = w; via = 'prefix'; }
+      } catch (e) { if (e.aborted) throw e; }
+    }
+    gotHits = r.hits.length;
+    dropped = r.hits.length - r.items.length;
+    if (r.items.length) { raw = r.items; if (!via) via = 'search'; }
+    else if (r.hits.length) problems.push('nové vyhledávání: ' + r.hits.length + ' produktů bez výživových údajů');
+    else problems.push('nové vyhledávání: nic nenašlo' + (wildQ !== q ? ' ani podle začátku slova' : ''));
   } catch (e) { if (e.aborted) throw e; problems.push('nové vyhledávání: ' + e.message); }
 
   if (!raw) {
@@ -1578,22 +1593,29 @@ async function searchOFF(q, czOnly, signal) {
       });
       const j = await tryTwice('https://world.openfoodfacts.org/cgi/search.pl?' + par.toString());
       const hits = j.products || [];
-      if (hits.length) { raw = hits; via = 'legacy'; }
+      const good = hits.map(pr => mapOFFSearch(pr)).filter(x => x && x.hasE);
+      if (good.length) { raw = good; via = 'legacy'; gotHits = hits.length; dropped = hits.length - good.length; }
+      else if (hits.length) problems.push('starší vyhledávání: ' + hits.length + ' produktů bez výživových údajů');
       else problems.push('starší vyhledávání: nic nenašlo');
     } catch (e) { if (e.aborted) throw e; problems.push('starší vyhledávání: ' + e.message); }
   }
 
   if (!raw) {
     const err = new Error(problems.join(' · '));
-    err.empty = problems.every(p => /nic nenašlo/.test(p));   // nic nenalezeno ≠ výpadek
+    // nic použitelného ≠ výpadek sítě — hlásí se jinak
+    err.empty = problems.every(p => /nic nenašlo|bez výživových údajů/.test(p));
     throw err;
   }
 
-  let items = raw.map(pr => mapOFFSearch(pr)).filter(x => x && x.kcal > 0);
+  let items = raw;
   const seen = {};
   items = items.filter(x => seen[x.id] ? false : (seen[x.id] = 1));
   const notes = [];
   if (via === 'prefix') notes.push('Přesná shoda nic nenašla — hledal jsem podle začátku slova („' + esc(wildQ) + '").');
+  if (dropped > 0) notes.push(
+    dropped === 1 ? '1 další produkt online nemá vyplněné výživové hodnoty, nabídnout nejde.'
+      : dropped < 5 ? dropped + ' další produkty online nemají vyplněné výživové hodnoty, nabídnout nejdou.'
+        : dropped + ' dalších produktů online nemá vyplněné výživové hodnoty, nabídnout nejdou.');
   if (czOnly) {
     const cz = items.filter(x => x.cz);
     if (cz.length) items = cz;
@@ -1601,7 +1623,7 @@ async function searchOFF(q, czOnly, signal) {
   } else {
     items.sort((a, b) => (b.cz ? 1 : 0) - (a.cz ? 1 : 0));
   }
-  return { items: items.slice(0, 15), note: notes.join(' '), via };
+  return { items: items.slice(0, 15), note: notes.join(' '), via, gotHits, dropped };
 }
 
 /* ---------------- portion sheet ---------------- */
