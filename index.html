@@ -1175,22 +1175,48 @@ async function loopNative() {
     await new Promise(r => setTimeout(r, 180));
   }
 }
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error(src));
+    document.head.appendChild(s);
+  });
+}
 async function loadZXing() {
   if (zxing) return;
-  try {
-    if (!window.ZXing) {
-      await new Promise((res, rej) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
-        s.onload = res; s.onerror = rej; document.head.appendChild(s);
-      });
+  if (!window.ZXing) {
+    $('scanMsg').textContent = 'Načítám skener…';
+    try { await loadScript('zxing.js'); }                       // lokální kopie – funguje offline
+    catch (e) {
+      try { await loadScript('https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js'); }
+      catch (e2) { zxing = null; return; }
     }
-    zxing = new window.ZXing.BrowserMultiFormatReader();
-  } catch (e) { zxing = null; }
+  }
+  try {
+    const H = new Map();
+    H.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      window.ZXing.BarcodeFormat.EAN_13, window.ZXing.BarcodeFormat.EAN_8,
+      window.ZXing.BarcodeFormat.UPC_A, window.ZXing.BarcodeFormat.UPC_E,
+      window.ZXing.BarcodeFormat.CODE_128, window.ZXing.BarcodeFormat.CODE_39,
+      window.ZXing.BarcodeFormat.ITF
+    ]);
+    zxing = new window.ZXing.BrowserMultiFormatReader(H, 200);
+  } catch (e) {
+    try { zxing = new window.ZXing.BrowserMultiFormatReader(); } catch (e2) { zxing = null; }
+  }
 }
-function loopZXing() {
-  zxing.decodeFromVideoElement($('video'), (result) => { if (result && scanning) hit(result.getText()); })
-    .catch(() => { $('scanMsg').textContent = 'Skener selhal – zadej kód ručně'; });
+async function loopZXing() {
+  const v = $('video');
+  $('scanMsg').textContent = 'Namiř na čárový kód';
+  while (scanning && stream) {
+    if (v.videoWidth) {
+      try {
+        const res = zxing.decode(v);
+        if (res) { hit(res.getText()); return; }
+      } catch (e) { /* NotFoundException = v tomhle snímku nic není */ }
+    }
+    await new Promise(r => setTimeout(r, 120));
+  }
 }
 function hit(code) {
   const t = Date.now();
