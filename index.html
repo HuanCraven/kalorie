@@ -202,7 +202,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
     </div>
     <label class="row" style="margin:10px 0 0;gap:8px;align-items:center">
       <input type="checkbox" id="czOnly" style="width:auto" checked>
-      <span class="tiny muted">jen produkty prodávané v Česku</span></label>
+      <span class="tiny muted">jen české (když nic nenajde, ukážu všechny)</span></label>
     <div id="nameRes" style="margin-top:8px"></div>
   </div>
 
@@ -550,7 +550,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-10';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-11';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -902,23 +902,27 @@ async function searchByName() {
       ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`}">
       <div class="nm">${esc(p.name)}</div>
       <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100 ${esc(p.unit)}
-        <span class="pill ${local ? 'man' : 'off'}">${local ? 'moje' : 'OFF'}</span></div>
+        <span class="pill ${local ? 'man' : 'off'}">${local ? 'moje' : 'OFF'}</span>${p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
     </div></div>`;
   box.innerHTML = (mine.length ? mine.map(p => card(p, true)).join('') : '')
     + '<p class="tiny muted" style="margin:8px 0 0">Hledám v Open Food Facts…</p>';
-  let found = [];
-  try { found = await searchOFF(q, $('czOnly').checked); }
-  catch (e) { found = null; }
-  if (found === null) {
-    box.innerHTML = (mine.length ? mine.map(p => card(p, true)).join('') : '')
-      + '<p class="tiny muted" style="margin:8px 0 0">Online vyhledávání se nepovedlo (jsi offline?).</p>';
+  let res = null, errTxt = '';
+  try { res = await searchOFF(q, $('czOnly').checked); }
+  catch (e) { errTxt = e.message || 'neznámá chyba'; }
+  const mineHtml = mine.map(p => card(p, true)).join('');
+  if (!res) {
+    box.innerHTML = mineHtml +
+      '<p class="tiny" style="margin:8px 0 0;color:var(--warn)">Online vyhledávání selhalo.</p>' +
+      '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) + '</p>' +
+      '<button class="btn sm full" style="margin-top:8px" onclick="openEdit(null)">Zadat ručně</button>';
     return;
   }
-  lastFound = {}; found.forEach(p => lastFound[p.id] = p);
-  const fresh = found.filter(p => !products.some(x => x.id === p.id));
-  box.innerHTML = (mine.map(p => card(p, true)).join(''))
+  lastFound = {}; res.items.forEach(p => lastFound[p.id] = p);
+  const fresh = res.items.filter(p => !products.some(x => x.id === p.id));
+  box.innerHTML = mineHtml
     + (fresh.length ? fresh.map(p => card(p, false)).join('')
-      : '<p class="tiny muted" style="margin:8px 0 0">Online nic dalšího. Zkus jiné slovo nebo zadej ručně.</p>');
+      : '<p class="tiny muted" style="margin:8px 0 0">Online nic dalšího. Zkus jiné slovo nebo zadej ručně.</p>')
+    + (res.note ? '<p class="tiny muted" style="margin:8px 0 0">' + res.note + '</p>' : '');
 }
 let lastFound = {};
 async function useFound(id) {
@@ -928,26 +932,70 @@ async function useFound(id) {
   renderDb(); info();
   openPortion(p.id);
 }
-async function searchOFF(q, czOnly) {
-  const par = new URLSearchParams({
-    search_terms: q, search_simple: '1', action: 'process', json: '1', page_size: '20',
-    fields: 'code,product_name,product_name_cs,brands,nutriments,serving_quantity'
-  });
-  if (czOnly) {
-    par.set('tagtype_0', 'countries'); par.set('tag_contains_0', 'contains');
-    par.set('tag_0', 'czech-republic');
-  }
+async function getJson(url, ms) {
   const ctrl = new AbortController();
-  const to = setTimeout(() => ctrl.abort(), 12000);
-  let j;
+  const to = setTimeout(() => ctrl.abort(), ms || 12000);
   try {
-    const res = await fetch('https://world.openfoodfacts.org/cgi/search.pl?' + par.toString(),
-      { signal: ctrl.signal, headers: { 'Accept': 'application/json' } });
-    if (!res.ok) throw new Error('http ' + res.status);
-    j = await res.json();
+    const res = await fetch(url, { signal: ctrl.signal, headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('vypršel čas');
+    throw new Error(e.message || 'síť');
   } finally { clearTimeout(to); }
-  return (j.products || []).map(pr => mapOFF(String(pr.code || ''), pr))
-    .filter(x => x && x.kcal > 0).slice(0, 12);
+}
+
+function mapOFFSearch(pr) {
+  const m = mapOFF(String(pr.code || ''), pr);
+  if (!m) return null;
+  const ct = pr.countries_tags || [];
+  m.cz = Array.isArray(ct) && ct.some(t => /czech/i.test(t));
+  return m;
+}
+
+/* Zkusí moderní full-textové vyhledávání, při selhání starší endpoint.
+   Vrací {items, note, via} nebo vyhodí chybu s popisem, co přesně selhalo. */
+async function searchOFF(q, czOnly) {
+  const FLD = 'code,product_name,product_name_cs,brands,nutriments,serving_quantity,countries_tags';
+  const problems = [];
+  let raw = null, via = '';
+
+  try {
+    const u = 'https://search.openfoodfacts.org/search?q=' + encodeURIComponent(q) +
+      '&page_size=25&fields=' + encodeURIComponent(FLD);
+    const j = await getJson(u);
+    const hits = j.hits || j.products || j.results || [];
+    if (hits.length) { raw = hits.map(h => h._source || h); via = 'search'; }
+    else problems.push('nové vyhledávání: nic nenašlo');
+  } catch (e) { problems.push('nové vyhledávání: ' + e.message); }
+
+  if (!raw) {
+    try {
+      const par = new URLSearchParams({
+        search_terms: q, search_simple: '1', action: 'process', json: '1',
+        page_size: '25', fields: FLD
+      });
+      const j = await getJson('https://world.openfoodfacts.org/cgi/search.pl?' + par.toString());
+      const hits = j.products || [];
+      if (hits.length) { raw = hits; via = 'legacy'; }
+      else problems.push('starší vyhledávání: nic nenašlo');
+    } catch (e) { problems.push('starší vyhledávání: ' + e.message); }
+  }
+
+  if (!raw) throw new Error(problems.join(' · '));
+
+  let items = raw.map(pr => mapOFFSearch(pr)).filter(x => x && x.kcal > 0);
+  const seen = {};
+  items = items.filter(x => seen[x.id] ? false : (seen[x.id] = 1));
+  let note = '';
+  if (czOnly) {
+    const cz = items.filter(x => x.cz);
+    if (cz.length) items = cz;
+    else note = 'Žádný z výsledků není označený jako prodávaný v Česku — ukazuju všechny.';
+  } else {
+    items.sort((a, b) => (b.cz ? 1 : 0) - (a.cz ? 1 : 0));
+  }
+  return { items: items.slice(0, 15), note, via };
 }
 
 /* ---------------- portion sheet ---------------- */
