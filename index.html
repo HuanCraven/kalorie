@@ -266,6 +266,14 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>Hotová česká jídla</h3>
+    <p class="tiny muted" style="margin:0 0 8px">Svíčková, guláš, řízek, buchty… Hodnoty na 100 g
+      hotového pokrmu, spočítané ze surovin. Kolik sníš, zadáš sám.</p>
+    <div id="jidCats" class="row wrap2" style="gap:6px"></div>
+    <div id="jidList" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
     <h3>Základní potraviny</h3>
     <p class="tiny muted" style="margin:0 0 8px">Zelenina, maso, obiloviny a další nebalené věci,
       které v databázi čárových kódů nejsou. Vestavěné, funguje offline.</p>
@@ -774,10 +782,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <div id="toast"></div>
 
 <script src="zaklad.js"></script>
+<script src="jidla.js"></script>
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-38';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-39';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -895,7 +904,7 @@ function offCachePut(k, v) {
   products = await dbAll('products');
   try { extFoods = await dbAll('ext'); } catch (e) { extFoods = []; }
   fillGoals();
-  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); extInfoTxt();
+  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
   await renderDay();
   checkBackup();
   renderDb();
@@ -955,6 +964,7 @@ function info() {
   const bd = ('BarcodeDetector' in window) ? 'nativní BarcodeDetector' : 'ZXing (záložní)';
   $('verNow').textContent = APP_VERSION;
   $('infoTxt').innerHTML = 'Verze: ' + APP_VERSION + '<br>Skener: ' + bd + '<br>Produktů v databázi: ' + products.length +
+    '<br>Hotových jídel: ' + (window.JIDLA ? JIDLA.length : 0) +
     '<br>Základních potravin: ' + (window.ZAKLAD ? ZAKLAD.length : 0) +
     (extFoods.length ? '<br>Externí databáze: ' + extFoods.length + ' potravin' : '') +
     '<br>Zdroj online dat: Open Food Facts<br>Data se nikam neodesílají kromě dotazu na čárový kód.' +
@@ -1139,7 +1149,7 @@ function renderDb() {
       <div class="grow" onclick="openPortion('${sid(p.id)}')">
         <div class="nm">${esc(p.name)}</div>
         <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100${esc(p.unit)}
-          <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : (p.source === 'zaklad' ? 'základní' : (p.source === 'ext' ? 'ČR' : 'ručně')))}</span></div>
+          <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : (p.source === 'jidlo' ? 'jídlo' : (p.source === 'zaklad' ? 'základní' : (p.source === 'ext' ? 'ČR' : 'ručně'))))}</span></div>
       </div>
       <button class="btn sm" onclick="openEdit('${sid(p.id)}')">✎</button>
     </div>`).join('')
@@ -1239,16 +1249,31 @@ function zakladMatches(q) {
   if (!window.ZAKLAD) return [];
   return ZAKLAD.filter(z => matchWords(z.n, q)).slice(0, 8).map(zakProduct);
 }
+/* hotová jídla — hodnoty na 100 g uvařeného pokrmu */
+function jidloProduct(j) {
+  return {
+    id: 'j-' + norm(j.n).replace(/[^a-z0-9]+/g, '-'), barcode: null,
+    name: j.n, brand: 'hotové jídlo', unit: 'g',
+    kcal: j.e, p: j.p, c: j.c, f: j.f, fib: j.v || 0, salt: j.s || 0,
+    serving: null, source: 'jidlo', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
+  };
+}
+function jidlaMatches(q) {
+  if (!window.JIDLA) return [];
+  return JIDLA.filter(j => matchWords(j.n + ' ' + j.k, q)).slice(0, 8).map(jidloProduct);
+}
 function localMatches(q) {
   const mine = products
     .filter(p => matchWords(p.name + ' ' + (p.brand || ''), q))
     .sort((a, b) => (b.uses || 0) - (a.uses || 0))
     .slice(0, 6);
   const ids = new Set(mine.map(p => p.id));
+  const jid = jidlaMatches(q).filter(z => !ids.has(z.id));
+  jid.forEach(z => ids.add(z.id));
   const zak = zakladMatches(q).filter(z => !ids.has(z.id));
   zak.forEach(z => ids.add(z.id));
   const ext = extMatches(q).filter(z => !ids.has(z.id));
-  return mine.concat(zak, ext).slice(0, 16);
+  return mine.concat(jid, zak, ext).slice(0, 18);
 }
 
 function renderZakCats() {
@@ -1269,6 +1294,35 @@ function showZak(cat) {
     </div></div>`;
   }).join('');
 }
+function renderJidCats() {
+  if (!window.JIDLA || !$('jidCats')) return;
+  const cats = [...new Set(JIDLA.map(j => j.k))];
+  $('jidCats').innerHTML = cats.map(c =>
+    `<button class="btn sm" data-c="${esc(c)}" onclick="showJid('${esc(c)}')">${esc(c)}</button>`).join('');
+}
+function showJid(cat) {
+  document.querySelectorAll('#jidCats button').forEach(b => b.classList.toggle('pri', b.dataset.c === cat));
+  const list = JIDLA.filter(j => j.k === cat).sort((a, b) => a.n.localeCompare(b.n, 'cs'));
+  $('jidList').innerHTML = list.map(j => {
+    const pr = jidloProduct(j);
+    return `<div class="item"><div class="grow" onclick="useJidlo('${sid(pr.id)}')">
+      <div class="nm">${esc(j.n)}</div>
+      <div class="sub">${r0(j.e)} kcal · B ${r1(j.p)} · S ${r1(j.c)} · T ${r1(j.f)}${
+        j.v ? ' · vl ' + r1(j.v) : ''}${j.s ? ' · sůl ' + r1(j.s) : ''}</div>
+    </div></div>`;
+  }).join('');
+}
+async function useJidlo(id) {
+  let pr = products.find(x => x.id === id);
+  if (!pr) {
+    const j = JIDLA.find(x => jidloProduct(x).id === id);
+    if (!j) { toast('Nenalezeno'); return; }
+    pr = jidloProduct(j);
+    await dbPut('products', pr); products.push(pr); renderDb(); info();
+  }
+  openPortion(pr.id);
+}
+
 /* ---------------- recepturník ---------------- */
 let recIngs = [];
 let extFoods = [];
@@ -1395,7 +1449,9 @@ function findAny(id) {
   const p = products.find(x => x.id === id);
   if (p) return p;
   if (window.ZAKLAD) { const z = ZAKLAD.find(x => zakProduct(x).id === id); if (z) return zakProduct(z); }
-  return null;
+  if (window.JIDLA) { const j = JIDLA.find(x => jidloProduct(x).id === id); if (j) return jidloProduct(j); }
+  const e = extFoods.find(x => x.id === id);
+  return e ? extProduct(e) : null;
 }
 function recAdd(id) {
   const p = findAny(id);
@@ -1484,13 +1540,14 @@ function renderLocalMatches(q) {
 function resCard(p, local) {
   const known = products.some(x => x.id === p.id);
   const act = (p.source === 'zaklad' && !known) ? `useZaklad('${sid(p.id)}')`
+    : (p.source === 'jidlo' && !known) ? `useJidlo('${sid(p.id)}')`
     : (p.source === 'ext' && !known) ? `useExt('${sid(p.id)}')`
     : (local ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`);
   return `<div class="item"><div class="grow" onclick="${act}">
       <div class="nm">${esc(p.name)}</div>
       <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100 ${esc(p.unit)}
-        <span class="pill ${(p.source === 'zaklad' || p.source === 'ext' || local) ? 'man' : 'off'}">${
-          p.source === 'zaklad' ? 'základní' : p.source === 'ext' ? 'ČR' : (local ? 'moje' : 'OFF')}</span>${
+        <span class="pill ${(p.source === 'zaklad' || p.source === 'ext' || p.source === 'jidlo' || local) ? 'man' : 'off'}">${
+          p.source === 'jidlo' ? 'jídlo' : p.source === 'zaklad' ? 'základní' : p.source === 'ext' ? 'ČR' : (local ? 'moje' : 'OFF')}</span>${
           p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
     </div></div>`;
 }
