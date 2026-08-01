@@ -192,7 +192,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       </div>
       <div style="text-align:right">
         <div class="tiny mono" id="alcWeek"></div>
-        <div class="tiny" style="color:var(--acc)">otevřít ›</div>
+        <div class="tiny mono" id="alcMonth" style="margin-top:2px"></div>
+        <div class="tiny" style="color:var(--acc);margin-top:2px">otevřít ›</div>
       </div>
     </div>
   </div>
@@ -376,12 +377,24 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
-      <div class="row" style="gap:10px;margin:10px 0 14px">
-    <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+      <div class="lbl-s">Denní průměr</div>
+  <div class="row" style="gap:10px;margin:0 0 14px">
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+      <div class="tiny muted">7 dní</div><b class="mono" id="alcA7" style="font-size:20px">0</b><div class="tiny muted">g/den</div></div>
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+      <div class="tiny muted" id="alcMName">měsíc</div><b class="mono" id="alcAM" style="font-size:20px">0</b><div class="tiny muted">g/den</div></div>
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+      <div class="tiny muted">celkem</div><b class="mono" id="alcAAll" style="font-size:20px">0</b><div class="tiny muted">g/den</div></div>
+  </div>
+  <p class="tiny muted" id="alcAvgNote" style="margin:-8px 0 14px"></p>
+
+  <div class="lbl-s">Součty</div>
+  <div class="row" style="gap:10px;margin:0 0 14px">
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
       <div class="tiny muted">7 dní</div><b class="mono" id="alc7" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
-    <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
       <div class="tiny muted">30 dní</div><b class="mono" id="alc30" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
-    <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
       <div class="tiny muted">dní bez</div><b class="mono" id="alcDry" style="font-size:20px">0</b><div class="tiny muted">/30</div></div>
   </div>
   <div id="alcLimitBar"></div>
@@ -658,7 +671,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-20';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-21';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -922,6 +935,8 @@ async function renderDay() {
     ? '7 dní: ' + r0(alcWeek) + ' / ' + goals.alc + ' g'
     : '7 dní: ' + r0(alcWeek) + ' g';
   $('alcWeek').style.color = (goals.alc && alcWeek > goals.alc) ? 'var(--bad)' : 'var(--dim)';
+  const asum = await alcStats();
+  $('alcMonth').textContent = 'ø ' + asum.mName + ': ' + r1(asum.avgM) + ' g/den';
 
   const favs = products.slice().sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).filter(p => p.uses);
   $('favList').innerHTML = favs.length ? favs.map(p =>
@@ -1834,7 +1849,7 @@ const KCAL_PER_KG = 7700;      // energie v 1 kg tělesné tkáně
 const C_DEF = '#2f8fe6';       // deficit / hlavní série  (ověřeno validátorem)
 const C_SUR = '#e0574d';       // přebytek
 const C_GRID = '#39414f', C_INK = '#8b95a7';
-let period = 7, statCache = null;
+let period = 7, statCache = null, alcCache = null;
 
 async function loadDaily() {
   const d = await dbGet('daily', curDate) || {};
@@ -2022,6 +2037,7 @@ function stTip(i) {
 /* --- render --- */
 function setPeriod(p) { period = p; renderStats(); }
 async function renderStats() {
+  alcCache = await alcStats();
   const list = await statsData(period), a = agg(list);
   statCache = { list, a };
   ['per7', 'per30', 'per90'].forEach(id =>
@@ -2152,6 +2168,8 @@ function summaryText() {
   L.push('');
   L.push('ALKOHOL: ' + r0(a.alc) + ' g čistého za období, ' + dnu(a.alcDays) + ' s alkoholem, ' +
     r0(a.alcKcal) + ' kcal');
+  if (alcCache) L.push('  denní průměr: 7 dní ' + r1(alcCache.avg7) + ' g · ' + alcCache.mName + ' ' +
+    r1(alcCache.avgM) + ' g · celkem ' + r1(alcCache.avgAll) + ' g (od ' + alcCache.first + ')');
   L.push('');
   L.push('DENNÍ ŘADA (datum;kcal;B;S;T;alk_g;aktivni_kcal;vaha)');
   list.forEach(d => L.push('  ' + d.date + ';' + (d.logged ? r0(d.k) : '') + ';' + r0(d.p) + ';' +
@@ -2373,6 +2391,9 @@ function renderDrinkEdit() {
 async function saveDrinks() { await dbPut('meta', { k: 'drinks', v: drinks }); renderDrinkBtns(); renderDay(); }
 function addDrinkDef() { drinks.push({ nm: 'Nový nápoj', ml: 200, abv: 12, c: 0 }); saveDrinks(); renderDrinkEdit(); }
 
+const MES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
+  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+
 async function alcStats() {
   const all = await dbAll('log');
   const byDay = {};
@@ -2384,11 +2405,43 @@ async function alcStats() {
     const k = dstr(x); days.push({ d: k, g: byDay[k] || 0 });
   }
   const sum = k => days.slice(-k).reduce((a, x) => a + x.g, 0);
-  return { days, d7: sum(7), d30: sum(30), dry: days.filter(x => x.g === 0).length, today: byDay[curDate] || 0 };
+
+  // kalendářní měsíc prohlíženého dne — dělí se počtem dnů, které už uplynuly
+  const cur = new Date(curDate + 'T12:00:00'), now = new Date();
+  const pref = curDate.slice(0, 7);
+  const sameMonth = cur.getFullYear() === now.getFullYear() && cur.getMonth() === now.getMonth();
+  const dnyVMesici = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+  const mDays = sameMonth ? cur.getDate() : dnyVMesici;
+  const mSum = Object.entries(byDay)
+    .filter(([k]) => k.startsWith(pref) && k <= curDate)
+    .reduce((a, [, v]) => a + v, 0);
+
+  // celkově od prvního záznamu v deníku (i dny bez alkoholu se počítají)
+  const dates = all.map(r => r.date).filter(d => d <= curDate).sort();
+  const first = dates[0] || curDate;
+  const allDays = Math.max(1, Math.round(
+    (new Date(curDate + 'T12:00:00') - new Date(first + 'T12:00:00')) / 86400000) + 1);
+  const allSum = Object.entries(byDay)
+    .filter(([k]) => k <= curDate).reduce((a, [, v]) => a + v, 0);
+
+  return {
+    days, d7: sum(7), d30: sum(30), dry: days.filter(x => x.g === 0).length,
+    today: byDay[curDate] || 0,
+    avg7: sum(7) / 7,
+    mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
+    allSum, allDays, avgAll: allSum / allDays, first
+  };
 }
 async function renderAlc() {
   const s = await alcStats();
   $('alc7').textContent = r0(s.d7); $('alc30').textContent = r0(s.d30); $('alcDry').textContent = s.dry;
+  $('alcA7').textContent = r1(s.avg7);
+  $('alcAM').textContent = r1(s.avgM);
+  $('alcMName').textContent = s.mName;
+  $('alcAAll').textContent = r1(s.avgAll);
+  $('alcAvgNote').textContent = s.mName + ': ' + r0(s.mSum) + ' g za ' + dnu(s.mDays) +
+    ' · celkem ' + r0(s.allSum) + ' g za ' + dnu(s.allDays) + ' od ' + czd(s.first) +
+    ' (dny bez alkoholu se do průměru počítají)';
   const lim = goals.alc || 0;
   $('alcLimitBar').innerHTML = lim ? (() => {
     const pct = Math.min(100, s.d7 / lim * 100), over = s.d7 > lim;
