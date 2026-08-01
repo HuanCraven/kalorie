@@ -9,9 +9,9 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2312151a'/%3E%3Cg fill='%23e8ecf3'%3E%3Crect x='6' y='9' width='2' height='14'/%3E%3Crect x='10' y='9' width='1' height='14'/%3E%3Crect x='13' y='9' width='3' height='14' fill='%234ea3ff'/%3E%3Crect x='18' y='9' width='1' height='14'/%3E%3Crect x='21' y='9' width='2' height='14'/%3E%3Crect x='25' y='9' width='1' height='14'/%3E%3C/g%3E%3C/svg%3E">
 <style>
 :root{
-  --bg:#12151a; --card:#1b1f27; --card2:#232936; --line:#2e3542;
-  --fg:#e8ecf3; --dim:#8b95a7; --acc:#4ea3ff; --ok:#3fbf7f; --warn:#f0a742; --bad:#e2564d;
-  --mp:#6ea8ff; --mc:#f0a742; --mf:#e2564d;
+  --bg:#0e1116; --card:#171b23; --card2:#1f2531; --line:#2b323f; --line2:#3a4353;
+  --fg:#eef2f8; --dim:#8794a8; --dim2:#647084;
+  --acc:#4ea3ff; --acc-d:#2f8fe6; --ok:#3fbf7f; --warn:#f0a742; --bad:#e0574d;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
@@ -86,6 +86,38 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
   transition:opacity .2s;pointer-events:none;font-size:14px}
 #toast.on{opacity:1}
 .hr{height:1px;background:var(--line);margin:12px 0}
+
+/* --- hierarchie a nové komponenty --- */
+.card{position:relative}
+.card.hero{background:linear-gradient(180deg,#1b2333 0%,var(--card) 60%);border-color:#33405a}
+.card.compact{padding:11px 14px}
+.lbl-s{font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;
+  letter-spacing:.07em;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.lbl-s::before{content:"";width:3px;height:12px;background:var(--acc);border-radius:2px;flex:0 0 3px}
+h3{font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;
+  letter-spacing:.07em;margin:0 0 10px;display:flex;align-items:center;gap:7px}
+h3::before{content:"";width:3px;height:12px;background:var(--acc);border-radius:2px;flex:0 0 3px}
+.sheet h2{font-size:18px}
+/* segmentovaný přepínač */
+.seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:3px;margin-bottom:12px;gap:2px}
+.seg button{flex:1;padding:9px 0;border-radius:9px;font-size:13px;font-weight:600;color:var(--dim)}
+.seg button.on{background:var(--acc);color:#04121f}
+.pane{display:none}.pane.on{display:block}
+/* číselné zvýraznění */
+.item .kc{font-weight:700;font-size:15px}
+.item .sub{color:var(--dim2)}
+.item{padding:11px 0}
+/* navigace */
+nav{background:#12161d}
+nav button{position:relative;padding:8px 0 9px}
+nav button.on svg{stroke:var(--acc)}
+nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:26px;height:2px;background:var(--acc);border-radius:0 0 3px 3px}
+/* jemné oddělení skupin jídel */
+.mealhead{display:flex;justify-content:space-between;align-items:center;
+  background:var(--card2);border-radius:9px;padding:6px 10px;margin:2px 0 2px}
+.mealhead .n{font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em}
 </style>
 </head>
 <body>
@@ -106,7 +138,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
     <button class="btn sm" id="dayNext" onclick="shiftDay(1)">›</button>
   </div>
 
-  <div class="card">
+  <div class="card hero">
     <div class="tot">
       <div class="ring">
         <svg width="88" height="88" viewBox="0 0 88 88">
@@ -151,17 +183,18 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
     <p class="tiny muted" id="balHint" style="margin:6px 0 0"></p>
   </div>
 
-  <div class="card">
-    <div class="row" style="justify-content:space-between;margin-bottom:8px">
-      <h3 style="margin:0">Alkohol</h3>
-      <button class="btn sm" onclick="openAlcOverview()">Přehled</button>
+  <div class="card compact" onclick="go('alc')" style="cursor:pointer">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div>
+        <div class="lbl-s">Alkohol</div>
+        <span><b class="mono" id="alcToday" style="font-size:18px">0</b>
+          <span class="tiny muted">g dnes</span></span>
+      </div>
+      <div style="text-align:right">
+        <div class="tiny mono" id="alcWeek"></div>
+        <div class="tiny" style="color:var(--acc)">otevřít ›</div>
+      </div>
     </div>
-    <div class="row" style="justify-content:space-between;margin-bottom:10px">
-      <span><b class="mono" id="alcToday" style="font-size:19px">0</b> <span class="tiny muted">g čistého alk. dnes</span></span>
-      <span class="tiny mono" id="alcWeek"></span>
-    </div>
-    <div id="drinkBtns" class="row wrap2" style="margin-bottom:8px"></div>
-    <button class="btn sm full" onclick="openCustomDrink()">+ Jiný nápoj</button>
   </div>
 
   <div class="card">
@@ -170,8 +203,16 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
   </div>
 </section>
 
-<!-- ============ SKENOVAT ============ -->
+<!-- ============ ZADAT ============ -->
 <section id="p-scan" class="page">
+  <div class="seg" id="addSeg">
+    <button data-s="code" class="on" onclick="setAdd('code')">Kód</button>
+    <button data-s="find" onclick="setAdd('find')">Hledat</button>
+    <button data-s="photo" onclick="setAdd('photo')">Foto</button>
+    <button data-s="man" onclick="setAdd('man')">Ručně</button>
+  </div>
+
+  <div class="pane on" id="s-code">
   <div class="card">
     <div id="scanBox">
       <video id="video" playsinline muted></video>
@@ -188,16 +229,20 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
     <h3>Ruční zadání kódu</h3>
     <div class="row">
       <input class="grow mono" id="manualCode" inputmode="numeric" placeholder="8594001020304">
-      <button class="btn pri" onclick="lookup(document.getElementById('manualCode').value.trim())">Hledat</button>
+      <button class="btn pri" id="codeBtn" onclick="lookup(document.getElementById('manualCode').value.trim())">Hledat</button>
     </div>
     <p class="tiny muted" style="margin:8px 0 0">Číslice pod čárovým kódem. Funguje i bez kamery.</p>
   </div>
 
+  </div>
+
+  <div class="pane" id="s-find">
   <div class="card">
     <h3>Hledat podle názvu</h3>
     <div class="row">
       <input class="grow" id="nameQ" placeholder="rajče, rohlík, kuřecí prsa…"
-        onkeydown="if(event.key==='Enter')searchByName()">
+        autocomplete="off" oninput="onNameInput()"
+        onkeydown="if(event.key==='Enter'){clearTimeout(sugT);searchByName();}">
       <button class="btn pri" id="nameBtn" onclick="searchByName()">Hledat</button>
     </div>
     <label class="row" style="margin:10px 0 0;gap:8px;align-items:center">
@@ -206,14 +251,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
     <div id="nameRes" style="margin-top:8px"></div>
   </div>
 
-  <div class="card">
-    <h3>Bez čárového kódu</h3>
-    <button class="btn full" onclick="openEdit(null)">+ Zadat potravinu ručně</button>
   </div>
-</section>
 
-<!-- ============ FOTO ============ -->
-<section id="p-photo" class="page">
+  <div class="pane" id="s-photo">
   <div class="card">
     <h3>1 · Vyfoť jídlo</h3>
     <div class="row" style="margin-bottom:10px">
@@ -262,6 +302,39 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
     <button class="btn full" onclick="aiSave(true)">Přidat + uložit jako recept</button>
     <p class="tiny muted" style="margin:8px 0 0">Recept se uloží do databáze jako jedna položka —
       příště ho přidáš jedním klepnutím bez focení.</p>
+  </div>
+  </div>
+
+  <div class="pane" id="s-man">
+  <div class="card">
+    <h3>Bez čárového kódu</h3>
+    <button class="btn full" onclick="openEdit(null)">+ Zadat potravinu ručně</button>
+  </div>  </div>
+</section>
+
+<!-- ============ ALKOHOL ============ -->
+<section id="p-alc" class="page">
+  <div class="card">
+    <div class="lbl-s">Rychlý zápis</div>
+    <div id="drinkBtns" class="row wrap2" style="margin-bottom:8px"></div>
+    <button class="btn sm full" onclick="openCustomDrink()">+ Jiný nápoj</button>
+  </div>
+
+  <div class="card">
+      <div class="row" style="gap:10px;margin:10px 0 14px">
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+      <div class="tiny muted">7 dní</div><b class="mono" id="alc7" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+      <div class="tiny muted">30 dní</div><b class="mono" id="alc30" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
+      <div class="tiny muted">dní bez</div><b class="mono" id="alcDry" style="font-size:20px">0</b><div class="tiny muted">/30</div></div>
+  </div>
+  <div id="alcLimitBar"></div>
+  <h3 style="margin-top:14px">Posledních 21 dní</h3>
+  <div id="alcChart" style="display:flex;align-items:flex-end;gap:3px;height:110px;margin:8px 0 4px"></div>
+  <div class="row" style="justify-content:space-between"><span class="tiny muted" id="alcFrom"></span><span class="tiny muted">dnes</span></div>
+  <h3 style="margin-top:16px">Dnešní záznamy</h3>
+  <div id="alcList"></div>
   </div>
 </section>
 
@@ -414,15 +487,15 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
   <button class="on" data-p="day" onclick="go('day')">
     <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Dnes</button>
   <button data-p="scan" onclick="go('scan')">
-    <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M11 8v8M15 8v8"/></svg>Skenovat</button>
-  <button data-p="photo" onclick="go('photo')">
-    <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Foto</button>
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Zadat</button>
+  <button data-p="alc" onclick="go('alc')">
+    <svg viewBox="0 0 24 24"><path d="M8 3h8l-1 6a4 4 0 0 1-3 3v6M9 21h6M5 3h2M17 3h2"/></svg>Alkohol</button>
   <button data-p="db" onclick="go('db')">
     <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Jídla</button>
   <button data-p="stats" onclick="go('stats')">
     <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Staty</button>
   <button data-p="set" onclick="go('set')">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Nastavení</button>
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Víc</button>
 </nav>
 
 <!-- portion sheet -->
@@ -500,28 +573,6 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
   </div>
 </div>
 
-<!-- alcohol overview -->
-<div class="mod" id="modAlc" onclick="if(event.target===this)closeMod('modAlc')">
-  <div class="sheet">
-    <h2>Alkohol — přehled</h2>
-    <div class="row" style="gap:10px;margin:10px 0 14px">
-      <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
-        <div class="tiny muted">7 dní</div><b class="mono" id="alc7" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
-      <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
-        <div class="tiny muted">30 dní</div><b class="mono" id="alc30" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
-      <div class="card grow" style="margin:0;background:var(--card2);text-align:center">
-        <div class="tiny muted">dní bez</div><b class="mono" id="alcDry" style="font-size:20px">0</b><div class="tiny muted">/30</div></div>
-    </div>
-    <div id="alcLimitBar"></div>
-    <h3 style="margin-top:14px">Posledních 21 dní</h3>
-    <div id="alcChart" style="display:flex;align-items:flex-end;gap:3px;height:110px;margin:8px 0 4px"></div>
-    <div class="row" style="justify-content:space-between"><span class="tiny muted" id="alcFrom"></span><span class="tiny muted">dnes</span></div>
-    <h3 style="margin-top:16px">Dnešní záznamy</h3>
-    <div id="alcList"></div>
-    <button class="btn full" style="margin-top:12px" onclick="closeMod('modAlc')">Zavřít</button>
-  </div>
-</div>
-
 <!-- custom drink -->
 <div class="mod" id="modDrink" onclick="if(event.target===this)closeMod('modDrink')">
   <div class="sheet">
@@ -550,7 +601,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-11';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-12';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -696,9 +747,18 @@ function go(p) {
   if (p !== 'scan') stopCam();
   if (p === 'db') renderDb();
   if (p === 'stats') renderStats();
+  if (p === 'alc') renderAlc();
   window.scrollTo(0, 0);
 }
 function closeMod(id) { $(id).classList.remove('on'); }
+
+/* podzáložky na stránce Zadat */
+function setAdd(k) {
+  document.querySelectorAll('#p-scan .pane').forEach(e => e.classList.toggle('on', e.id === 's-' + k));
+  document.querySelectorAll('#addSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === k));
+  if (k !== 'code') stopCam();
+  if (k === 'find') setTimeout(() => $('nameQ').focus(), 100);
+}
 
 /* ---------------- jídla dne ---------------- */
 const MEALS = [
@@ -775,10 +835,8 @@ async function renderDay() {
   $('logList').innerHTML = rows.length
     ? groups.filter(g => g.rows.length).map(g => `
         <div style="margin-bottom:10px">
-          <div class="row" style="justify-content:space-between;align-items:baseline;
-               border-bottom:1px solid var(--line);padding-bottom:4px">
-            <span class="tiny" style="color:var(--acc);font-weight:600;text-transform:uppercase;
-              letter-spacing:.04em">${g.m.n}</span>
+          <div class="mealhead">
+            <span class="n">${g.m.n}</span>
             <span class="tiny muted mono">${r0(g.rows.reduce((a, r) => a + r.kcal, 0))} kcal
               <button class="btn sm" style="padding:3px 7px;margin-left:6px"
                 onclick="copyMeal('${g.m.k}')" title="zkopírovat toto jídlo ze včerejška">⧉</button></span>
@@ -891,26 +949,53 @@ function mapOFF(code, prod) {
 }
 
 /* --- vyhledávání podle názvu: nejdřív moje databáze, pak Open Food Facts --- */
-async function searchByName() {
+let sugT = null, sugSeq = 0;
+function onNameInput() {
   const q = ($('nameQ').value || '').trim();
-  if (q.length < 2) { toast('Zadej aspoň dvě písmena'); return; }
-  const box = $('nameRes');
-  const mine = products.filter(p =>
-    (p.name + ' ' + (p.brand || '')).toLowerCase().includes(q.toLowerCase())).slice(0, 6);
-  const card = (p, local) => `
-    <div class="item"><div class="grow" onclick="${local
+  clearTimeout(sugT);
+  if (q.length < 2) { $('nameRes').innerHTML = ''; return; }
+  renderLocalMatches(q);                    // moje databáze okamžitě
+  sugT = setTimeout(() => searchByName(true), 450);   // online až po pauze v psaní
+}
+function localMatches(q) {
+  const t = q.toLowerCase();
+  return products
+    .filter(p => (p.name + ' ' + (p.brand || '')).toLowerCase().includes(t))
+    .sort((a, b) => (b.uses || 0) - (a.uses || 0))
+    .slice(0, 6);
+}
+function renderLocalMatches(q) {
+  const mine = localMatches(q);
+  $('nameRes').innerHTML = (mine.length ? mine.map(p => resCard(p, true)).join('') : '')
+    + '<p class="tiny muted" style="margin:8px 0 0">Píšu dotaz…</p>';
+}
+function resCard(p, local) {
+  return `<div class="item"><div class="grow" onclick="${local
       ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`}">
       <div class="nm">${esc(p.name)}</div>
       <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100 ${esc(p.unit)}
         <span class="pill ${local ? 'man' : 'off'}">${local ? 'moje' : 'OFF'}</span>${p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
     </div></div>`;
+}
+
+async function searchByName(quiet) {
+  if (!quiet) clearTimeout(sugT);     // ruční hledání ruší čekající našeptávání
+  const q = ($('nameQ').value || '').trim();
+  if (q.length < 2) { if (!quiet) toast('Zadej aspoň dvě písmena'); return; }
+  const seq = ++sugSeq;
+  const box = $('nameRes');
+  const mine = localMatches(q);
+  const card = resCard;
   box.innerHTML = (mine.length ? mine.map(p => card(p, true)).join('') : '')
     + '<p class="tiny muted" style="margin:8px 0 0">Hledám v Open Food Facts…</p>';
   let res = null, errTxt = '';
   try { res = await searchOFF(q, $('czOnly').checked); }
   catch (e) { errTxt = e.message || 'neznámá chyba'; }
+  if (seq !== sugSeq) return;              // mezitím přišel novější dotaz
   const mineHtml = mine.map(p => card(p, true)).join('');
   if (!res) {
+    if (quiet) { box.innerHTML = mineHtml +
+      '<p class="tiny muted" style="margin:8px 0 0">Online se nepodařilo — klepni na Hledat.</p>'; return; }
     box.innerHTML = mineHtml +
       '<p class="tiny" style="margin:8px 0 0;color:var(--warn)">Online vyhledávání selhalo.</p>' +
       '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) + '</p>' +
@@ -1828,7 +1913,7 @@ async function logDrink(i) {
   });
   if (navigator.vibrate) navigator.vibrate(40);
   toast(d.nm + ' · ' + r1(alcG(d)) + ' g alk.');
-  renderDay();
+  renderDay(); renderAlc();
 }
 function openCustomDrink() { calcDrink(); $('modDrink').classList.add('on'); }
 function curDrink() {
@@ -1847,7 +1932,7 @@ async function addCustomDrink(keep) {
     date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml, meal: defaultMeal(),
     kcal: alcKcal(d), p: 0, c: alcCarb(d), f: 0, alc: alcG(d), abv: d.abv, ts: Date.now()
   });
-  closeMod('modDrink'); toast('Zapsáno'); renderDay();
+  closeMod('modDrink'); toast('Zapsáno'); renderDay(); renderAlc();
 }
 function renderDrinkEdit() {
   $('drinkEdit').innerHTML = drinks.map((d, i) => `
@@ -1879,7 +1964,7 @@ async function alcStats() {
   const sum = k => days.slice(-k).reduce((a, x) => a + x.g, 0);
   return { days, d7: sum(7), d30: sum(30), dry: days.filter(x => x.g === 0).length, today: byDay[curDate] || 0 };
 }
-async function openAlcOverview() {
+async function renderAlc() {
   const s = await alcStats();
   $('alc7').textContent = r0(s.d7); $('alc30').textContent = r0(s.d30); $('alcDry').textContent = s.dry;
   const lim = goals.alc || 0;
@@ -1903,9 +1988,8 @@ async function openAlcOverview() {
     <div class="item"><div class="grow"><div class="nm">${esc(r.name)}</div>
       <div class="sub">${r0(r.amount)} ml · ${r1(r.abv || 0)} % · ${r0(r.kcal)} kcal</div></div>
     <div class="kc">${r1(r.alc)}<span class="tiny muted"> g</span></div>
-    <button class="btn sm dan" onclick="delLog(${Number(r.id) || 0});closeMod('modAlc')">✕</button></div>`).join('')
+    <button class="btn sm dan" onclick="delLog(${Number(r.id) || 0});renderAlc()">✕</button></div>`).join('')
     : '<p class="tiny muted">Dnes nic.</p>';
-  $('modAlc').classList.add('on');
 }
 
 /* ---------------- camera scanner ---------------- */
