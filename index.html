@@ -744,7 +744,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-28';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-29';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1030,7 +1030,7 @@ async function delLog(id) { await dbDel('log', id); renderDay(); }
 function renderDb() {
   const q = ($('dbSearch').value || '').trim().toLowerCase();
   const list = products
-    .filter(p => !q || norm(p.name + ' ' + (p.brand || '') + ' ' + (p.barcode || '')).includes(norm(q)))
+    .filter(p => !q || matchWords(p.name + ' ' + (p.brand || '') + ' ' + (p.barcode || ''), q))
     .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
   $('dbCount').textContent = products.length + ' položek v databázi' + (q ? ' · nalezeno ' + list.length : '');
   $('dbList').innerHTML = list.length ? list.map(p => `
@@ -1116,6 +1116,11 @@ function onNameInput() {
   sugT = setTimeout(() => searchByName(true), 450);   // online až po pauze v psaní
 }
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+/* shoda po slovech a bez ohledu na pořadí: „slunecnicovy chleb" najde „Chléb slunečnicový" */
+function matchWords(hay, q) {
+  const h = norm(hay), ws = norm(q).split(/\s+/).filter(Boolean);
+  return ws.length > 0 && ws.every(w => h.includes(w));
+}
 
 function zakProduct(z) {
   return {
@@ -1127,13 +1132,11 @@ function zakProduct(z) {
 }
 function zakladMatches(q) {
   if (!window.ZAKLAD) return [];
-  const t = norm(q);
-  return ZAKLAD.filter(z => norm(z.n).includes(t)).slice(0, 8).map(zakProduct);
+  return ZAKLAD.filter(z => matchWords(z.n, q)).slice(0, 8).map(zakProduct);
 }
 function localMatches(q) {
-  const t = norm(q);
   const mine = products
-    .filter(p => norm(p.name + ' ' + (p.brand || '')).includes(t))
+    .filter(p => matchWords(p.name + ' ' + (p.brand || ''), q))
     .sort((a, b) => (b.uses || 0) - (a.uses || 0))
     .slice(0, 6);
   const ids = new Set(mine.map(p => p.id));
@@ -1174,8 +1177,8 @@ function extProduct(x) {
 }
 function extMatches(q) {
   if (!extFoods.length) return [];
-  const t = norm(q); const out = [];
-  for (const x of extFoods) { if (norm(x.n).includes(t)) { out.push(extProduct(x)); if (out.length >= 10) break; } }
+  const out = [];
+  for (const x of extFoods) { if (matchWords(x.n, q)) { out.push(extProduct(x)); if (out.length >= 10) break; } }
   return out;
 }
 async function useExt(id) {
@@ -1229,8 +1232,10 @@ async function parseExt(txt) {
     return;
   }
   const zdroj = /origfdnm/.test(H.join(' ')) ? 'NutriDatabaze.cz' : 'CSV';
-  const num = v => { const x = parseFloat(String(v).replace(',', '.').replace(/[^0-9.\-]/g, '')); return isFinite(x) ? x : 0; };
-  const rows = [], seen = new Set();
+  // '-' znamená v odborných databázích „neuvedeno", ne nulu
+  const MISS = v => { const t = String(v == null ? '' : v).trim(); return t === '' || t === '-' || t === '\u2014' || /^n\.?a\.?$/i.test(t); };
+  const num = v => { if (MISS(v)) return null; const x = parseFloat(String(v).replace(',', '.').replace(/[^0-9.\-]/g, '')); return isFinite(x) ? x : null; };
+  const rows = [], seen = new Set(); let dopoctu = 0;
   for (let i = 1; i < lines.length; i++) {
     const c = lines[i].split(sep).map(x => x.trim());
     if (c.length <= iK) continue;
@@ -1241,9 +1246,17 @@ async function parseExt(txt) {
     let id = 'x-' + norm(nm).replace(/[^a-z0-9]+/g, '-').slice(0, 48);
     while (seen.has(id)) id += '2';
     seen.add(id);
-    rows.push({ id, n: nm, z: zdroj, e,
-      p: iP >= 0 ? num(c[iP]) : 0, c: iC >= 0 ? num(c[iC]) : 0, f: iF >= 0 ? num(c[iF]) : 0,
-      v: iV >= 0 ? num(c[iV]) : 0, s: iS >= 0 ? num(c[iS]) : 0 });
+    const P = iP >= 0 ? num(c[iP]) : null, F = iF >= 0 ? num(c[iF]) : null;
+    const V = iV >= 0 ? num(c[iV]) : null, S = iS >= 0 ? num(c[iS]) : null;
+    let C = iC >= 0 ? num(c[iC]) : null, dopo = false;
+    // chybí-li sacharidy, dopočti je z energie: kcal = 4B + 4S + 9T + 2vl
+    if (C === null && P !== null && F !== null) {
+      C = Math.max(0, r1((e - 4 * P - 9 * F - 2 * (V || 0)) / 4));
+      dopo = true;
+    }
+    rows.push({ id, n: nm + (dopo ? ' *' : ''), z: zdroj, e,
+      p: P || 0, c: C || 0, f: F || 0, v: V || 0, s: S || 0, x: dopo ? 1 : 0 });
+    if (dopo) dopoctu++;
   }
   if (!rows.length) { box.textContent = 'Sloupce jsem našel, ale žádný použitelný řádek.'; return; }
   await new Promise(res => { const t = db.transaction('ext', 'readwrite'); t.objectStore('ext').clear(); t.oncomplete = res; });
@@ -1255,7 +1268,9 @@ async function parseExt(txt) {
     (iF >= 0 ? ', T=' + esc(head[iF]) : '') + (iV >= 0 ? ', vláknina=' + esc(head[iV]) : '') +
     (iS >= 0 ? ', sůl=' + esc(head[iS]) : '') +
     '<br>Ukázka: ' + esc(rows[0].n) + ' — ' + r0(rows[0].e) + ' kcal, B ' + r1(rows[0].p) +
-    ' S ' + r1(rows[0].c) + ' T ' + r1(rows[0].f);
+    ' S ' + r1(rows[0].c) + ' T ' + r1(rows[0].f) +
+    (dopoctu ? '<br><span style="color:var(--warn)">U ' + dopoctu + ' položek chyběly v souboru ' +
+      'sacharidy — dopočítal jsem je z energie. Jsou označené hvězdičkou.</span>' : '');
   toast('Načteno ' + rows.length + ' potravin');
 }
 
