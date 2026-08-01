@@ -272,8 +272,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <input type="file" id="camFile" accept="image/*" capture="environment" style="display:none" onchange="gotPhoto(this)">
     <input type="file" id="galFile" accept="image/*" style="display:none" onchange="gotPhoto(this)">
     <img id="photoPrev" style="display:none;width:100%;border-radius:12px;margin-bottom:10px">
-    <p class="tiny muted" style="margin:0">Vyfoť talíř shora nebo pod úhlem 45°. Pomůže, když je vedle
-      něco na měřítko — příbor, sklenice, ruka.</p>
+    <div class="fld" style="margin-bottom:6px">
+      <label>Popis (nepovinné, ale hodně pomůže)</label>
+      <input id="photoNote" placeholder="burek z T Marketu, dlouhý asi 15 cm, vedle je 10Kč">
+    </div>
+    <p class="tiny muted" style="margin:0">Vyfoť talíř shora nebo pod úhlem 45°. Napiš, co na fotce
+      nejde poznat — velikost, čím je to plněné, kolik oleje. Odhad se tím zpřesní víc než čímkoli jiným.</p>
   </div>
 
   <div class="card">
@@ -457,6 +461,10 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <div class="fld"><label>Vláknina — cíl (g)</label><input id="gFib" type="number" inputmode="numeric"></div>
       <div class="fld"><label>Sůl — strop (g)</label><input id="gSalt" type="number" inputmode="decimal"></div>
     </div>
+    <label class="row" style="gap:8px;align-items:flex-start;margin:0 0 12px">
+      <input type="checkbox" id="gProj" style="width:auto;margin-top:2px">
+      <span class="tiny muted">Instrukce mám uložené v Claude projektu — posílat k fotce jen krátkou
+        zprávu místo celého zadání</span></label>
     <div class="fld"><label>Klidový výdej — bazální metabolismus (kcal/den)</label>
       <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750"></div>
     <button class="btn pri full" onclick="saveGoals()">Uložit cíle</button>
@@ -635,7 +643,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-17';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-19';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1320,12 +1328,14 @@ function fillGoals() {
   $('gF').value = goals.f; $('gAlc').value = goals.alc || 0;
   $('gRmr').value = goals.rmr || '';
   $('gFib').value = goals.fib || 30; $('gSalt').value = goals.salt || 5;
+  $('gProj').checked = !!goals.proj;
 }
 async function saveGoals() {
   goals = {
     kcal: n($('gKcal').value) || 2000, p: n($('gP').value) || 0, c: n($('gC').value) || 0,
     f: n($('gF').value) || 0, alc: n($('gAlc').value) || 0, rmr: n($('gRmr').value) || 0,
-    fib: n($('gFib').value) || 30, salt: n($('gSalt').value) || 5
+    fib: n($('gFib').value) || 30, salt: n($('gSalt').value) || 5,
+    proj: $('gProj').checked
   };
   await dbPut('meta', { k: 'goals', v: goals });
   renderDay(); toast('Cíle uloženy');
@@ -1435,6 +1445,18 @@ Pravidla:
 - česky, ale ČÍSLA PIŠ S TEČKOU (3.6), ne s čárkou
 - žádný text před ani za JSON blokem`;
 
+/* zpráva, která jde s fotkou: buď celé zadání, nebo jen popis (když má uživatel projekt) */
+function promptFor(kind) {
+  const base = kind === 'label' ? LABEL_PROMPT : AI_PROMPT;
+  const note = (kind === 'label' ? '' : (($('photoNote') || {}).value || '')).trim();
+  const short = kind === 'label'
+    ? 'Přepiš tabulku výživových údajů z fotky do obvyklého JSONu.'
+    : 'Odhadni výživové hodnoty jídla na fotce a vrať je v obvyklém JSONu.';
+  let out = goals.proj ? short : base;
+  if (note) out += '\n\nDoplňující informace ode mě: ' + note;
+  return out;
+}
+
 function gotPhoto(inp) {
   const f = inp.files && inp.files[0];
   if (!f) return;
@@ -1447,10 +1469,11 @@ function gotPhoto(inp) {
 }
 
 async function copyPrompt() {
-  try { await navigator.clipboard.writeText(AI_PROMPT); toast('Zadání zkopírováno'); }
+  const T = promptFor('meal');
+  try { await navigator.clipboard.writeText(T); toast('Zadání zkopírováno'); }
   catch (e) {
     const t = document.createElement('textarea');
-    t.value = AI_PROMPT; document.body.appendChild(t); t.select();
+    t.value = T; document.body.appendChild(t); t.select();
     try { document.execCommand('copy'); toast('Zadání zkopírováno'); }
     catch (e2) { toast('Zkopíruj ručně z README'); }
     t.remove();
@@ -1459,15 +1482,16 @@ async function copyPrompt() {
 
 async function shareToClaude() {
   if (!photoFile) { toast('Nejdřív vyfoť jídlo'); return; }
-  try { await navigator.clipboard.writeText(AI_PROMPT); } catch (e) {}
-  const data = { files: [photoFile], text: AI_PROMPT, title: 'Výživové hodnoty' };
+  const T = promptFor('meal');
+  try { await navigator.clipboard.writeText(T); } catch (e) {}
+  const data = { files: [photoFile], text: T, title: 'Výživové hodnoty' };
   try {
     if (navigator.canShare && navigator.canShare({ files: [photoFile] })) {
       await navigator.share(data);
       toast('Zadání máš ve schránce — vlož ho v Claude k fotce');
       return;
     }
-    if (navigator.share) { await navigator.share({ text: AI_PROMPT }); return; }
+    if (navigator.share) { await navigator.share({ text: T }); return; }
   } catch (e) {
     if (e && e.name === 'AbortError') return;
   }
@@ -1488,25 +1512,123 @@ function tryJson(src) {
   if (i < 0 || j <= i) return null;
   let raw = s.slice(i, j + 1)
     .replace(/[\u201C\u201D\u201E]/g, '"').replace(/[\u2018\u2019]/g, "'")
-    .replace(/,\s*([}\]])/g, '$1')
-    .replace(/(\d),(\d)/g, '$1.$2');        // desetinná čárka uvnitř čísel
-  let o;
-  try { o = JSON.parse(raw); } catch (e) { return null; }
-  const arr = o.polozky || o.items || o.suroviny || [];
-  if (!Array.isArray(arr) || !arr.length) return null;
+    .replace(/,\s*([}\]])/g, '$1');
+  let o = null;
+  try { o = JSON.parse(raw); }
+  catch (e) {
+    // teprve když to neprojde, zkus opravit desetinné čárky (7,5 → 7.5).
+    // Pozor na pole [300,400] — proto jen 1–2 číslice, po nichž nenásleduje další.
+    try { o = JSON.parse(raw.replace(/(\d),(\d{1,2})(?!\d)/g, '$1.$2')); }
+    catch (e2) { return null; }
+  }
+  const arr = o.polozky || o.items || o.suroviny || o.polozka || o.ingredience || [];
+  if (!Array.isArray(arr) || !arr.length) return tryJsonLoose(o);   // jiný tvar JSONu
   const pick = (x, keys) => { for (const k of keys) if (x[k] !== undefined && x[k] !== null && x[k] !== '') return n(x[k]); return 0; };
   return {
     name: String(o.jidlo || o.nazev || o.name || ''),
     note: String(o.pozn || o.poznamka || o.note || ''),
     perPortion: false,
-    items: arr.map(x => ({
-      nazev: String(x.nazev || x.name || x.surovina || 'položka'),
+    items: arr.filter(x => x && typeof x === 'object').map(x => ({
+      nazev: String(x.nazev || x.name || x.surovina || x.polozka || 'položka'),
       mn: pick(x, ['mn', 'mnozstvi', 'množství', 'gramy', 'amount', 'g']) || 100,
       kcal: pick(x, ['kcal', 'energie', 'energy', 'kalorie']),
       b: pick(x, ['b', 'bilkoviny', 'bílkoviny', 'protein', 'proteins']),
       s: pick(x, ['s', 'sacharidy', 'carbs', 'carbohydrates']),
       t: pick(x, ['t', 'tuky', 'fat', 'fats'])
     }))
+  };
+}
+
+/* 1b) JSON jiného tvaru – projde strukturu a najde hodnoty podle názvů klíčů */
+function numOf(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') { const x = parseFloat(v.replace(',', '.').replace(/[^0-9.\-]/g, '')); return isFinite(x) ? x : null; }
+  if (Array.isArray(v)) {
+    const ns = v.map(numOf).filter(x => x !== null);
+    return ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : null;
+  }
+  if (typeof v === 'object') {
+    for (const k of ['odhad', 'estimate', 'stred', 'hodnota', 'value', 'prumer'])
+      if (v[k] !== undefined) return numOf(v[k]);
+    const ns = Object.values(v).map(numOf).filter(x => x !== null);
+    return ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : null;
+  }
+  return null;
+}
+const KEY = {
+  kcal: /(^|_)(kcal|energie|energy|kalorie)/i,
+  b: /(^|_)(bilkoviny|bílkoviny|protein)/i,
+  s: /(^|_)(sacharidy|carbs|carbohydr)/i,
+  t: /(^|_)(tuky|^tuk$|fat)/i,
+  fib: /(^|_)(vlaknina|vláknina|fiber)/i,
+  salt: /(^|_)(sul|sůl|salt|sodik)/i
+};
+function grab(obj) {                       // vytáhne živiny z jednoho bloku
+  if (!obj || typeof obj !== 'object') return null;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (/nasycen|saturated|cukry|sugar/i.test(k)) continue;   // "z toho" položky nejsou celky
+    for (const [f, re] of Object.entries(KEY))
+      if (out[f] === undefined && re.test(k)) { const x = numOf(v); if (x !== null) out[f] = x; }
+  }
+  return out.kcal !== undefined ? out : null;
+}
+function findBlock(o, re) {
+  let hit = null;
+  (function w(x) {
+    if (!x || typeof x !== 'object' || hit) return;
+    for (const [k, v] of Object.entries(x)) {
+      if (hit) return;
+      if (re.test(k) && v && typeof v === 'object') { const g = grab(v); if (g) { hit = g; return; } }
+      if (typeof v === 'object') w(v);
+    }
+  })(o);
+  return hit;
+}
+function findStr(o, re) {
+  let hit = '';
+  (function w(x) {
+    if (!x || typeof x !== 'object' || hit) return;
+    for (const [k, v] of Object.entries(x)) {
+      if (hit) return;
+      if (typeof v === 'string' && re.test(k) && v.trim()) { hit = v.trim(); return; }
+      if (typeof v === 'object') w(v);
+    }
+  })(o);
+  return hit;
+}
+function findNum(o, re) {
+  let hit = null;
+  (function w(x) {
+    if (!x || typeof x !== 'object' || hit !== null) return;
+    for (const [k, v] of Object.entries(x)) {
+      if (hit !== null) return;
+      if (re.test(k)) { const n2 = numOf(v); if (n2 !== null) { hit = n2; return; } }
+      if (v && typeof v === 'object' && !re.test(k)) w(v);
+    }
+  })(o);
+  return hit;
+}
+function tryJsonLoose(o) {
+  const name = findStr(o, /polozka|položka|nazev|název|jidlo|jídlo|name|produkt|surovina/i) || 'Jídlo z fotky';
+  const note = findStr(o, /pozn|note|spolehliv|comment|nejist/i) || '';
+  let mn = findNum(o, /hmotnost|gramaz|gramáž|^g$|_g$|porce|vaha|váha|weight|amount|mnozstvi|množství/i);
+  if (!mn || mn <= 0) mn = 100;
+  const per100 = findBlock(o, /100/) || (grab(o) && !findBlock(o, /cela|celk|total|porc/i) ? grab(o) : null);
+  const total = findBlock(o, /cela|celk|total|porc|dohromady/i);
+  let v = null, per = false;
+  if (per100) { v = per100; per = true; }
+  else if (total) { v = total; }
+  else { const g = grab(o); if (g) { v = g; per = true; } }
+  if (!v) return null;
+  const f = per ? 1 : (mn > 0 ? 100 / mn : 1);      // celkové hodnoty přepočti na 100 g
+  return {
+    name, note, perPortion: false,
+    items: [{
+      nazev: name, mn,
+      kcal: (v.kcal || 0) * f, b: (v.b || 0) * f, s: (v.s || 0) * f, t: (v.t || 0) * f
+    }]
   };
 }
 
@@ -1661,6 +1783,7 @@ async function aiSave(asRecipe) {
   });
   aiItems = []; $('aiCard').style.display = 'none'; $('aiIn').value = '';
   $('photoPrev').style.display = 'none'; photoFile = null;
+  if ($('photoNote')) $('photoNote').value = '';
   renderDb(); info();
   toast(asRecipe ? 'Přidáno a uloženo jako recept' : 'Přidáno do dneška');
   go('day'); renderDay();
@@ -2046,10 +2169,11 @@ function gotLabel(inp) {
 }
 async function shareLabel() {
   if (!labelFile) { toast('Nejdřív vyfoť tabulku'); return; }
-  try { await navigator.clipboard.writeText(LABEL_PROMPT); } catch (e) {}
+  const T = promptFor('label');
+  try { await navigator.clipboard.writeText(T); } catch (e) {}
   try {
     if (navigator.canShare && navigator.canShare({ files: [labelFile] })) {
-      await navigator.share({ files: [labelFile], text: LABEL_PROMPT, title: 'Výživové údaje' });
+      await navigator.share({ files: [labelFile], text: T, title: 'Výživové údaje' });
       toast('Zadání máš ve schránce — vlož ho v Claude k fotce'); return;
     }
   } catch (e) { if (e && e.name === 'AbortError') return; }
