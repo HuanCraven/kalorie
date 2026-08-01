@@ -323,6 +323,15 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
 <!-- ============ ALKOHOL ============ -->
 <section id="p-alc" class="page">
+  <div class="card compact" id="alcDateCard" style="margin-bottom:12px">
+    <div class="row" style="gap:8px;align-items:center">
+      <span class="tiny muted" style="flex:0 0 auto">Zapisuji na</span>
+      <input type="date" id="alcDate" class="grow" style="padding:8px 10px" onchange="setAddDate(this.value)">
+      <button class="btn sm" onclick="setAddDate(dstr(new Date()))">dnes</button>
+    </div>
+    <p class="tiny" id="alcDateWarn" style="margin:8px 0 0;color:var(--warn);display:none"></p>
+  </div>
+
   <div class="card">
     <div class="lbl-s">Rychlý zápis</div>
     <div id="drinkBtns" class="row wrap2" style="margin-bottom:8px"></div>
@@ -351,8 +360,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div id="alcLimitBar"></div>
   <h3 style="margin-top:14px">Posledních 21 dní</h3>
   <div id="alcChart" style="display:flex;align-items:flex-end;gap:3px;height:110px;margin:8px 0 4px"></div>
-  <div class="row" style="justify-content:space-between"><span class="tiny muted" id="alcFrom"></span><span class="tiny muted">dnes</span></div>
-  <h3 style="margin-top:16px">Dnešní záznamy</h3>
+  <div class="row" style="justify-content:space-between"><span class="tiny muted" id="alcFrom"></span><span class="tiny muted" id="alcTo">dnes</span></div>
+  <h3 style="margin-top:16px" id="alcListHead">Dnešní záznamy</h3>
   <div id="alcList"></div>
   </div>
 </section>
@@ -601,7 +610,10 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     </div>
     <div class="fld"><label>Sacharidy (g / 100 ml) — u destilátů 0</label>
       <input id="dkC" type="number" inputmode="decimal" value="0" oninput="calcDrink()"></div>
-    <div class="fld"><label>Zařadit k jídlu</label><select id="dkMeal"></select></div>
+    <div class="grid2">
+      <div class="fld"><label>Zařadit k jídlu</label><select id="dkMeal"></select></div>
+      <div class="fld"><label>Datum</label><input type="date" id="dkDate" onchange="setAddDate(this.value)"></div>
+    </div>
     <div class="card" style="background:var(--card2);margin-bottom:12px">
       <div class="row" style="justify-content:space-between"><span class="muted tiny">Čistý alkohol</span><b class="mono" id="dkAlc">0 g</b></div>
       <div class="row" style="justify-content:space-between"><span class="muted tiny">Energie</span><b class="mono" id="dkK">0 kcal</b></div>
@@ -619,7 +631,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-13';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-14';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1116,19 +1128,26 @@ function setAddDate(v) {
   curDate = v;
   syncAddDate();
   renderDay();
+  if ($('p-alc').classList.contains('on')) renderAlc();
 }
+function dayTxt(k) {
+  const d = new Date(k + 'T12:00:00');
+  return DAYS[d.getDay()] + ' ' + d.getDate() + '. ' + (d.getMonth() + 1) + '.';
+}
+function isToday() { return curDate === dstr(new Date()); }
+
 function syncAddDate() {
-  const today = dstr(new Date());
-  if ($('addDate')) $('addDate').value = curDate;
-  if ($('poDate')) $('poDate').value = curDate;
-  const w = $('addDateWarn'), c = $('addDateCard');
-  if (!w) return;
-  if (curDate !== today) {
-    const d = new Date(curDate + 'T12:00:00');
-    w.textContent = '⚠ Nezapisuješ na dnešek, ale na ' + DAYS[d.getDay()] + ' ' +
-      d.getDate() + '. ' + (d.getMonth() + 1) + '.';
-    w.style.display = ''; c.style.borderColor = '#4a3a20';
-  } else { w.style.display = 'none'; c.style.borderColor = 'var(--line)'; }
+  ['addDate', 'poDate', 'alcDate', 'dkDate'].forEach(id => { if ($(id)) $(id).value = curDate; });
+  const msg = isToday() ? '' : '⚠ Nezapisuješ na dnešek, ale na ' + dayTxt(curDate);
+  [['addDateWarn', 'addDateCard'], ['alcDateWarn', 'alcDateCard']].forEach(([wi, ci]) => {
+    const w = $(wi), c = $(ci);
+    if (!w || !c) return;
+    w.textContent = msg;
+    w.style.display = msg ? '' : 'none';
+    c.style.borderColor = msg ? '#4a3a20' : 'var(--line)';
+  });
+  if ($('alcListHead')) $('alcListHead').textContent = isToday() ? 'Dnešní záznamy' : 'Záznamy — ' + dayTxt(curDate);
+  if ($('alcTo')) $('alcTo').textContent = isToday() ? 'dnes' : czd(curDate);
 }
 function addToMeal(k) {
   pendingMeal = k;
@@ -1968,7 +1987,7 @@ async function logDrink(i) {
     alc: alcG(d), abv: d.abv, ts: Date.now()
   });
   if (navigator.vibrate) navigator.vibrate(40);
-  toast(d.nm + ' · ' + r1(alcG(d)) + ' g alk.');
+  toast(d.nm + ' · ' + r1(alcG(d)) + ' g alk.' + (isToday() ? '' : ' → ' + dayTxt(curDate)));
   renderDay(); renderAlc();
 }
 let editDrinkId = null;
@@ -1980,6 +1999,7 @@ function openCustomDrink() {
   $('dkSave').textContent = 'Zapsat';
   $('dkKeep').style.display = '';
   fillDrinkMeal(); $('dkMeal').value = defaultMeal();
+  $('dkDate').value = curDate;
   calcDrink();
   $('modDrink').classList.add('on');
 }
@@ -1994,6 +2014,7 @@ function editDrink(r) {
   $('dkAbv').value = r1(r.abv || 0);
   $('dkC').value = r.amount ? r1((r.c || 0) / r.amount * 100) : 0;
   fillDrinkMeal(); $('dkMeal').value = r.meal || defaultMeal();
+  $('dkDate').value = r.date || curDate;
   calcDrink();
   $('modDrink').classList.add('on');
 }
@@ -2009,7 +2030,8 @@ async function addCustomDrink(keep) {
   const d = curDrink();
   if (d.ml <= 0 || d.abv <= 0) { toast('Zadej objem a procenta'); return; }
   const rec = {
-    date: curDate, productId: 'alk', name: d.nm, unit: 'ml', amount: d.ml, meal: $('dkMeal').value,
+    date: $('dkDate').value || curDate, productId: 'alk', name: d.nm, unit: 'ml',
+    amount: d.ml, meal: $('dkMeal').value,
     kcal: alcKcal(d), p: 0, c: alcCarb(d), f: 0, alc: alcG(d), abv: d.abv, ts: Date.now()
   };
   if (editDrinkId) {
@@ -2021,7 +2043,9 @@ async function addCustomDrink(keep) {
   }
   if (keep) { drinks.push(d); await dbPut('meta', { k: 'drinks', v: drinks }); renderDrinkBtns(); renderDrinkEdit(); }
   await dbPut('log', rec);
-  closeMod('modDrink'); toast('Zapsáno'); renderDay(); renderAlc();
+  closeMod('modDrink');
+  toast('Zapsáno' + (isToday() ? '' : ' → ' + dayTxt(curDate)));
+  renderDay(); renderAlc();
 }
 function renderDrinkEdit() {
   $('drinkEdit').innerHTML = drinks.map((d, i) => `
@@ -2072,13 +2096,15 @@ async function renderAlc() {
   }).join('');
   const f = last[0] ? new Date(last[0].d + 'T12:00:00') : new Date();
   $('alcFrom').textContent = f.getDate() + '. ' + (f.getMonth() + 1) + '.';
+  syncAddDate();
   const rows = (await dbByIdx('log', 'date', curDate)).filter(r => r.alc);
   $('alcList').innerHTML = rows.length ? rows.map(r => `
-    <div class="item"><div class="grow"><div class="nm">${esc(r.name)}</div>
-      <div class="sub">${r0(r.amount)} ml · ${r1(r.abv || 0)} % · ${r0(r.kcal)} kcal</div></div>
+    <div class="item"><div class="grow" onclick="editLog(${Number(r.id) || 0})">
+      <div class="nm">${esc(r.name)}</div>
+      <div class="sub">${r0(r.amount)} ml · ${r1(r.abv || 0)} % · ${r0(r.kcal)} kcal · ${mealName(r.meal)}</div></div>
     <div class="kc">${r1(r.alc)}<span class="tiny muted"> g</span></div>
-    <button class="btn sm dan" onclick="delLog(${Number(r.id) || 0});renderAlc()">✕</button></div>`).join('')
-    : '<p class="tiny muted">Dnes nic.</p>';
+    <button class="btn sm dan" onclick="event.stopPropagation();delLog(${Number(r.id) || 0});renderAlc()">✕</button></div>`).join('')
+    : '<p class="tiny muted">' + (isToday() ? 'Dnes nic.' : 'Tenhle den nic.') + '</p>';
 }
 
 /* ---------------- camera scanner ---------------- */
