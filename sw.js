@@ -1,4 +1,4 @@
-const CACHE = 'kaltrack-v8';
+const CACHE = 'kaltrack-v10';
 const SHELL = ['./', './index.html', './manifest.json', './zxing.js'];
 
 self.addEventListener('install', e => {
@@ -17,6 +17,9 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+
+  // kontrola aktualizace se nesmí obsloužit z cache, jinak by hlásila falešnou shodu
+  if (url.searchParams.has('nosw')) return;
 
   // Open Food Facts: vždy ze sítě, nikdy z cache (data se mění)
   if (url.hostname.endsWith('openfoodfacts.org')) return;

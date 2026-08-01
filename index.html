@@ -392,6 +392,17 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
   </div>
 
   <div class="card">
+    <h3>Verze a aktualizace</h3>
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <span class="tiny muted">Nainstalovaná verze</span>
+      <b class="mono" id="verNow">—</b>
+    </div>
+    <button class="btn pri full" onclick="checkUpdate()">Zkontrolovat aktualizaci</button>
+    <p class="tiny muted" id="updMsg" style="margin:8px 0 0">
+      Stáhne novou verzi ze serveru a restartuje aplikaci. Data zůstanou.</p>
+  </div>
+
+  <div class="card">
     <h3>Info</h3>
     <p class="tiny muted" id="infoTxt"></p>
   </div>
@@ -539,6 +550,8 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 <script>
 'use strict';
 
+const APP_VERSION = '2026.08.01-10';   // zvyš při každé změně index.html
+
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
 const n = v => { const x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? x : 0; };
@@ -627,9 +640,49 @@ let editingId = null;
   }
 })();
 
+/* --- kontrola aktualizace --- */
+async function checkUpdate() {
+  $('verNow').textContent = APP_VERSION;
+  if (navigator.onLine === false) {
+    $('updMsg').textContent = 'Jsi offline — aktualizaci nejde ověřit.';
+    return;
+  }
+  $('updMsg').textContent = 'Ptám se serveru…';
+  let serverVer = null;
+  try {
+    // nosw=1 obchází service worker, ať se neptáme vlastní cache
+    const res = await fetch('index.html?nosw=1&v=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const txt = await res.text();
+    const m = txt.match(/APP_VERSION = '([^']+)'/);
+    serverVer = m ? m[1] : null;
+  } catch (e) {
+    $('updMsg').textContent = 'Nejde se spojit se serverem — jsi offline?';
+    return;
+  }
+  if (!serverVer) { $('updMsg').textContent = 'Verzi na serveru se nepodařilo přečíst.'; return; }
+  if (serverVer === APP_VERSION) {
+    $('updMsg').textContent = 'Máš nejnovější verzi (' + serverVer + ').';
+    return;
+  }
+  $('updMsg').textContent = 'Na serveru je ' + serverVer + ' — aktualizuji…';
+  try {
+    if ('serviceWorker' in navigator) {
+      const rs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(rs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const ks = await caches.keys();
+      await Promise.all(ks.map(k => caches.delete(k)));
+    }
+  } catch (e) { /* i tak zkusíme reload */ }
+  location.reload(true);
+}
+
 function info() {
   const bd = ('BarcodeDetector' in window) ? 'nativní BarcodeDetector' : 'ZXing (záložní)';
-  $('infoTxt').innerHTML = 'Skener: ' + bd + '<br>Produktů v databázi: ' + products.length +
+  $('verNow').textContent = APP_VERSION;
+  $('infoTxt').innerHTML = 'Verze: ' + APP_VERSION + '<br>Skener: ' + bd + '<br>Produktů v databázi: ' + products.length +
     '<br>Zdroj online dat: Open Food Facts<br>Data se nikam neodesílají kromě dotazu na čárový kód.' +
     '<br>Trvalé úložiště: ' + (persisted === true ? 'zapnuté (prohlížeč data nesmaže sám)'
       : persisted === false ? 'NEZAPNUTÉ — zálohuj častěji' : 'neznámé');
