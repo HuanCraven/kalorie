@@ -546,47 +546,61 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <!-- ============ NASTAVENÍ ============ -->
 <section id="p-set" class="page">
   <div class="card">
-    <h3>Denní cíle</h3>
-    <div class="fld"><label>Energie (kcal)</label><input id="gKcal" type="number" inputmode="numeric"></div>
-    <div class="grid2">
-      <div class="fld"><label>Bílkoviny (g)</label><input id="gP" type="number" inputmode="numeric"></div>
-      <div class="fld"><label>Sacharidy (g)</label><input id="gC" type="number" inputmode="numeric"></div>
+    <h3>Jak počítat cíle</h3>
+    <div class="seg" id="modeSeg" style="margin-bottom:12px">
+      <button data-m="fix" onclick="setMode(0)">Pevné</button>
+      <button data-m="dyn" onclick="setMode(1)">Podle zátěže</button>
     </div>
-    <div class="fld"><label>Tuky (g)</label><input id="gF" type="number" inputmode="numeric"></div>
-    <div class="hr"></div>
-    <label class="row" style="gap:8px;align-items:flex-start;margin:0 0 10px">
-      <input type="checkbox" id="gDyn" style="width:auto;margin-top:2px" onchange="saveGoals()">
-      <span class="tiny"><b>Dynamické cíle podle zátěže</b> — cíl energie se počítá z výdeje,
-        ne z pevného čísla</span></label>
+
+    <div id="fixBox">
+      <div class="fld"><label>Energie (kcal)</label><input id="gKcal" type="number" inputmode="numeric"></div>
+      <div class="grid2">
+        <div class="fld"><label>Bílkoviny (g)</label><input id="gP" type="number" inputmode="numeric"></div>
+        <div class="fld"><label>Sacharidy (g)</label><input id="gC" type="number" inputmode="numeric"></div>
+      </div>
+      <div class="fld"><label>Tuky (g)</label><input id="gF" type="number" inputmode="numeric"></div>
+    </div>
+
     <div id="dynBox" style="display:none">
       <div class="grid2">
-        <div class="fld"><label>Denní deficit (kcal, záporné = přebytek)</label>
-          <input id="gDef" type="number" inputmode="numeric" placeholder="např. 400"></div>
-        <div class="fld"><label>Bílkoviny (g na kg váhy) — 2,0 při tréninku v deficitu</label>
+        <div class="fld"><label>Denní deficit (kcal)</label>
+          <input id="gDef" type="number" inputmode="numeric" placeholder="400"></div>
+        <div class="fld"><label>Bílkoviny (g/kg)</label>
           <input id="gPKg" type="number" inputmode="decimal" step="0.1" placeholder="2.0"></div>
       </div>
-      <div class="fld"><label>Tuky (g na kg váhy)</label>
+      <div class="fld"><label>Tuky (g/kg)</label>
         <input id="gFKg" type="number" inputmode="decimal" step="0.1" placeholder="0.9"></div>
       <p class="tiny muted" id="dynHint" style="margin:-4px 0 10px"></p>
     </div>
+
     <div class="grid2">
       <div class="fld"><label>Vláknina — cíl (g)</label><input id="gFib" type="number" inputmode="numeric"></div>
       <div class="fld"><label>Sůl — strop (g)</label><input id="gSalt" type="number" inputmode="decimal"></div>
     </div>
-    <div class="fld"><label>Klidový výdej — bazální metabolismus (kcal/den)</label>
+    <button class="btn pri full" onclick="saveGoals()">Uložit</button>
+  </div>
+
+  <div class="card">
+    <h3>Klidový výdej</h3>
+    <div class="fld"><label>Bazální metabolismus (kcal/den)</label>
       <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750"></div>
-    <button class="btn pri full" onclick="saveGoals()">Uložit cíle</button>
-    <div class="hr"></div>
-    <h3>Nevíš klidový výdej?</h3>
-    <div class="grid2">
-      <div class="fld"><label>Pohlaví</label><select id="cSex"><option value="m">muž</option><option value="f">žena</option></select></div>
-      <div class="fld"><label>Věk</label><input id="cAge" type="number" inputmode="numeric"></div>
-      <div class="fld"><label>Výška (cm)</label><input id="cH" type="number" inputmode="numeric"></div>
-      <div class="fld"><label>Váha (kg)</label><input id="cW" type="number" inputmode="decimal"></div>
-    </div>
-    <button class="btn full" onclick="calcRmr()">Spočítat a doplnit</button>
-    <p class="tiny muted" style="margin:8px 0 0">Mifflin–St Jeor. Je to odhad s chybou kolem 10 %.
-      Aplikace ho po pár týdnech porovná se skutečnou změnou váhy a ukáže ti reálné číslo.</p>
+    <button class="btn pri full" style="margin-bottom:12px" onclick="saveGoals()">Uložit</button>
+    <details>
+      <summary class="tiny muted" style="cursor:pointer">Neznám ho — spočítat</summary>
+      <div style="margin-top:10px">
+        <div class="grid2">
+          <div class="fld"><label>Pohlaví</label><select id="cSex"><option value="m">muž</option><option value="f">žena</option></select></div>
+          <div class="fld"><label>Věk</label><input id="cAge" type="number" inputmode="numeric"></div>
+          <div class="fld"><label>Výška (cm)</label><input id="cH" type="number" inputmode="numeric"></div>
+          <div class="fld"><label>Váha (kg)</label><input id="cW" type="number" inputmode="decimal"></div>
+        </div>
+        <button class="btn full" onclick="calcRmr()">Spočítat a doplnit</button>
+        <p class="tiny muted" style="margin:8px 0 0">Mifflin–St Jeor, odhad s chybou kolem 10 %.
+          Statistiky ho po pár týdnech porovnají se skutečnou změnou váhy.</p>
+      </div>
+    </details>
+    <p class="tiny muted" style="margin:10px 0 0">Používá se na výpočet bilance a v režimu
+      „podle zátěže" i na denní cíl energie.</p>
   </div>
 
   <div class="card">
@@ -761,7 +775,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-31';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-32';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -819,7 +833,7 @@ const dbByIdx = (s, i, v) => req(tx(s, 'readonly').index(i).getAll(v));
 
 /* ---------------- state ---------------- */
 let products = [];            // cache
-let goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, alcDay: 0, rmr: 0, fib: 30, salt: 5 };
+let goals = { kcal: 2000, p: 130, c: 220, f: 65, alcDay: 0, rmr: 0, fib: 30, salt: 5 };
 let curDate = dstr(new Date());
 let persisted = null;         // chrání IndexedDB před automatickým smazáním
 let curProduct = null;        // product open in portion sheet
@@ -833,7 +847,8 @@ let editingId = null;
   const hadDay = !!(g && g.v && Object.prototype.hasOwnProperty.call(g.v, 'alcDay'));
   if (g && g.v) goals = Object.assign(goals, g.v);
   // starší verze měly týdenní limit — převeď ho na denní průměr
-  if (!hadDay && goals.alc) { goals.alcDay = r1(goals.alc / 7); await dbPut('meta', { k: 'goals', v: goals }); }
+  if (!hadDay && goals.alc) goals.alcDay = r1(goals.alc / 7);
+  delete goals.alc;                      // starý týdenní limit už se nepoužívá
   const dk = await dbGet('meta', 'drinks');
   if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
   products = await dbAll('products');
@@ -915,6 +930,7 @@ function go(p) {
   if (p === 'db') renderDb();
   if (p === 'stats') renderStats();
   if (p === 'alc') renderAlc();
+  if (p === 'set') dynUi();
   window.scrollTo(0, 0);
 }
 function closeMod(id) { $(id).classList.remove('on'); }
@@ -1732,7 +1748,6 @@ function fillGoals() {
   $('gKcal').value = goals.kcal; $('gP').value = goals.p; $('gC').value = goals.c;
   $('gF').value = goals.f; $('gAlcDay').value = goals.alcDay || 0;
   $('gRmr').value = goals.rmr || '';
-  $('gDyn').checked = !!goals.dyn;
   $('gDef').value = goals.def || 0;
   $('gPKg').value = goals.pKg || 2.0;
   $('gFKg').value = goals.fKg || 0.9;
@@ -1744,9 +1759,9 @@ function fillGoals() {
 async function saveGoals() {
   goals = {
     kcal: n($('gKcal').value) || 2000, p: n($('gP').value) || 0, c: n($('gC').value) || 0,
-    f: n($('gF').value) || 0, alc: goals.alc || 0, alcDay: n($('gAlcDay').value) || 0,
+    f: n($('gF').value) || 0, alcDay: n($('gAlcDay').value) || 0,
     rmr: n($('gRmr').value) || 0,
-    dyn: $('gDyn') ? $('gDyn').checked : !!goals.dyn,
+    dyn: !!goals.dyn,
     def: $('gDef') ? n($('gDef').value) : (goals.def || 0),
     pKg: ($('gPKg') && n($('gPKg').value)) || 2.0,
     fKg: ($('gFKg') && n($('gFKg').value)) || 0.9,
@@ -1845,7 +1860,7 @@ async function wipe() {
     t.objectStore('meta').clear(); t.objectStore('daily').clear();
     t.objectStore('ext').clear(); t.oncomplete = r;
   });
-  products = []; extFoods = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alc: 0, alcDay: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
+  products = []; extFoods = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alcDay: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
   fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info();
   extInfoTxt(); toast('Smazáno');
 }
@@ -2257,10 +2272,20 @@ async function saveDaily() {
   toast('Uloženo');
   renderDay();
 }
+async function setMode(dyn) {
+  goals.dyn = !!dyn;
+  await dbPut('meta', { k: 'goals', v: goals });
+  dynUi(); renderDay();
+}
 async function dynUi() {
   if (!$('dynBox')) return;
   $('dynBox').style.display = goals.dyn ? '' : 'none';
+  $('fixBox').style.display = goals.dyn ? 'none' : '';
+  document.querySelectorAll('#modeSeg button').forEach(b =>
+    b.classList.toggle('on', (b.dataset.m === 'dyn') === !!goals.dyn));
   if (!goals.dyn) return;
+  const lw = await lastWeight(dstr(new Date()));
+  if (lw && $('cW') && !$('cW').value) $('cW').value = lw;
   const w = await lastWeight(dstr(new Date())) || n(($('cW') || {}).value) || 0;
   $('dynHint').innerHTML = !goals.rmr
     ? '<span style="color:var(--warn)">Nejdřív nastav klidový výdej, jinak nejde cíl spočítat.</span>'
@@ -2476,7 +2501,7 @@ function svgAlcTrend(long, trend, lim) {
 }
 
 /* Denní záznamy — otázka „kdy a kolik", ne „jsem v limitu". */
-function svgAlcBars(days, lim) {
+function svgAlcBars(days) {
   const W = 320, H = 92, L = 26;
   const mx = Math.max(10, ...days.map(d => d.g)) * 1.1;
   const bw = (W - L) / days.length;
@@ -3132,7 +3157,7 @@ async function renderAlc() {
   $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : '<p class="tiny muted" style="margin:0">' +
     'Limit není nastavený (Víc → Alkohol).</p>';
   $('alcTrend').innerHTML = svgAlcTrend(s.long, s.trend, s.lim);
-  $('alcChart').innerHTML = svgAlcBars(s.days.slice(-21), s.lim);
+  $('alcChart').innerHTML = svgAlcBars(s.days.slice(-21));
   syncAddDate();
   const allLog = await dbAll('log');
   s.ref = refDrink(allLog.filter(r => r.date > dstr(new Date(Date.now() - 60 * 86400000))));
