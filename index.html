@@ -775,7 +775,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-35';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.01-36';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1460,17 +1460,19 @@ async function searchByName(quiet) {
   if (searchCtrl) searchCtrl.abort();      // zruš dotaz, který ještě běží
   const myCtrl = new AbortController();
   searchCtrl = myCtrl;
-  let res = null, errTxt = '';
+  let res = null, errTxt = '', errEmpty = false;
   try { res = await searchOFF(q, $('czOnly').checked, myCtrl.signal); }
-  catch (e) { if (e.aborted) return; errTxt = e.message || 'neznámá chyba'; }
+  catch (e) { if (e.aborted) return; errTxt = e.message || 'neznámá chyba'; errEmpty = !!e.empty; }
   if (seq !== sugSeq) return;              // mezitím přišel novější dotaz
   if (searchCtrl === myCtrl) searchCtrl = null;
   const mineHtml = mine.map(p => card(p, true)).join('');
   if (!res) {
     box.innerHTML = mineHtml +
-      '<p class="tiny" style="margin:8px 0 0;color:var(--warn)">Online vyhledávání selhalo.</p>' +
-      '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) +
-      '</p><button class="btn sm full" style="margin-top:8px" onclick="searchByName()">Zkusit znovu</button>' +
+      (errEmpty
+        ? '<p class="tiny muted" style="margin:8px 0 0">Online nic nenašlo — ani přesně, ani podle začátku slova. Zkus jiné slovo nebo zadej ručně.</p>'
+        : '<p class="tiny" style="margin:8px 0 0;color:var(--warn)">Online vyhledávání selhalo.</p>' +
+          '<p class="tiny muted" style="margin:4px 0 0">Důvod: ' + esc(errTxt) + '</p>') +
+      '<button class="btn sm full" style="margin-top:8px" onclick="searchByName()">Zkusit znovu</button>' +
       '<button class="btn sm full" style="margin-top:6px" onclick="openEdit(null)">Zadat ručně</button>';
     return;
   }
@@ -1542,13 +1544,30 @@ async function searchOFF(q, czOnly, signal) {
     }
   };
 
-  try {
-    const u = 'https://search.openfoodfacts.org/search?q=' + encodeURIComponent(q) +
+  // online index hledá celá slova; "schin" nenajde nic. Proto druhý pokus s hvězdičkou.
+  const wildQ = q.trim().split(/\s+/).filter(Boolean)
+    .map(w => (w.length >= 3 && !/[*?:"()~^]/.test(w)) ? w + '*' : w).join(' ');
+
+  const askSearch = async (query) => {
+    const u = 'https://search.openfoodfacts.org/search?q=' + encodeURIComponent(query) +
       '&page_size=25&fields=' + encodeURIComponent(FLD);
     const j = await tryTwice(u);
-    const hits = j.hits || j.products || j.results || [];
+    return j.hits || j.products || j.results || [];
+  };
+
+  try {
+    const hits = await askSearch(q);
     if (hits.length) { raw = hits.map(h => h._source || h); via = 'search'; }
-    else problems.push('nové vyhledávání: nic nenašlo');
+    else if (wildQ !== q) {
+      try {
+        const h2 = await askSearch(wildQ);
+        if (h2.length) { raw = h2.map(h => h._source || h); via = 'prefix'; }
+        else problems.push('nové vyhledávání: nic nenašlo ani podle začátku slova');
+      } catch (e) {
+        if (e.aborted) throw e;
+        problems.push('nové vyhledávání: nic nenašlo');
+      }
+    } else problems.push('nové vyhledávání: nic nenašlo');
   } catch (e) { if (e.aborted) throw e; problems.push('nové vyhledávání: ' + e.message); }
 
   if (!raw) {
@@ -1564,20 +1583,25 @@ async function searchOFF(q, czOnly, signal) {
     } catch (e) { if (e.aborted) throw e; problems.push('starší vyhledávání: ' + e.message); }
   }
 
-  if (!raw) throw new Error(problems.join(' · '));
+  if (!raw) {
+    const err = new Error(problems.join(' · '));
+    err.empty = problems.every(p => /nic nenašlo/.test(p));   // nic nenalezeno ≠ výpadek
+    throw err;
+  }
 
   let items = raw.map(pr => mapOFFSearch(pr)).filter(x => x && x.kcal > 0);
   const seen = {};
   items = items.filter(x => seen[x.id] ? false : (seen[x.id] = 1));
-  let note = '';
+  const notes = [];
+  if (via === 'prefix') notes.push('Přesná shoda nic nenašla — hledal jsem podle začátku slova („' + esc(wildQ) + '").');
   if (czOnly) {
     const cz = items.filter(x => x.cz);
     if (cz.length) items = cz;
-    else note = 'Žádný z výsledků není označený jako prodávaný v Česku — ukazuju všechny.';
+    else notes.push('Žádný z výsledků není označený jako prodávaný v Česku — ukazuju všechny.');
   } else {
     items.sort((a, b) => (b.cz ? 1 : 0) - (a.cz ? 1 : 0));
   }
-  return { items: items.slice(0, 15), note, via };
+  return { items: items.slice(0, 15), note: notes.join(' '), via };
 }
 
 /* ---------------- portion sheet ---------------- */
