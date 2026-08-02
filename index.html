@@ -525,6 +525,58 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 </section>
 
+<!-- ============ POHYB ============ -->
+<section id="p-fit" class="page">
+  <div class="card compact" id="fitDateCard" style="margin-bottom:12px">
+    <div class="row" style="gap:8px;align-items:center">
+      <span class="tiny muted" style="flex:0 0 auto">Zapisuji na</span>
+      <input type="date" id="fitDate" class="grow" style="padding:8px 10px" onchange="setAddDate(this.value)">
+      <button class="btn sm" onclick="setAddDate(dstr(new Date()))">dnes</button>
+    </div>
+    <p class="tiny" id="fitDateWarn" style="margin:8px 0 0;color:var(--warn);display:none"></p>
+  </div>
+
+  <div class="card">
+    <h3 id="fitFormHead">Zapsat aktivitu</h3>
+    <div id="fitRecent" class="row wrap2" style="margin-bottom:8px"></div>
+    <div class="fld"><label>Aktivita</label>
+      <input id="fitQ" placeholder="běh, kolo, posilování… nebo vlastní název" autocomplete="off"
+        oninput="fitSearch()">
+      <div id="fitRes"></div>
+    </div>
+    <div class="grid2">
+      <div class="fld"><label>Délka (min)</label>
+        <input id="fitMin" type="number" inputmode="numeric" oninput="fitCalc()"></div>
+      <div class="fld"><label>Spálené kcal</label>
+        <input id="fitKcal" type="number" inputmode="numeric" placeholder="doplň nebo nech odhad"></div>
+    </div>
+    <p class="tiny muted" id="fitHint" style="margin:-4px 0 10px"></p>
+    <div class="row">
+      <button class="btn grow" id="fitCancel" style="display:none" onclick="fitReset()">Zrušit</button>
+      <button class="btn pri grow" id="fitAdd" onclick="fitSave()">Zapsat</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl-s">Součty</div>
+    <div class="row" style="gap:10px;margin:0 0 8px">
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+        <div class="tiny muted">dnes</div><b class="mono" id="fitToday" style="font-size:19px">0</b><div class="tiny muted">kcal</div></div>
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+        <div class="tiny muted">7 dní</div><b class="mono" id="fit7" style="font-size:19px">0</b><div class="tiny muted">kcal</div></div>
+      <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+        <div class="tiny muted">30 dní</div><b class="mono" id="fit30" style="font-size:19px">0</b><div class="tiny muted">kcal</div></div>
+    </div>
+    <p class="tiny muted" style="margin:0">Spálené kalorie se přičítají ke klidovému výdeji a ke
+      kaloriím z hodinek — pozor na dvojí započtení, když ti trénink změří i hodinky.</p>
+  </div>
+
+  <div class="card">
+    <h3 id="fitListHead">Dnešní aktivity</h3>
+    <div id="fitList"></div>
+  </div>
+</section>
+
 <!-- ============ STATISTIKY ============ -->
 <section id="p-stats" class="page">
   <div class="row" style="margin-bottom:12px">
@@ -731,6 +783,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Zadat</button>
   <button data-p="alc" onclick="go('alc')">
     <svg viewBox="0 0 24 24"><path d="M8 3h8l-1 6a4 4 0 0 1-3 3v6M9 21h6M5 3h2M17 3h2"/></svg>Alkohol</button>
+  <button data-p="fit" onclick="go('fit')">
+    <svg viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg>Pohyb</button>
   <button data-p="db" onclick="go('db')">
     <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Jídla</button>
   <button data-p="stats" onclick="go('stats')">
@@ -855,7 +909,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.02-40';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.02-41';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -896,10 +950,14 @@ const pctTxt = v => v > 0 && v < 0.5 ? '<1 %' : r0(v) + ' %';
 let db = null;
 function openDB() {
   return new Promise((res, rej) => {
-    const rq = indexedDB.open('kaltrack', 3);
+    const rq = indexedDB.open('kaltrack', 4);
     rq.onupgradeneeded = e => {
       const d = e.target.result;
       if (!d.objectStoreNames.contains('ext')) d.createObjectStore('ext', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('workout')) {
+        const s = d.createObjectStore('workout', { keyPath: 'id', autoIncrement: true });
+        s.createIndex('date', 'date');
+      }
       if (!d.objectStoreNames.contains('daily')) d.createObjectStore('daily', { keyPath: 'date' });
       if (!d.objectStoreNames.contains('products')) {
         const s = d.createObjectStore('products', { keyPath: 'id' });
@@ -1083,6 +1141,7 @@ function go(p) {
   if (p === 'db') renderDbMode();
   if (p === 'stats') renderStats();
   if (p === 'alc') renderAlc();
+  if (p === 'fit') renderFit();
   if (p === 'set') dynUi();
   window.scrollTo(0, 0);
 }
@@ -1186,7 +1245,8 @@ async function renderDay() {
   }), { k: 0, p: 0, c: 0, f: 0, fib: 0, salt: 0 });
 
   const dd0 = await dbGet('daily', curDate) || {};
-  const TG = await dayTargets(curDate, typeof dd0.burn === 'number' ? dd0.burn : 0);
+  const wkToday = await workoutSum(curDate);
+  const TG = await dayTargets(curDate, (typeof dd0.burn === 'number' ? dd0.burn : 0) + wkToday);
   if (ringLeft) {                        // klepnutím na kruh: zbývá ↔ snědeno
     $('kcalNow').textContent = r0(TG.kcal - t.k);
     $('kcalGoal').textContent = 'zbývá';
@@ -1250,7 +1310,7 @@ async function renderDay() {
   }).join('');
 
   await loadDaily();
-  await renderBalance(t.k);
+  await renderBalance(t.k, wkToday);
 
   // alkohol: dnes + posledních 7 dní
   const wStart = new Date(curDate + 'T12:00:00'); wStart.setDate(wStart.getDate() - 6);
@@ -1290,7 +1350,7 @@ async function delLogUndo(id) {
 /* ---- swipe doleva = smazat (deník i alkohol) ---- */
 let swEl = null, swX = 0, swY = 0, swDx = 0, swAxis = null, swSup = false;
 function swFind(t) {
-  const it = t.closest && t.closest('#logList .item[data-del], #alcList .item[data-del]');
+  const it = t.closest && t.closest('#logList .item[data-del], #alcList .item[data-del], #fitList .item[data-fdel]');
   return (it && !t.closest('button,input,select')) ? it : null;
 }
 document.addEventListener('pointerdown', e => {
@@ -1316,7 +1376,9 @@ function swEnd() {
   if (Math.abs(dx) > 10) swSup = true;             // potlač klik, který by otevřel editaci
   if (dx < -70) {
     el.style.transform = 'translateX(-110%)';
-    setTimeout(() => delLogUndo(Number(el.dataset.del)), 140);
+    setTimeout(() => el.dataset.fdel
+      ? delWorkoutUndo(Number(el.dataset.fdel))
+      : delLogUndo(Number(el.dataset.del)), 140);
   } else {
     el.style.transform = '';
     el.parentElement.classList.remove('del');
@@ -2056,6 +2118,7 @@ function setAddDate(v) {
   syncAddDate();
   renderDay();
   if ($('p-alc').classList.contains('on')) renderAlc();
+  if ($('p-fit').classList.contains('on')) renderFit();
 }
 function dayTxt(k) {
   const d = new Date(k + 'T12:00:00');
@@ -2064,9 +2127,9 @@ function dayTxt(k) {
 function isToday() { return curDate === dstr(new Date()); }
 
 function syncAddDate() {
-  ['addDate', 'poDate', 'alcDate', 'dkDate'].forEach(id => { if ($(id)) $(id).value = curDate; });
+  ['addDate', 'poDate', 'alcDate', 'dkDate', 'fitDate'].forEach(id => { if ($(id)) $(id).value = curDate; });
   const msg = isToday() ? '' : '⚠ Nezapisuješ na dnešek, ale na ' + dayTxt(curDate);
-  [['addDateWarn', 'addDateCard'], ['alcDateWarn', 'alcDateCard']].forEach(([wi, ci]) => {
+  [['addDateWarn', 'addDateCard'], ['alcDateWarn', 'alcDateCard'], ['fitDateWarn', 'fitDateCard']].forEach(([wi, ci]) => {
     const w = $(wi), c = $(ci);
     if (!w || !c) return;
     w.textContent = msg;
@@ -2297,9 +2360,9 @@ async function checkBackup() {
 
 async function exportData() {
   const data = {
-    v: 3, exported: new Date().toISOString(), goals, drinks,
+    v: 4, exported: new Date().toISOString(), goals, drinks,
     products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily'),
-    ext: await dbAll('ext')
+    ext: await dbAll('ext'), workout: await dbAll('workout')
   };
   dl('kalorie-zaloha-' + dstr(new Date()) + '.json', JSON.stringify(data, null, 1));
   await dbPut('meta', { k: 'lastBackup', v: Date.now() });
@@ -2334,6 +2397,15 @@ function importData(inp) {
         await dbPut('log', c); nl++;
       }
       for (const x of (d.daily || [])) await dbPut('daily', x);
+      // cvičení — otisk brání zdvojení při opakovaném importu
+      const wsig = r => [r.date, r.ts, r.name, r0(r.kcal)].join('|');
+      const whave = new Set((await dbAll('workout')).map(wsig));
+      for (const x of (d.workout || [])) {
+        const c = Object.assign({}, x); delete c.id;
+        if (whave.has(wsig(c))) continue;
+        whave.add(wsig(c));
+        await dbPut('workout', c);
+      }
       if (Array.isArray(d.ext) && d.ext.length) {
         for (const x of d.ext) await dbPut('ext', x);
         extFoods = await dbAll('ext'); extInfoTxt();
@@ -2355,10 +2427,10 @@ function importData(inp) {
 async function wipe() {
   if (!confirm('Opravdu smazat úplně všechno? Nejde vrátit.')) return;
   await new Promise(r => {
-    const t = db.transaction(['products', 'log', 'meta', 'daily', 'ext'], 'readwrite');
+    const t = db.transaction(['products', 'log', 'meta', 'daily', 'ext', 'workout'], 'readwrite');
     t.objectStore('products').clear(); t.objectStore('log').clear();
     t.objectStore('meta').clear(); t.objectStore('daily').clear();
-    t.objectStore('ext').clear(); t.oncomplete = r;
+    t.objectStore('ext').clear(); t.objectStore('workout').clear(); t.oncomplete = r;
   });
   products = []; extFoods = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alcDay: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
   fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info();
@@ -2806,9 +2878,10 @@ function calcRmr() {
   saveGoals();                          // autosave — žádné tlačítko Uložit už není
   toast('Doplněno a uloženo: ' + r0(bmr) + ' kcal');
 }
-async function renderBalance(intake) {
+async function renderBalance(intake, wk) {
   const d = await dbGet('daily', curDate) || {};
   const burn = (typeof d.burn === 'number') ? d.burn : 0;
+  if (wk === undefined) wk = await workoutSum(curDate);
   const rmr = goals.rmr || 0;
   if (!rmr) {
     $('balExp').textContent = 'Bilance';
@@ -2816,8 +2889,9 @@ async function renderBalance(intake) {
     $('balHint').textContent = 'Nastav klidový výdej v Nastavení, jinak nejde bilanci spočítat.';
     return;
   }
-  const out = rmr + burn, bal = intake - out;
-  $('balExp').textContent = 'Výdej ' + r0(rmr) + ' + ' + r0(burn) + ' = ' + r0(out) + ' kcal';
+  const out = rmr + burn + wk, bal = intake - out;
+  $('balExp').textContent = 'Výdej ' + r0(rmr) + ' + ' + r0(burn) +
+    (wk ? ' + cvičení ' + r0(wk) : '') + ' = ' + r0(out) + ' kcal';
   $('balVal').textContent = (bal > 0 ? '+' : '') + r0(bal) + ' kcal';
   $('balVal').style.color = bal > 0 ? C_SUR : C_DEF;
   $('balHint').textContent = (typeof d.burn === 'number') ? '' : 'Aktivní kalorie z hodinek zatím nezadané — počítá se s 0.';
@@ -2827,6 +2901,7 @@ async function renderBalance(intake) {
 async function statsData(days) {
   const all = await dbAll('log');
   const dl = await dbAll('daily');
+  const wk = await workoutByDay();          // cvičení se přičítá k aktivním kcal
   const dmap = {}; dl.forEach(d => dmap[d.date] = d);
   const byDay = {};
   all.forEach(r => {
@@ -2838,10 +2913,12 @@ async function statsData(days) {
   for (let i = days - 1; i >= 0; i--) {
     const x = new Date(base); x.setDate(x.getDate() - i);
     const key = dstr(x), b = byDay[key], dd = dmap[key] || {};
+    const w = wk[key] || 0;
     list.push({
       date: key, k: b ? b.k : 0, p: b ? b.p : 0, c: b ? b.c : 0, f: b ? b.f : 0,
       alc: b ? b.alc : 0, items: b ? b.items : [], logged: !!b,
-      burn: (typeof dd.burn === 'number') ? dd.burn : null,
+      burn: (typeof dd.burn === 'number') ? dd.burn + w : (w > 0 ? w : null),
+      wk: w,
       weight: (typeof dd.weight === 'number') ? dd.weight : null
     });
   }
@@ -3204,7 +3281,9 @@ function summaryText() {
   L.push('');
   L.push('VÝDEJ');
   L.push('  klidový: ' + (a.rmr || 'nenastaven') + ' kcal/den');
-  L.push('  aktivní z hodinek: průměr ' + r0(a.avgBurn) + ' kcal, zadáno ' + a.burnDays + '/' + a.days + ' dnů');
+  L.push('  aktivní (hodinky + cvičení): průměr ' + r0(a.avgBurn) + ' kcal, zadáno ' + a.burnDays + '/' + a.days + ' dnů');
+  const wkTot = list.reduce((x, d) => x + (d.wk || 0), 0);
+  if (wkTot > 0) L.push('  z toho zapsané cvičení: ' + r0(wkTot) + ' kcal za období');
   L.push('  celkem: ' + r0(a.avgOut) + ' kcal/den');
   L.push('  bilance: ' + (a.avgBal > 0 ? '+' : '') + r0(a.avgBal) + ' kcal/den, kumulativně ' +
     (a.cumBal > 0 ? '+' : '') + r0(a.cumBal) + ' kcal');
@@ -3694,6 +3773,190 @@ async function renderAlc() {
       <div class="sub">${r0(r.amount)} ml · ${r1(r.abv || 0)} % · ${r0(r.kcal)} kcal · ${mealName(r.meal)}</div></div>
     <div class="kc">${r1(r.alc)}<span class="tiny muted"> g</span></div></div></div>`).join('')
     : '<p class="tiny muted">' + (isToday() ? 'Dnes nic.' : 'Tenhle den nic.') + '</p>';
+}
+
+/* ---------------- pohyb / cvičení ----------------
+   MET hodnoty podle Compendium of Physical Activities (Ainsworth a kol., 2011).
+   kcal = (MET − 1) × váha(kg) × hodiny — minus 1 MET, protože klidový výdej
+   za tu dobu už je započtený v bazálu. Odhad jde vždy ručně přepsat. */
+const FIT_DB = [
+  { n: 'Chůze pomalá (4 km/h)', m: 3.0 }, { n: 'Chůze svižná (5,5 km/h)', m: 4.3 },
+  { n: 'Chůze rychlá (6,5 km/h)', m: 5.0 }, { n: 'Chůze se psem', m: 3.0 },
+  { n: 'Nordic walking', m: 4.8 }, { n: 'Turistika v terénu', m: 6.0 },
+  { n: 'Turistika s batohem', m: 7.8 },
+  { n: 'Běh 8 km/h', m: 8.3 }, { n: 'Běh 10 km/h', m: 9.8 }, { n: 'Běh 12 km/h', m: 11.5 },
+  { n: 'Kolo pohodově (<16 km/h)', m: 4.0 }, { n: 'Kolo 16–19 km/h', m: 6.8 },
+  { n: 'Kolo 19–22 km/h', m: 8.0 }, { n: 'Kolo svižně (22–26 km/h)', m: 10.0 },
+  { n: 'Horské kolo', m: 8.5 }, { n: 'Spinning', m: 8.5 },
+  { n: 'Plavání pohodově', m: 6.0 }, { n: 'Plavání kondičně (kraul)', m: 8.3 },
+  { n: 'Plavání prsa', m: 5.3 },
+  { n: 'Posilování (stroje, činky)', m: 3.5 }, { n: 'Posilování intenzivně', m: 6.0 },
+  { n: 'Kruhový trénink / HIIT', m: 8.0 }, { n: 'Kettlebell', m: 8.0 },
+  { n: 'Švihadlo', m: 11.8 }, { n: 'Veslovací trenažér', m: 7.0 },
+  { n: 'Jóga', m: 2.5 }, { n: 'Pilates', m: 3.0 }, { n: 'Strečink', m: 2.3 },
+  { n: 'Aerobik / zumba', m: 7.3 }, { n: 'Tanec', m: 4.8 },
+  { n: 'Fotbal rekreačně', m: 7.0 }, { n: 'Fotbal zápas', m: 10.0 },
+  { n: 'Florbal', m: 9.0 }, { n: 'Hokej', m: 8.0 },
+  { n: 'Tenis dvouhra', m: 8.0 }, { n: 'Tenis čtyřhra', m: 6.0 },
+  { n: 'Badminton', m: 5.5 }, { n: 'Squash', m: 7.3 }, { n: 'Stolní tenis', m: 4.0 },
+  { n: 'Volejbal', m: 4.0 }, { n: 'Basketbal', m: 6.5 },
+  { n: 'Bruslení / in-line', m: 7.5 }, { n: 'Lyže sjezd', m: 5.3 }, { n: 'Běžky', m: 9.0 },
+  { n: 'Lezení na stěně', m: 7.5 }, { n: 'Jízda na koni', m: 5.5 },
+  { n: 'Golf (pěšky s bagem)', m: 4.3 },
+  { n: 'Práce na zahradě', m: 3.8 }, { n: 'Sekání trávy', m: 5.5 },
+  { n: 'Rytí, kopání', m: 7.8 }, { n: 'Štípání dřeva', m: 6.3 },
+  { n: 'Úklid domácnosti', m: 3.3 }, { n: 'Stěhování, nošení', m: 5.8 },
+  { n: 'Malování, renovace', m: 3.3 }
+];
+let fitMet = null, fitEditId = null;
+
+async function fitWeight() {
+  return await lastWeight(curDate) || n(($('cW') || {}).value) || 0;
+}
+function fitSearch() {
+  const q = ($('fitQ').value || '').trim();
+  fitMet = null;                                 // volný text = vlastní aktivita bez odhadu
+  if (q.length < 2) { $('fitRes').innerHTML = ''; fitCalc(); return; }
+  const hits = FIT_DB.filter(a => matchWords(a.n, q)).slice(0, 6);
+  $('fitRes').innerHTML = hits.map((a, i) => `
+    <div class="item" style="padding:8px 0"><div class="grow" onclick="fitPick(${FIT_DB.indexOf(a)})">
+      <div class="nm">${esc(a.n)}</div><div class="sub">${a.m} MET</div>
+    </div></div>`).join('');
+  fitCalc();
+}
+function fitPick(i) {
+  const a = FIT_DB[i]; if (!a) return;
+  $('fitQ').value = a.n; fitMet = a.m;
+  $('fitRes').innerHTML = '';
+  fitCalc();
+  $('fitMin').focus();
+}
+async function fitCalc() {
+  const min = n($('fitMin').value);
+  const w = await fitWeight();
+  if (fitMet && min > 0 && w > 0) {
+    const kcal = r0((fitMet - 1) * w * min / 60);
+    $('fitKcal').placeholder = kcal;
+    $('fitHint').textContent = 'Odhad ' + kcal + ' kcal (' + fitMet + ' MET · ' + r1(w) +
+      ' kg, očištěno o klidový výdej). Nech prázdné, nebo přepiš vlastním číslem.';
+  } else if (fitMet && !w) {
+    $('fitHint').textContent = 'Neznám tvou váhu — zapiš ji na hlavní stránce, pak umím kcal odhadnout.';
+    $('fitKcal').placeholder = '';
+  } else {
+    $('fitHint').textContent = fitMet ? 'Zadej délku a odhadnu kalorie.' : '';
+    $('fitKcal').placeholder = fitMet ? '' : 'vlastní aktivita — kcal zadej sám';
+  }
+}
+async function fitSave() {
+  const name = ($('fitQ').value || '').trim();
+  if (!name) { toast('Zadej aktivitu'); return; }
+  const min = n($('fitMin').value);
+  let kcal = n($('fitKcal').value);
+  if (!kcal && fitMet && min > 0) {
+    const w = await fitWeight();
+    if (w > 0) kcal = r0((fitMet - 1) * w * min / 60);
+  }
+  if (kcal <= 0) { toast('Zadej kalorie, nebo vyber aktivitu a délku'); return; }
+  if (kcal > 5000) { toast('Přes 5000 kcal? Zkontroluj to.'); return; }
+  const rec = { date: curDate, name, min: min || 0, met: fitMet || 0, kcal, ts: Date.now() };
+  if (fitEditId) {
+    const old = await dbGet('workout', fitEditId);
+    rec.id = fitEditId; rec.ts = old.ts; rec.date = old.date;
+    await dbPut('workout', rec);
+  } else {
+    await dbPut('workout', rec);
+  }
+  const wasEdit = !!fitEditId;
+  fitReset();
+  toast((wasEdit ? 'Upraveno: ' : 'Zapsáno: ') + name + ' · ' + r0(kcal) + ' kcal' +
+    (isToday() ? '' : ' → ' + dayTxt(curDate)));
+  renderFit(); renderDay();
+}
+function fitReset() {
+  fitEditId = null; fitMet = null;
+  ['fitQ', 'fitMin', 'fitKcal'].forEach(id => $(id).value = '');
+  $('fitRes').innerHTML = ''; $('fitHint').textContent = '';
+  $('fitKcal').placeholder = 'doplň nebo nech odhad';
+  $('fitFormHead').textContent = 'Zapsat aktivitu';
+  $('fitAdd').textContent = 'Zapsat';
+  $('fitCancel').style.display = 'none';
+}
+async function fitEdit(id) {
+  const r = await dbGet('workout', id);
+  if (!r) return;
+  fitEditId = id; fitMet = r.met || null;
+  $('fitQ').value = r.name; $('fitMin').value = r.min || '';
+  $('fitKcal').value = r0(r.kcal);
+  $('fitFormHead').textContent = 'Upravit aktivitu';
+  $('fitAdd').textContent = 'Uložit změnu';
+  $('fitCancel').style.display = '';
+  fitCalc();
+  window.scrollTo(0, 0);
+}
+async function delWorkoutUndo(id) {
+  const rec = await dbGet('workout', id);
+  if (!rec) return;
+  await dbDel('workout', id);
+  renderFit(); renderDay();
+  toastAct('Smazáno: ' + rec.name, 'Vrátit', async () => {
+    await dbPut('workout', rec);
+    renderFit(); renderDay();
+  });
+}
+async function workoutSum(date) {
+  const rows = await dbByIdx('workout', 'date', date);
+  return rows.reduce((a, r) => a + (r.kcal || 0), 0);
+}
+async function workoutByDay() {
+  const all = await dbAll('workout');
+  const by = {};
+  all.forEach(r => { by[r.date] = (by[r.date] || 0) + (r.kcal || 0); });
+  return by;
+}
+async function renderFit() {
+  syncAddDate();
+  const by = await workoutByDay();
+  const sum = k => {
+    const base = new Date(curDate + 'T12:00:00');
+    let t = 0;
+    for (let i = 0; i < k; i++) {
+      const x = new Date(base); x.setDate(x.getDate() - i);
+      t += by[dstr(x)] || 0;
+    }
+    return t;
+  };
+  $('fitToday').textContent = r0(by[curDate] || 0);
+  $('fit7').textContent = r0(sum(7));
+  $('fit30').textContent = r0(sum(30));
+  $('fitListHead').textContent = isToday() ? 'Dnešní aktivity' : 'Aktivity — ' + dayTxt(curDate);
+  // často opakované aktivity — rychlé chipy
+  const all = await dbAll('workout');
+  const cnt = {};
+  all.forEach(r => { cnt[r.name] = (cnt[r.name] || 0) + 1; });
+  const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  $('fitRecent').innerHTML = top.map(([nm]) => {
+    const last = all.filter(r => r.name === nm).sort((a, b) => b.ts - a.ts)[0];
+    return `<button class="btn sm" onclick="fitRepeat(${Number(last.id)})">${esc(nm)}</button>`;
+  }).join('');
+  const rows = (await dbByIdx('workout', 'date', curDate)).sort((a, b) => a.ts - b.ts);
+  $('fitList').innerHTML = rows.length ? rows.map(r => `
+    <div class="swrap"><div class="item" data-fdel="${Number(r.id)}">
+      <div class="grow" onclick="fitEdit(${Number(r.id)})">
+        <div class="nm">${esc(r.name)}</div>
+        <div class="sub">${r.min ? r0(r.min) + ' min' : 'bez délky'}${r.met ? ' · ' + r.met + ' MET' : ''}</div>
+      </div>
+      <div class="kc">−${r0(r.kcal)}<span class="tiny muted"> kcal</span></div>
+    </div></div>`).join('')
+    : '<p class="tiny muted">' + (isToday() ? 'Dnes zatím nic.' : 'Tenhle den nic.') + '</p>';
+}
+async function fitRepeat(id) {
+  const r = await dbGet('workout', id);
+  if (!r) return;
+  fitEditId = null; fitMet = r.met || null;
+  $('fitQ').value = r.name; $('fitMin').value = r.min || '';
+  $('fitKcal').value = '';
+  fitCalc();
+  toast('Předvyplněno — uprav délku a zapiš');
 }
 
 /* ---------------- camera scanner ---------------- */
