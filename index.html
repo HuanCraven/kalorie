@@ -10,7 +10,7 @@
 <style>
 :root{
   --bg:#0e1116; --card:#171b23; --card2:#1f2531; --line:#2b323f; --line2:#3a4353;
-  --fg:#eef2f8; --dim:#8794a8; --dim2:#647084;
+  --fg:#eef2f8; --dim:#8794a8; --dim2:#7b8799;
   --acc:#4ea3ff; --acc-d:#2f8fe6; --ok:#3fbf7f; --warn:#f0a742; --bad:#e0574d;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -36,7 +36,7 @@ input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
 .btn.sm{padding:7px 10px;font-size:13px;font-weight:500}
 .btn.full{width:100%}
 .muted{color:var(--dim)}
-.tiny{font-size:12px}
+.tiny{font-size:12.5px}
 .mono{font-variant-numeric:tabular-nums}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#161a21;
   border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:40}
@@ -91,10 +91,10 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 .card{position:relative}
 .card.hero{background:linear-gradient(180deg,#1b2333 0%,var(--card) 60%);border-color:#33405a}
 .card.compact{padding:11px 14px}
-.lbl-s{font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;
+.lbl-s{font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;
   letter-spacing:.07em;margin-bottom:8px;display:flex;align-items:center;gap:7px}
 .lbl-s::before{content:"";width:3px;height:12px;background:var(--acc);border-radius:2px;flex:0 0 3px}
-h3{font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;
+h3{font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;
   letter-spacing:.07em;margin:0 0 10px;display:flex;align-items:center;gap:7px}
 h3::before{content:"";width:3px;height:12px;background:var(--acc);border-radius:2px;flex:0 0 3px}
 .sheet h2{font-size:18px}
@@ -117,7 +117,17 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 /* jemné oddělení skupin jídel */
 .mealhead{display:flex;justify-content:space-between;align-items:center;
   background:var(--card2);border-radius:9px;padding:6px 10px;margin:2px 0 2px}
-.mealhead .n{font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em}
+.mealhead .n{font-size:12px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em}
+/* swipe mazání záznamů */
+.swrap{position:relative;border-radius:9px;overflow:hidden}
+.swrap::before{content:"Smazat";position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:flex-end;padding-right:18px;background:var(--bad);color:#fff;
+  font-weight:700;font-size:13px;opacity:0;transition:opacity .12s}
+.swrap.del::before{opacity:1}
+.swrap .item{position:relative;background:var(--card);transition:transform .16s;touch-action:pan-y}
+.swrap.drag .item{transition:none}
+#toast button{background:none;border:none;color:var(--acc);font-weight:700;
+  padding:2px 4px 2px 12px;font-size:14px}
 </style>
 </head>
 <body>
@@ -132,6 +142,24 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <button class="btn sm pri" onclick="exportData()">Zálohovat</button>
     </div>
   </div>
+  <div class="card" id="persWarn" style="display:none;border-color:#4a3a20;background:#241f14">
+    <div class="row" style="justify-content:space-between;gap:10px">
+      <span class="tiny">Prohlížeč nepovolil trvalé úložiště — při nedostatku místa může data smazat.
+        Zálohuj častěji.</span>
+      <button class="btn sm pri" onclick="exportData()">Zálohovat</button>
+    </div>
+  </div>
+  <div class="card" id="obCard" style="display:none">
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <h3 style="margin-bottom:6px">Začni tady</h3>
+      <button class="btn sm" onclick="obDismiss()" aria-label="zavřít">✕</button>
+    </div>
+    <p class="tiny muted" style="margin:0 0 10px">Tři kroky a aplikace začne dávat smysl.
+      Kartu kdykoli zavřeš křížkem.</p>
+    <button class="btn full" style="margin-bottom:8px" onclick="go('set')">1 · Nastavit denní cíle a klidový výdej</button>
+    <button class="btn full" style="margin-bottom:8px" onclick="go('scan')">2 · Naskenovat první potravinu</button>
+    <button class="btn full" onclick="go('scan');setAdd('find')">3 · Nebo najít jídlo podle názvu</button>
+  </div>
   <div class="row" style="margin-bottom:10px">
     <button class="btn sm" id="dayPrev" onclick="shiftDay(-1)">‹</button>
     <div class="grow" style="text-align:center"><b id="dayLabel"></b></div>
@@ -141,7 +169,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="card hero">
     <p class="tiny muted" id="dynLine" style="display:none;margin:0 0 10px"></p>
     <div class="tot">
-      <div class="ring">
+      <div class="ring" id="ringBox" onclick="toggleRing()" style="cursor:pointer">
         <svg width="88" height="88" viewBox="0 0 88 88">
           <circle cx="44" cy="44" r="38" stroke="#232936" stroke-width="9" fill="none"/>
           <circle id="ringArc" cx="44" cy="44" r="38" stroke="var(--acc)" stroke-width="9"
@@ -246,6 +274,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <p class="tiny muted" style="margin:8px 0 0">Číslice pod čárovým kódem. Funguje i bez kamery.</p>
   </div>
 
+  <div class="card" id="recentCard" style="display:none">
+    <h3>Naposledy použité</h3>
+    <div id="recentList"></div>
+  </div>
+
   </div>
 
   <div class="pane" id="s-find">
@@ -255,31 +288,18 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <input class="grow" id="nameQ" placeholder="rajče, rohlík, kuřecí prsa…"
         autocomplete="off" oninput="onNameInput()"
         onkeydown="if(event.key==='Enter'){clearTimeout(sugT);searchByName();}">
+      <button class="btn" id="nameClr" onclick="clearNameQ()" aria-label="smazat dotaz"
+        style="display:none">✕</button>
       <button class="btn pri" id="nameBtn" onclick="searchByName()">Hledat</button>
     </div>
-    <p class="tiny muted" style="margin:6px 0 0">Vlastní databáze hledají hned při psaní. Tlačítko
-      <b>Hledat</b> se navíc zeptá Open Food Facts — ten povoluje jen 10 dotazů za minutu.</p>
     <label class="row" style="margin:10px 0 0;gap:8px;align-items:center">
       <input type="checkbox" id="czOnly" style="width:auto" checked>
       <span class="tiny muted">jen české (když nic nenajde, ukážu všechny)</span></label>
     <div id="nameRes" style="margin-top:8px"></div>
   </div>
 
-  <div class="card">
-    <h3>Hotová česká jídla</h3>
-    <p class="tiny muted" style="margin:0 0 8px">Svíčková, guláš, řízek, buchty… Hodnoty na 100 g
-      hotového pokrmu, spočítané ze surovin. Kolik sníš, zadáš sám.</p>
-    <div id="jidCats" class="row wrap2" style="gap:6px"></div>
-    <div id="jidList" style="margin-top:8px"></div>
-  </div>
-
-  <div class="card">
-    <h3>Základní potraviny</h3>
-    <p class="tiny muted" style="margin:0 0 8px">Zelenina, maso, obiloviny a další nebalené věci,
-      které v databázi čárových kódů nejsou. Vestavěné, funguje offline.</p>
-    <div id="zakCats" class="row wrap2" style="gap:6px"></div>
-    <div id="zakList" style="margin-top:8px"></div>
-  </div>
+  <p class="tiny muted" style="margin:4px 2px 12px">Hotová jídla a základní potraviny procházej
+    v záložce <b>Jídla</b> dole — tady je najdeš i hledáním nahoře.</p>
 
   </div>
 
@@ -308,14 +328,17 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <span class="tiny">Mám <b>projekt v Claude</b> s instrukcemi</span>
     </label>
     <div id="projOn" style="display:none">
-      <p class="tiny muted" style="margin:0 0 8px">Sdílení z Androidu vždycky otevře <b>nový chat mimo
-        projekt</b>, kde instrukce neplatí. Použij proto tenhle postup — zpráva pak není potřeba vůbec:</p>
-      <ol class="tiny muted" style="margin:0 0 10px;padding-left:18px;line-height:1.7">
-        <li>Ulož fotku do telefonu (tlačítko níž)</li>
-        <li>Otevři Claude → svůj projekt → nový chat</li>
-        <li>Přilož fotku z galerie a odešli — bez psaní</li>
-      </ol>
-      <button class="btn pri full" style="margin-bottom:8px" onclick="savePhoto()">Uložit fotku do telefonu</button>
+      <details id="fotoHelp1" open>
+        <summary class="tiny muted" style="cursor:pointer">Jak na to</summary>
+        <p class="tiny muted" style="margin:8px 0 8px">Sdílení z Androidu vždycky otevře <b>nový chat mimo
+          projekt</b>, kde instrukce neplatí. Použij proto tenhle postup — zpráva pak není potřeba vůbec:</p>
+        <ol class="tiny muted" style="margin:0 0 10px;padding-left:18px;line-height:1.7">
+          <li>Ulož fotku do telefonu (tlačítko níž)</li>
+          <li>Otevři Claude → svůj projekt → nový chat</li>
+          <li>Přilož fotku z galerie a odešli — bez psaní</li>
+        </ol>
+      </details>
+      <button class="btn pri full" style="margin:8px 0 8px" onclick="savePhoto()">Uložit fotku do telefonu</button>
     </div>
     <div id="projOff">
       <p class="tiny muted" style="margin:0 0 8px">Bez projektu se musí ke každé fotce poslat i zadání.
@@ -324,12 +347,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <h3 style="margin-top:14px">2 · Pošli to Claudeovi</h3>
     <button class="btn pri full" id="shareBtn" style="margin-bottom:8px" onclick="shareToClaude()">Odeslat fotku do Claude</button>
     <button class="btn full" onclick="copyPrompt()">Zkopírovat jen zadání</button>
-    <div class="card" style="background:var(--card2);margin:10px 0 0;padding:10px">
-      <p class="tiny" style="margin:0 0 6px;color:var(--warn)">⚠ Důležité</p>
-      <p class="tiny muted" style="margin:0">Android u sdílení často zahodí přiložený text a pošle jen fotku.
+    <details id="fotoHelp2" open style="margin:10px 0 0">
+      <summary class="tiny" style="cursor:pointer;color:var(--warn)">⚠ Důležité ke sdílení</summary>
+      <p class="tiny muted" style="margin:8px 0 0">Android u sdílení často zahodí přiložený text a pošle jen fotku.
         Zadání se proto vždycky kopíruje i do schránky — <b style="color:var(--fg)">v Claude ho dlouhým
         stiskem vlož do zprávy k fotce</b>, teprve pak odešli. Bez zadání odpoví větou místo dat.</p>
-    </div>
+    </details>
   </div>
 
   <div class="card">
@@ -400,8 +423,24 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div class="pane" id="s-man">
   <div class="card">
-    <h3>Bez čárového kódu</h3>
+    <h3>Rychlý zápis</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Odhad bez zakládání potraviny — třeba jídlo
+      v restauraci. Stačí kalorie, makra jsou volitelná.</p>
+    <div class="fld"><label>Název (volitelné)</label>
+      <input id="qaName" placeholder="Oběd v restauraci"></div>
+    <div class="grid4">
+      <div class="fld"><label>kcal</label><input id="qaKcal" type="number" inputmode="numeric"></div>
+      <div class="fld"><label>B (g)</label><input id="qaB" type="number" inputmode="decimal"></div>
+      <div class="fld"><label>S (g)</label><input id="qaC" type="number" inputmode="decimal"></div>
+      <div class="fld"><label>T (g)</label><input id="qaF" type="number" inputmode="decimal"></div>
+    </div>
+    <button class="btn pri full" onclick="quickAdd()">Zapsat</button>
+  </div>
+  <div class="card">
+    <h3>Nová potravina do databáze</h3>
     <button class="btn full" onclick="openEdit(null)">+ Zadat potravinu ručně</button>
+    <p class="tiny muted" style="margin:8px 0 0">Celý formulář podle etikety — uloží se natrvalo
+      a příště ji najdeš hledáním.</p>
   </div>  </div>
 </section>
 
@@ -447,7 +486,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div class="card">
       <div class="lbl-s">Denní průměr</div>
-  <div class="row" style="gap:10px;margin:0 0 14px">
+  <div class="row" style="gap:10px;margin:0 0 10px">
     <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
       <div class="tiny muted">7 dní</div><b class="mono" id="alcA7" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
     <div class="card grow" style="margin:0;background:#22303f;text-align:center;padding:10px;border-color:#33405a">
@@ -455,26 +494,32 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
   <div class="row" style="gap:10px;margin:0 0 8px">
     <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted" id="alcMName">měsíc</div><b class="mono" id="alcAM" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
+      <div class="tiny muted">od začátku měření</div><b class="mono" id="alcAAll" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
     <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted">celkem</div><b class="mono" id="alcAAll" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
+      <div class="tiny muted">dní bez alkoholu</div><b class="mono" id="alcDry" style="font-size:19px">0</b><div class="tiny muted">z 30</div></div>
   </div>
-  <p class="tiny muted" id="alcAvgNote" style="margin:-8px 0 14px"></p>
+  <p class="tiny muted" id="alcAvgNote" style="margin:0 0 14px"></p>
 
-  <div class="lbl-s">Součty</div>
-  <div class="row" style="gap:10px;margin:0 0 14px">
-    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted">7 dní</div><b class="mono" id="alc7" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
-    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted">30 dní</div><b class="mono" id="alc30" style="font-size:20px">0</b><div class="tiny muted">g</div></div>
-    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted">dní bez</div><b class="mono" id="alcDry" style="font-size:20px">0</b><div class="tiny muted">/30</div></div>
-  </div>
   <div id="alcLimitBar"></div>
   <h3 style="margin-top:16px">Vývoj 30denního průměru</h3>
   <div id="alcTrend" style="margin:8px 0 4px"></div>
-  <h3 style="margin-top:16px">Kdy a kolik — posledních 21 dní</h3>
-  <div id="alcChart" style="margin:8px 0 4px"></div>
+
+  <details style="margin-top:14px">
+    <summary class="tiny muted" style="cursor:pointer">Podrobnosti — měsíc, součty, jednotlivé dny</summary>
+    <div style="margin-top:10px">
+      <div class="row" style="gap:10px;margin:0 0 10px">
+        <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+          <div class="tiny muted" id="alcMName">měsíc</div><b class="mono" id="alcAM" style="font-size:18px">0</b><div class="tiny muted">g/den</div></div>
+        <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+          <div class="tiny muted">7 dní</div><b class="mono" id="alc7" style="font-size:18px">0</b><div class="tiny muted">g</div></div>
+        <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+          <div class="tiny muted">30 dní</div><b class="mono" id="alc30" style="font-size:18px">0</b><div class="tiny muted">g</div></div>
+      </div>
+      <h3>Kdy a kolik — posledních 21 dní</h3>
+      <div id="alcChart" style="margin:8px 0 4px"></div>
+    </div>
+  </details>
+
   <h3 style="margin-top:16px" id="alcListHead">Dnešní záznamy</h3>
   <div id="alcList"></div>
   </div>
@@ -546,11 +591,33 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
 <!-- ============ DATABÁZE ============ -->
 <section id="p-db" class="page">
+  <div class="seg" id="dbSeg">
+    <button data-d="moje" class="on" onclick="setDbMode('moje')">Moje</button>
+    <button data-d="jidla" onclick="setDbMode('jidla')">Hotová</button>
+    <button data-d="zaklad" onclick="setDbMode('zaklad')">Základní</button>
+    <button data-d="ext" onclick="setDbMode('ext')">ČR</button>
+  </div>
   <div class="card">
-    <input id="dbSearch" placeholder="Hledat v mé databázi…" oninput="renderDb()">
+    <input id="dbSearch" placeholder="Hledat v mé databázi…" oninput="renderDbMode()">
     <p class="tiny muted" style="margin:8px 0 0" id="dbCount"></p>
   </div>
-  <div class="card"><div id="dbList"></div></div>
+  <div class="card" id="dbMoje"><div id="dbList"></div></div>
+  <div class="card" id="dbJid" style="display:none">
+    <p class="tiny muted" style="margin:0 0 8px">Svíčková, guláš, řízek, buchty… Hodnoty na 100 g
+      hotového pokrmu, spočítané ze surovin. Kolik sníš, zadáš sám.</p>
+    <div id="jidCats" class="row wrap2" style="gap:6px"></div>
+    <div id="jidList" style="margin-top:8px"></div>
+  </div>
+  <div class="card" id="dbZak" style="display:none">
+    <p class="tiny muted" style="margin:0 0 8px">Zelenina, maso, obiloviny a další nebalené věci,
+      které v databázi čárových kódů nejsou. Vestavěné, funguje offline.</p>
+    <div id="zakCats" class="row wrap2" style="gap:6px"></div>
+    <div id="zakList" style="margin-top:8px"></div>
+  </div>
+  <div class="card" id="dbExt" style="display:none">
+    <p class="tiny muted" id="extListHint" style="margin:0 0 8px"></p>
+    <div id="extList"></div>
+  </div>
 </section>
 
 <!-- ============ NASTAVENÍ ============ -->
@@ -563,38 +630,37 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     </div>
 
     <div id="fixBox">
-      <div class="fld"><label>Energie (kcal)</label><input id="gKcal" type="number" inputmode="numeric"></div>
+      <div class="fld"><label>Energie (kcal)</label><input id="gKcal" type="number" inputmode="numeric" oninput="gSave()"></div>
       <div class="grid2">
-        <div class="fld"><label>Bílkoviny (g)</label><input id="gP" type="number" inputmode="numeric"></div>
-        <div class="fld"><label>Sacharidy (g)</label><input id="gC" type="number" inputmode="numeric"></div>
+        <div class="fld"><label>Bílkoviny (g)</label><input id="gP" type="number" inputmode="numeric" oninput="gSave()"></div>
+        <div class="fld"><label>Sacharidy (g)</label><input id="gC" type="number" inputmode="numeric" oninput="gSave()"></div>
       </div>
-      <div class="fld"><label>Tuky (g)</label><input id="gF" type="number" inputmode="numeric"></div>
+      <div class="fld"><label>Tuky (g)</label><input id="gF" type="number" inputmode="numeric" oninput="gSave()"></div>
     </div>
 
     <div id="dynBox" style="display:none">
       <div class="grid2">
         <div class="fld"><label>Denní deficit (kcal)</label>
-          <input id="gDef" type="number" inputmode="numeric" placeholder="400"></div>
+          <input id="gDef" type="number" inputmode="numeric" placeholder="400" oninput="gSave()"></div>
         <div class="fld"><label>Bílkoviny (g/kg)</label>
-          <input id="gPKg" type="number" inputmode="decimal" step="0.1" placeholder="2.0"></div>
+          <input id="gPKg" type="number" inputmode="decimal" step="0.1" placeholder="2.0" oninput="gSave()"></div>
       </div>
       <div class="fld"><label>Tuky (g/kg)</label>
-        <input id="gFKg" type="number" inputmode="decimal" step="0.1" placeholder="0.9"></div>
+        <input id="gFKg" type="number" inputmode="decimal" step="0.1" placeholder="0.9" oninput="gSave()"></div>
       <p class="tiny muted" id="dynHint" style="margin:-4px 0 10px"></p>
     </div>
 
     <div class="grid2">
-      <div class="fld"><label>Vláknina — cíl (g)</label><input id="gFib" type="number" inputmode="numeric"></div>
-      <div class="fld"><label>Sůl — strop (g)</label><input id="gSalt" type="number" inputmode="decimal"></div>
+      <div class="fld"><label>Vláknina — cíl (g)</label><input id="gFib" type="number" inputmode="numeric" oninput="gSave()"></div>
+      <div class="fld"><label>Sůl — strop (g)</label><input id="gSalt" type="number" inputmode="decimal" oninput="gSave()"></div>
     </div>
-    <button class="btn pri full" onclick="saveGoals()">Uložit</button>
+    <p class="tiny muted" style="margin:0">Změny se ukládají samy.</p>
   </div>
 
   <div class="card">
     <h3>Klidový výdej</h3>
     <div class="fld"><label>Bazální metabolismus (kcal/den)</label>
-      <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750"></div>
-    <button class="btn pri full" style="margin-bottom:12px" onclick="saveGoals()">Uložit</button>
+      <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750" oninput="gSave()"></div>
     <details>
       <summary class="tiny muted" style="cursor:pointer">Neznám ho — spočítat</summary>
       <div style="margin-top:10px">
@@ -616,10 +682,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="card">
     <h3>Alkohol</h3>
     <div class="fld"><label>Limit — průměr za posledních 30 dní (g čistého alkoholu na den, 0 = vypnuto)</label>
-      <input id="gAlcDay" type="number" inputmode="decimal" step="0.5"></div>
-    <p class="tiny muted" style="margin:-4px 0 10px">Aplikace pak počítá, kolik ti do limitu ještě zbývá,
-      a řekne ti to v pivech. Orientačně: 10 g/den ≈ pivo 12° obden.</p>
-    <button class="btn pri full" style="margin-bottom:12px" onclick="saveGoals()">Uložit limit</button>
+      <input id="gAlcDay" type="number" inputmode="decimal" step="0.5" oninput="gSave()"></div>
+    <p class="tiny muted" style="margin:-4px 0 0">Aplikace pak počítá, kolik ti do limitu ještě zbývá,
+      a řekne ti to v pivech. Orientačně: 10 g/den ≈ pivo 12° obden. Změna se uloží sama.</p>
   </div>
 
   <div class="card">
@@ -702,6 +767,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <button class="btn pri grow" id="poAdd" onclick="addPortion()">Přidat</button>
     </div>
     <button class="btn sm full" style="margin-top:10px" onclick="editCurrent()">Upravit potravinu</button>
+    <button class="btn dan sm full" id="poDel" style="margin-top:8px;display:none"
+      onclick="closeMod('modPortion');delLogUndo(editLogId);editLogId=null">Smazat záznam</button>
   </div>
 </div>
 
@@ -776,6 +843,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <button class="btn pri grow" id="dkSave" onclick="addCustomDrink(false)">Zapsat</button>
     </div>
     <button class="btn sm full" id="dkKeep" style="margin-top:10px" onclick="addCustomDrink(true)">Zapsat a uložit mezi tlačítka</button>
+    <button class="btn dan sm full" id="dkDel" style="margin-top:8px;display:none"
+      onclick="closeMod('modDrink');delLogUndo(editDrinkId);editDrinkId=null">Smazat záznam</button>
   </div>
 </div>
 
@@ -786,7 +855,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.01-39';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.02-40';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -796,8 +865,20 @@ const r1 = v => Math.round(v * 10) / 10;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function toast(msg) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  const t = $('toast'); t.textContent = msg; t.style.pointerEvents = 'none'; t.classList.add('on');
   clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 2200);
+}
+/* toast s akcí (typicky „Vrátit" po smazání) — delší čas, jde na něj klepnout */
+function toastAct(msg, btnTxt, fn) {
+  const t = $('toast');
+  t.innerHTML = esc(msg);
+  const b = document.createElement('button');
+  b.textContent = btnTxt;
+  b.onclick = () => { t.classList.remove('on'); fn(); };
+  t.appendChild(b);
+  t.style.pointerEvents = 'auto';
+  t.classList.add('on');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 5000);
 }
 function dstr(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -850,6 +931,22 @@ let persisted = null;         // chrání IndexedDB před automatickým smazán�
 let curProduct = null;        // product open in portion sheet
 let servingAmt = 100;
 let editingId = null;
+let ringLeft = false;         // kruh: false = snědeno, true = zbývá
+try { ringLeft = localStorage.getItem('ringLeft') === '1'; } catch (e) {}
+function toggleRing() {
+  ringLeft = !ringLeft;
+  try { localStorage.setItem('ringLeft', ringLeft ? '1' : '0'); } catch (e) {}
+  renderDay();
+}
+async function obDismiss() {
+  await dbPut('meta', { k: 'obDone', v: 1 });
+  $('obCard').style.display = 'none';
+}
+async function obCheck() {
+  const done = await dbGet('meta', 'obDone');
+  const logs = await dbAll('log');
+  $('obCard').style.display = (!done && !logs.length && !products.length) ? '' : 'none';
+}
 
 /* ---------------- boot ---------------- */
 /* ---- hlídač limitu Open Food Facts: 10 dotazů/min/IP, my si necháváme rezervu ---- */
@@ -905,8 +1002,12 @@ function offCachePut(k, v) {
   try { extFoods = await dbAll('ext'); } catch (e) { extFoods = []; }
   fillGoals();
   renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
+  // po prvním úspěšném zpracování fotky se návody sbalí — tlačítka zůstávají
+  const fotoOk = await dbGet('meta', 'fotoOk');
+  if (fotoOk) ['fotoHelp1', 'fotoHelp2'].forEach(id => { if ($(id)) $(id).removeAttribute('open'); });
   await renderDay();
   checkBackup();
+  obCheck();
   renderDb();
   info();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -918,6 +1019,7 @@ function offCachePut(k, v) {
       persisted = await navigator.storage.persisted();
     } catch (e) { persisted = null; }
     info();
+    if ($('persWarn')) $('persWarn').style.display = persisted === false ? '' : 'none';
   }
 })();
 
@@ -978,7 +1080,7 @@ function go(p) {
   $('p-' + p).classList.add('on');
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   if (p !== 'scan') stopCam();
-  if (p === 'db') renderDb();
+  if (p === 'db') renderDbMode();
   if (p === 'stats') renderStats();
   if (p === 'alc') renderAlc();
   if (p === 'set') dynUi();
@@ -991,7 +1093,38 @@ function setAdd(k) {
   document.querySelectorAll('#p-scan .pane').forEach(e => e.classList.toggle('on', e.id === 's-' + k));
   document.querySelectorAll('#addSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === k));
   if (k !== 'code') stopCam();
+  if (k === 'code') renderRecent();
   if (k === 'find') setTimeout(() => $('nameQ').focus(), 100);
+}
+
+/* naposledy použité produkty — rychlé opakování bez kamery */
+function renderRecent() {
+  if (!$('recentList')) return;
+  const rec = products.filter(p => p.lastUsed).sort((a, b) => b.lastUsed - a.lastUsed).slice(0, 6);
+  $('recentCard').style.display = rec.length ? '' : 'none';
+  $('recentList').innerHTML = rec.map(p => `
+    <div class="item"><div class="grow" onclick="openPortion('${sid(p.id)}')">
+      <div class="nm">${esc(p.name)}</div>
+      <div class="sub">${p.brand ? esc(p.brand) + ' · ' : ''}${r0(p.kcal)} kcal/100 ${esc(p.unit)}${
+        p.lastAmount ? ' · naposledy ' + r1(p.lastAmount) + ' ' + esc(p.unit) : ''}</div>
+    </div></div>`).join('');
+}
+
+/* rychlý zápis jen kalorií — bez zakládání potraviny */
+async function quickAdd() {
+  const kcal = n($('qaKcal').value);
+  if (kcal <= 0) { toast('Zadej aspoň kalorie'); return; }
+  if (kcal > 10000) { toast('Přes 10 000 kcal? Zkontroluj to.'); return; }
+  const name = ($('qaName').value || '').trim() || 'Rychlý zápis';
+  await dbPut('log', {
+    date: curDate, productId: 'quick', name, unit: 'porce', amount: 1,
+    meal: pendingMeal || defaultMeal(),
+    kcal, p: n($('qaB').value), c: n($('qaC').value), f: n($('qaF').value), ts: Date.now()
+  });
+  pendingMeal = null;
+  ['qaName', 'qaKcal', 'qaB', 'qaC', 'qaF'].forEach(id => $(id).value = '');
+  toast('Zapsáno: ' + name + ' · ' + r0(kcal) + ' kcal');
+  go('day'); renderDay();
 }
 
 /* ---------------- jídla dne ---------------- */
@@ -1054,8 +1187,13 @@ async function renderDay() {
 
   const dd0 = await dbGet('daily', curDate) || {};
   const TG = await dayTargets(curDate, typeof dd0.burn === 'number' ? dd0.burn : 0);
-  $('kcalNow').textContent = r0(t.k);
-  $('kcalGoal').textContent = '/ ' + TG.kcal;
+  if (ringLeft) {                        // klepnutím na kruh: zbývá ↔ snědeno
+    $('kcalNow').textContent = r0(TG.kcal - t.k);
+    $('kcalGoal').textContent = 'zbývá';
+  } else {
+    $('kcalNow').textContent = r0(t.k);
+    $('kcalGoal').textContent = '/ ' + TG.kcal;
+  }
   if (TG.dyn) {
     $('dynLine').style.display = '';
     $('dynLine').innerHTML = 'Cíl dnes <b style="color:var(--fg)">' + TG.kcal + ' kcal</b> = klid ' +
@@ -1084,7 +1222,7 @@ async function renderDay() {
   const orphan = rows.filter(r => !MEALS.some(m => m.k === r.meal));
   if (orphan.length) groups.push({ m: { k: 'nezar', n: 'Nezařazeno' }, rows: orphan });
   const row = r => `
-    <div class="item">
+    <div class="swrap"><div class="item" data-del="${Number(r.id) || 0}">
       <div class="grow" onclick="editLog(${Number(r.id) || 0})">
         <div class="nm">${esc(r.name)}</div>
         <div class="sub">${r.alc
@@ -1092,8 +1230,7 @@ async function renderDay() {
           : r1(r.amount) + ' ' + esc(r.unit || 'g') + ' · B ' + r1(r.p) + ' · S ' + r1(r.c) + ' · T ' + r1(r.f)}</div>
       </div>
       <div class="kc">${r0(r.kcal)}<span class="tiny muted"> kcal</span></div>
-      <button class="btn sm dan" onclick="event.stopPropagation();delLog(${Number(r.id) || 0})">✕</button>
-    </div>`;
+    </div></div>`;
   $('logList').innerHTML = groups.map(g => {
     const kc = g.rows.reduce((a, r) => a + r.kcal, 0);
     return `
@@ -1103,9 +1240,9 @@ async function renderDay() {
           <span class="row" style="gap:6px;align-items:center">
             <span class="tiny muted mono">${g.rows.length ? r0(kc) + ' kcal' : '—'}</span>
             ${g.m.k === 'nezar' ? '' : `
-              <button class="btn sm" style="padding:3px 8px" onclick="copyMeal('${g.m.k}')"
+              <button class="btn sm" style="padding:8px 12px" onclick="copyMeal('${g.m.k}')"
                 title="zkopírovat ze včerejška">⧉</button>
-              <button class="btn sm pri" style="padding:3px 9px" onclick="addToMeal('${g.m.k}')">+</button>`}
+              <button class="btn sm pri" style="padding:8px 13px" onclick="addToMeal('${g.m.k}')">+</button>`}
           </span>
         </div>
         ${g.rows.map(row).join('')}
@@ -1136,8 +1273,132 @@ async function renderDay() {
     : '<span class="tiny muted">Nejpoužívanější položky se objeví tady.</span>';
 }
 async function delLog(id) { await dbDel('log', id); renderDay(); }
+/* smazání s možností vrátit — záznam se podrží v paměti po dobu toastu */
+async function delLogUndo(id) {
+  const rec = await dbGet('log', id);
+  if (!rec) return;
+  await dbDel('log', id);
+  renderDay();
+  if ($('p-alc').classList.contains('on')) renderAlc();
+  toastAct('Smazáno: ' + rec.name, 'Vrátit', async () => {
+    await dbPut('log', rec);           // id zůstává — záznam se vrátí na místo
+    renderDay();
+    if ($('p-alc').classList.contains('on')) renderAlc();
+  });
+}
+
+/* ---- swipe doleva = smazat (deník i alkohol) ---- */
+let swEl = null, swX = 0, swY = 0, swDx = 0, swAxis = null, swSup = false;
+function swFind(t) {
+  const it = t.closest && t.closest('#logList .item[data-del], #alcList .item[data-del]');
+  return (it && !t.closest('button,input,select')) ? it : null;
+}
+document.addEventListener('pointerdown', e => {
+  const it = swFind(e.target);
+  if (!it) return;
+  swEl = it; swX = e.clientX; swY = e.clientY; swDx = 0; swAxis = null;
+});
+document.addEventListener('pointermove', e => {
+  if (!swEl) return;
+  const dx = e.clientX - swX, dy = e.clientY - swY;
+  if (swAxis === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8))
+    swAxis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+  if (swAxis !== 'x') { if (swAxis === 'y') swEl = null; return; }
+  swDx = Math.min(0, dx);
+  swEl.style.transform = 'translateX(' + swDx + 'px)';
+  swEl.parentElement.classList.add('drag');
+  swEl.parentElement.classList.toggle('del', swDx < -60);
+});
+function swEnd() {
+  if (!swEl) return;
+  const el = swEl, dx = swDx; swEl = null;
+  el.parentElement.classList.remove('drag');
+  if (Math.abs(dx) > 10) swSup = true;             // potlač klik, který by otevřel editaci
+  if (dx < -70) {
+    el.style.transform = 'translateX(-110%)';
+    setTimeout(() => delLogUndo(Number(el.dataset.del)), 140);
+  } else {
+    el.style.transform = '';
+    el.parentElement.classList.remove('del');
+  }
+}
+document.addEventListener('pointerup', swEnd);
+document.addEventListener('pointercancel', swEnd);
+document.addEventListener('click', e => {
+  if (swSup) { e.stopPropagation(); e.preventDefault(); swSup = false; }
+}, true);
 
 /* ---------------- database view ---------------- */
+let dbMode = 'moje';
+function setDbMode(m) {
+  dbMode = m;
+  document.querySelectorAll('#dbSeg button').forEach(b => b.classList.toggle('on', b.dataset.d === m));
+  $('dbMoje').style.display = m === 'moje' ? '' : 'none';
+  $('dbJid').style.display = m === 'jidla' ? '' : 'none';
+  $('dbZak').style.display = m === 'zaklad' ? '' : 'none';
+  $('dbExt').style.display = m === 'ext' ? '' : 'none';
+  $('dbSearch').placeholder = {
+    moje: 'Hledat v mé databázi…', jidla: 'Hledat v hotových jídlech…',
+    zaklad: 'Hledat v základních potravinách…', ext: 'Hledat v externí databázi…'
+  }[m];
+  renderDbMode();
+}
+const jidRowHtml = j => `<div class="item"><div class="grow" onclick="useJidlo('${sid(jidloProduct(j).id)}')">
+    <div class="nm">${esc(j.n)}</div>
+    <div class="sub">${r0(j.e)} kcal · B ${r1(j.p)} · S ${r1(j.c)} · T ${r1(j.f)}${
+      j.v ? ' · vl ' + r1(j.v) : ''}${j.s ? ' · sůl ' + r1(j.s) : ''}</div>
+  </div></div>`;
+const zakRowHtml = z => `<div class="item"><div class="grow" onclick="useZaklad('${sid(zakProduct(z).id)}')">
+    <div class="nm">${esc(z.n)}</div>
+    <div class="sub">${r0(z.e)} kcal · B ${r1(z.p)} · S ${r1(z.c)} · T ${r1(z.f)}${
+      z.v ? ' · vl ' + r1(z.v) : ''}${z.s ? ' · sůl ' + r1(z.s) : ''}</div>
+  </div></div>`;
+function renderDbMode() {
+  const q = ($('dbSearch').value || '').trim();
+  if (dbMode === 'moje') { renderDb(); return; }
+  if (dbMode === 'jidla') {
+    if (q.length >= 2) {
+      document.querySelectorAll('#jidCats button').forEach(b => b.classList.remove('pri'));
+      const list = (window.JIDLA || []).filter(j => matchWords(j.n + ' ' + j.k, q));
+      $('jidList').innerHTML = list.map(jidRowHtml).join('') || '<p class="muted tiny">Nic nenalezeno.</p>';
+      $('dbCount').textContent = 'nalezeno ' + list.length;
+    } else {
+      $('dbCount').textContent = (window.JIDLA ? JIDLA.length : 0) + ' hotových jídel — vyber kategorii';
+    }
+    return;
+  }
+  if (dbMode === 'zaklad') {
+    if (q.length >= 2) {
+      document.querySelectorAll('#zakCats button').forEach(b => b.classList.remove('pri'));
+      const list = (window.ZAKLAD || []).filter(z => matchWords(z.n + ' ' + z.k, q));
+      $('zakList').innerHTML = list.map(zakRowHtml).join('') || '<p class="muted tiny">Nic nenalezeno.</p>';
+      $('dbCount').textContent = 'nalezeno ' + list.length;
+    } else {
+      $('dbCount').textContent = (window.ZAKLAD ? ZAKLAD.length : 0) + ' základních potravin — vyber kategorii';
+    }
+    return;
+  }
+  // externí databáze (NutriDatabaze / CSV)
+  if (!extFoods.length) {
+    $('extListHint').innerHTML = 'Nic načteného. Databázi z CSV (např. NutriDatabaze.cz) ' +
+      'nahraješ ve <b>Víc → Externí databáze potravin</b>.';
+    $('extList').innerHTML = '';
+    $('dbCount').textContent = '';
+    return;
+  }
+  $('extListHint').textContent = '';
+  const list = q.length >= 2 ? extFoods.filter(x => matchWords(x.n, q)) : extFoods.slice(0, 30);
+  $('extList').innerHTML = list.slice(0, 60).map(x => {
+    const pr = extProduct(x);
+    return `<div class="item"><div class="grow" onclick="useExt('${sid(pr.id)}')">
+      <div class="nm">${esc(x.n)}</div>
+      <div class="sub">${r0(x.e)} kcal · B ${r1(x.p)} · S ${r1(x.c)} · T ${r1(x.f)}</div>
+    </div></div>`;
+  }).join('') || '<p class="muted tiny">Nic nenalezeno.</p>';
+  $('dbCount').textContent = q.length >= 2
+    ? 'nalezeno ' + list.length
+    : extFoods.length + ' potravin — prvních 30, zbytek přes hledání';
+}
 function renderDb() {
   const q = ($('dbSearch').value || '').trim().toLowerCase();
   const list = products
@@ -1148,7 +1409,7 @@ function renderDb() {
     <div class="item">
       <div class="grow" onclick="openPortion('${sid(p.id)}')">
         <div class="nm">${esc(p.name)}</div>
-        <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100${esc(p.unit)}
+        <div class="sub">${p.brand ? esc(p.brand) + ' · ' : ''}${r0(p.kcal)} kcal/100${esc(p.unit)}
           <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : (p.source === 'jidlo' ? 'jídlo' : (p.source === 'zaklad' ? 'základní' : (p.source === 'ext' ? 'ČR' : 'ručně'))))}</span></div>
       </div>
       <button class="btn sm" onclick="openEdit('${sid(p.id)}')">✎</button>
@@ -1227,8 +1488,15 @@ let sugT = null, sugSeq = 0;
 function onNameInput() {
   const q = ($('nameQ').value || '').trim();
   clearTimeout(sugT);
+  $('nameClr').style.display = q ? '' : 'none';
   if (q.length < 2) { $('nameRes').innerHTML = ''; return; }
   renderLocalMatches(q);
+}
+function clearNameQ() {
+  $('nameQ').value = '';
+  $('nameRes').innerHTML = '';
+  $('nameClr').style.display = 'none';
+  $('nameQ').focus();
 }
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 /* shoda po slovech a bez ohledu na pořadí: „slunecnicovy chleb" najde „Chléb slunečnicový" */
@@ -1545,7 +1813,7 @@ function resCard(p, local) {
     : (local ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`);
   return `<div class="item"><div class="grow" onclick="${act}">
       <div class="nm">${esc(p.name)}</div>
-      <div class="sub">${esc(p.brand || '—')} · ${r0(p.kcal)} kcal/100 ${esc(p.unit)}
+      <div class="sub">${p.brand ? esc(p.brand) + ' · ' : ''}${r0(p.kcal)} kcal/100 ${esc(p.unit)}
         <span class="pill ${(p.source === 'zaklad' || p.source === 'ext' || p.source === 'jidlo' || local) ? 'man' : 'off'}">${
           p.source === 'jidlo' ? 'jídlo' : p.source === 'zaklad' ? 'základní' : p.source === 'ext' ? 'ČR' : (local ? 'moje' : 'OFF')}</span>${
           p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
@@ -1835,6 +2103,7 @@ async function editLog(id) {
   $('poMeal').value = r.meal || defaultMeal();
   $('poDate').value = r.date || curDate;
   $('poAdd').textContent = 'Uložit změnu';
+  $('poDel').style.display = '';
   calcPortion();
   $('modPortion').classList.add('on');
 }
@@ -1844,6 +2113,7 @@ function openPortion(id) {
   if (!p) { toast('Produkt nenalezen'); return; }
   editLogId = null;
   $('poAdd').textContent = 'Přidat';
+  $('poDel').style.display = 'none';
   fillMealSelect();
   $('poMeal').value = pendingMeal || defaultMeal();
   $('poDate').value = curDate;
@@ -1854,7 +2124,7 @@ function openPortion(id) {
   servingAmt = p.serving || 100;
   $('poServ').textContent = p.serving ? 'porce ' + r0(p.serving) : 'porce';
   $('poServ').style.display = p.serving ? '' : 'none';
-  $('poAmt').value = p.serving || 100;
+  $('poAmt').value = p.lastAmount || p.serving || 100;   // naposledy zadaná gramáž má přednost
   calcPortion();
   $('modPortion').classList.add('on');
 }
@@ -1887,6 +2157,8 @@ async function addPortion() {
   await dbPut('log', rec);
   if (products.some(x => x.id === curProduct.id)) {
     curProduct.uses = (curProduct.uses || 0) + 1;
+    curProduct.lastAmount = amt;         // příště se předvyplní stejná gramáž
+    curProduct.lastUsed = Date.now();    // pro seznam „Naposledy použité"
     await dbPut('products', curProduct);
   }
   pendingMeal = null;
@@ -1981,6 +2253,9 @@ function fillGoals() {
   if ($('gProj')) $('gProj').checked = !!goals.proj;
   projUi();
 }
+/* autosave nastavení: uloží se 0,6 s po poslední změně, žádné tlačítko */
+let gSaveT = null;
+function gSave() { clearTimeout(gSaveT); gSaveT = setTimeout(saveGoals, 600); }
 async function saveGoals() {
   goals = {
     kcal: n($('gKcal').value) || 2000, p: n($('gP').value) || 0, c: n($('gC').value) || 0,
@@ -1994,7 +2269,7 @@ async function saveGoals() {
     proj: $('gProj') ? $('gProj').checked : !!goals.proj
   };
   await dbPut('meta', { k: 'goals', v: goals });
-  dynUi(); renderDay(); toast('Cíle uloženy');
+  dynUi(); renderDay(); toast('Uloženo');
 }
 
 /* ---------------- export / import ---------------- */
@@ -2471,6 +2746,8 @@ async function aiSave(asRecipe) {
   aiItems = []; $('aiCard').style.display = 'none'; $('aiIn').value = '';
   $('photoPrev').style.display = 'none'; photoFile = null;
   if ($('photoNote')) $('photoNote').value = '';
+  await dbPut('meta', { k: 'fotoOk', v: 1 });   // návody na Foto se od příště sbalí
+  ['fotoHelp1', 'fotoHelp2'].forEach(id => { if ($(id)) $(id).removeAttribute('open'); });
   renderDb(); info();
   toast(asRecipe ? 'Přidáno a uloženo jako recept' : 'Přidáno do dneška');
   go('day'); renderDay();
@@ -2526,7 +2803,8 @@ function calcRmr() {
   if (!a || !h || !w) { toast('Vyplň věk, výšku a váhu'); return; }
   const bmr = 10 * w + 6.25 * h - 5 * a + (s === 'm' ? 5 : -161);
   $('gRmr').value = r0(bmr);
-  toast('Doplněno: ' + r0(bmr) + ' kcal — ulož cíle');
+  saveGoals();                          // autosave — žádné tlačítko Uložit už není
+  toast('Doplněno a uloženo: ' + r0(bmr) + ' kcal');
 }
 async function renderBalance(intake) {
   const d = await dbGet('daily', curDate) || {};
@@ -3098,6 +3376,7 @@ function openCustomDrink() {
   $('dkTitle').textContent = 'Jiný nápoj';
   $('dkSave').textContent = 'Zapsat';
   $('dkKeep').style.display = '';
+  $('dkDel').style.display = 'none';
   fillDrinkMeal(); $('dkMeal').value = defaultMeal();
   $('dkDate').value = curDate;
   calcDrink();
@@ -3109,6 +3388,7 @@ function editDrink(r) {
   $('dkTitle').textContent = 'Upravit nápoj';
   $('dkSave').textContent = 'Uložit změnu';
   $('dkKeep').style.display = 'none';
+  $('dkDel').style.display = '';
   $('dkName').value = r.name;
   $('dkMl').value = r1(r.amount);
   $('dkAbv').value = r1(r.abv || 0);
@@ -3408,11 +3688,11 @@ async function renderAlc() {
   $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : $('alcLimitBar').innerHTML;
   const rows = (await dbByIdx('log', 'date', curDate)).filter(r => r.alc);
   $('alcList').innerHTML = rows.length ? rows.map(r => `
-    <div class="item"><div class="grow" onclick="editLog(${Number(r.id) || 0})">
+    <div class="swrap"><div class="item" data-del="${Number(r.id) || 0}">
+      <div class="grow" onclick="editLog(${Number(r.id) || 0})">
       <div class="nm">${esc(r.name)}</div>
       <div class="sub">${r0(r.amount)} ml · ${r1(r.abv || 0)} % · ${r0(r.kcal)} kcal · ${mealName(r.meal)}</div></div>
-    <div class="kc">${r1(r.alc)}<span class="tiny muted"> g</span></div>
-    <button class="btn sm dan" onclick="event.stopPropagation();delLog(${Number(r.id) || 0});renderAlc()">✕</button></div>`).join('')
+    <div class="kc">${r1(r.alc)}<span class="tiny muted"> g</span></div></div></div>`).join('')
     : '<p class="tiny muted">' + (isToday() ? 'Dnes nic.' : 'Tenhle den nic.') + '</p>';
 }
 
