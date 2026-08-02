@@ -558,6 +558,37 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>Chůze s batohem</h3>
+    <div class="grid2">
+      <div class="fld"><label>Rychlost (km/h)</label>
+        <input id="rkV" type="number" inputmode="decimal" step="0.5" value="4.5" oninput="ruckCalc()"></div>
+      <div class="fld"><label>Batoh (kg)</label>
+        <input id="rkL" type="number" inputmode="decimal" value="10" oninput="ruckCalc()"></div>
+      <div class="fld"><label>Čas (min)</label>
+        <input id="rkMin" type="number" inputmode="numeric" oninput="ruckCalc()"></div>
+      <div class="fld"><label>Terén</label>
+        <select id="rkTer" onchange="ruckCalc()">
+          <option value="1.0">silnice, asfalt</option>
+          <option value="1.2" selected>lesní cesta, pěšina</option>
+          <option value="1.45">náročný terén, kamení</option>
+          <option value="1.8">písek, hluboký sníh</option>
+        </select></div>
+      <div class="fld"><label>Převýšení stoupání (m, nepovinné)</label>
+        <input id="rkElev" type="number" inputmode="numeric" placeholder="0" oninput="ruckCalc()"></div>
+      <div class="fld"><label>Moje váha (kg)</label>
+        <input id="rkW" type="number" inputmode="decimal" oninput="ruckCalc()"></div>
+    </div>
+    <div class="card" style="background:var(--card2);margin-bottom:10px">
+      <div class="row" style="justify-content:space-between">
+        <span class="muted tiny">Spálím navíc</span><b class="mono" id="rkOut">—</b></div>
+      <p class="tiny muted" id="rkNote" style="margin:6px 0 0"></p>
+    </div>
+    <button class="btn pri full" onclick="ruckSave()">Zapsat pochod</button>
+    <p class="tiny muted" style="margin:8px 0 0">Pandolfova rovnice (armádní model nošení zátěže).
+      Odhad je očištěný o klidový výdej. Hodnoty si aplikace pamatuje.</p>
+  </div>
+
+  <div class="card">
     <div class="lbl-s">Součty</div>
     <div class="row" style="gap:10px;margin:0 0 8px">
       <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
@@ -909,7 +940,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.02-41';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.02-42';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3792,6 +3823,7 @@ const FIT_DB = [
   { n: 'Plavání prsa', m: 5.3 },
   { n: 'Posilování (stroje, činky)', m: 3.5 }, { n: 'Posilování intenzivně', m: 6.0 },
   { n: 'Kruhový trénink / HIIT', m: 8.0 }, { n: 'Kettlebell', m: 8.0 },
+  { n: 'Kickbox', m: 10.3 }, { n: 'Box (sparring)', m: 7.8 },
   { n: 'Švihadlo', m: 11.8 }, { n: 'Veslovací trenažér', m: 7.0 },
   { n: 'Jóga', m: 2.5 }, { n: 'Pilates', m: 3.0 }, { n: 'Strečink', m: 2.3 },
   { n: 'Aerobik / zumba', m: 7.3 }, { n: 'Tanec', m: 4.8 },
@@ -3915,6 +3947,7 @@ async function workoutByDay() {
 }
 async function renderFit() {
   syncAddDate();
+  ruckRestore();
   const by = await workoutByDay();
   const sum = k => {
     const base = new Date(curDate + 'T12:00:00');
@@ -3948,6 +3981,62 @@ async function renderFit() {
       <div class="kc">−${r0(r.kcal)}<span class="tiny muted"> kcal</span></div>
     </div></div>`).join('')
     : '<p class="tiny muted">' + (isToday() ? 'Dnes zatím nic.' : 'Tenhle den nic.') + '</p>';
+}
+/* ---- chůze s batohem: Pandolf, Givoni & Goldman (1977) ----
+   M[W] = 1.5·W + 2.0·(W+L)·(L/W)² + η·(W+L)·(1.5·V² + 0.35·V·G)
+   W = váha těla (kg), L = zátěž (kg), V = rychlost (m/s), G = sklon (%),
+   η = koeficient terénu. Výsledek očistíme o klidový výdej (1 kcal/kg/h),
+   stejně jako u MET odhadů — bazál už je v bilanci započtený. */
+function ruckKcal(W, L, vKmh, min, eta, elev) {
+  const V = vKmh / 3.6;
+  const distM = vKmh * 1000 * min / 60;
+  let G = (elev > 0 && distM > 0) ? Math.min(25, elev / distM * 100) : 0;
+  const M = 1.5 * W + 2.0 * (W + L) * Math.pow(L / W, 2) + eta * (W + L) * (1.5 * V * V + 0.35 * V * G);
+  const gross = M * min * 60 / 4184;         // watty → kcal
+  const net = gross - W * min / 60;          // minus klidový výdej za tu dobu
+  return { net: Math.max(0, net), gross, G };
+}
+async function ruckCalc() {
+  const W = n($('rkW').value) || await fitWeight();
+  if (W && !$('rkW').value) $('rkW').value = r1(W);
+  const vKmh = n($('rkV').value), L = n($('rkL').value), min = n($('rkMin').value);
+  const eta = n($('rkTer').value) || 1.2, elev = n($('rkElev').value);
+  if (!W || vKmh <= 0 || min <= 0) {
+    $('rkOut').textContent = '—';
+    $('rkNote').textContent = !W ? 'Neznám tvou váhu — doplň ji vpravo.' : 'Zadej rychlost a čas.';
+    return null;
+  }
+  const r = ruckKcal(W, L, vKmh, min, eta, elev);
+  $('rkOut').textContent = r0(r.net) + ' kcal';
+  $('rkNote').textContent = r1(vKmh * min / 60) + ' km · ' +
+    (L ? L + ' kg na zádech · ' : 'bez zátěže · ') +
+    (r.G ? 'průměrný sklon ' + r1(r.G) + ' %' : 'po rovině') +
+    (elev / (vKmh * 1000 * min / 60) * 100 > 25 ? ' (sklon omezen na 25 %)' : '');
+  return r;
+}
+async function ruckSave() {
+  const r = await ruckCalc();
+  if (!r || r.net <= 0) { toast('Vyplň rychlost, čas a váhu'); return; }
+  const vKmh = n($('rkV').value), L = n($('rkL').value), min = n($('rkMin').value);
+  const terTxt = $('rkTer').options[$('rkTer').selectedIndex].text.split(',')[0];
+  const name = (L ? 'Chůze s batohem ' + r1(L) + ' kg' : 'Chůze') +
+    ' (' + r1(vKmh) + ' km/h, ' + terTxt + ')';
+  await dbPut('workout', { date: curDate, name, min, met: 0, kcal: r0(r.net), ts: Date.now() });
+  // zapamatuj vstupy pro příště
+  await dbPut('meta', { k: 'ruck', v: { v: vKmh, l: L, ter: $('rkTer').value } });
+  $('rkMin').value = ''; $('rkElev').value = '';
+  ruckCalc();
+  toast('Zapsáno: ' + name + ' · ' + r0(r.net) + ' kcal' + (isToday() ? '' : ' → ' + dayTxt(curDate)));
+  renderFit(); renderDay();
+}
+async function ruckRestore() {
+  const m = await dbGet('meta', 'ruck');
+  if (m && m.v) {
+    if (m.v.v) $('rkV').value = m.v.v;
+    if (m.v.l !== undefined) $('rkL').value = m.v.l;
+    if (m.v.ter) $('rkTer').value = m.v.ter;
+  }
+  ruckCalc();
 }
 async function fitRepeat(id) {
   const r = await dbGet('workout', id);
