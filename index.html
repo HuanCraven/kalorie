@@ -319,6 +319,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     </div>
     <p class="tiny muted" style="margin:0">Vyfoť talíř shora nebo pod úhlem 45°. Napiš, co na fotce
       nejde poznat — velikost, čím je to plněné, kolik oleje. Odhad se tím zpřesní víc než čímkoli jiným.</p>
+    <button class="btn pri full" id="apiEstBtn" style="margin-top:10px;display:none"
+      onclick="apiEstimate()">✨ Odhadnout hned (Claude API)</button>
+    <p class="tiny muted" id="apiEstMsg" style="margin:8px 0 0;display:none"></p>
   </div>
 
   <div class="card">
@@ -771,6 +774,23 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>Claude API — odhad z fotky bez kopírování</h3>
+    <p class="tiny muted" style="margin:0 0 10px">S vlastním API klíčem pošle aplikace fotku
+      Claudovi přímo a rozpis se vyplní sám. Klíč zůstává jen v tomhle telefonu
+      a <b>není součástí zálohy</b>. Bez klíče funguje původní postup přes chat.</p>
+    <div class="fld"><label>API klíč (sk-ant-…)</label>
+      <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-api03-…"
+        onchange="saveApi()"></div>
+    <div class="fld"><label>Model</label>
+      <select id="apiModel" onchange="saveApi()">
+        <option value="claude-haiku-4-5">Haiku — rychlý a levný (≈ desetihaléře za fotku)</option>
+        <option value="claude-sonnet-4-6">Sonnet — přesnější (≈ do koruny za fotku)</option>
+      </select></div>
+    <button class="btn full" onclick="apiTest()">Vyzkoušet klíč</button>
+    <p class="tiny muted" id="apiMsg" style="margin:8px 0 0"></p>
+  </div>
+
+  <div class="card">
     <h3>Data</h3>
     <button class="btn full" style="margin-bottom:8px" onclick="exportData()">Export zálohy (JSON)</button>
     <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('impFile').click()">Import zálohy</button>
@@ -874,6 +894,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       </div>
       <input type="file" id="labFile" accept="image/*" capture="environment" style="display:none" onchange="gotLabel(this)">
       <img id="labPrev" style="display:none;width:100%;border-radius:10px;margin-bottom:8px">
+      <button class="btn sm pri full" id="apiLabBtn" style="margin-bottom:8px;display:none"
+        onclick="apiLabel()">✨ Přečíst hned (Claude API)</button>
       <div class="row">
         <input id="labIn" class="grow" placeholder="Vlož sem odpověď" style="font-size:13px">
         <button class="btn sm" onclick="pasteLabel()">📋</button>
@@ -940,7 +962,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.02-43';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.02-44';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1094,6 +1116,7 @@ function offCachePut(k, v) {
   // po prvním úspěšném zpracování fotky se návody sbalí — tlačítka zůstávají
   const fotoOk = await dbGet('meta', 'fotoOk');
   if (fotoOk) ['fotoHelp1', 'fotoHelp2'].forEach(id => { if ($(id)) $(id).removeAttribute('open'); });
+  await loadApi();
   await renderDay();
   checkBackup();
   obCheck();
@@ -3360,6 +3383,128 @@ function dlSummary() {
   const t = summaryText(); if (!t) { toast('Nejdřív otevři statistiky'); return; }
   dl('kalorie-souhrn-' + period + 'd-' + dstr(new Date()) + '.txt', t, 'text/plain');
   toast('Staženo');
+}
+
+/* ---------------- Claude API (vlastní klíč) ----------------
+   Volá se přímo z prohlížeče (hlavička anthropic-dangerous-direct-browser-access).
+   Klíč žije jen v meta úložišti tohohle telefonu — export zálohy meta neobsahuje. */
+let apiCfg = { key: '', model: 'claude-haiku-4-5' };
+
+async function loadApi() {
+  const m = await dbGet('meta', 'api');
+  if (m && m.v) apiCfg = Object.assign(apiCfg, m.v);
+  if ($('apiKey')) { $('apiKey').value = apiCfg.key || ''; $('apiModel').value = apiCfg.model; }
+  apiUi();
+}
+async function saveApi() {
+  apiCfg.key = ($('apiKey').value || '').trim();
+  apiCfg.model = $('apiModel').value;
+  await dbPut('meta', { k: 'api', v: apiCfg });
+  $('apiMsg').textContent = apiCfg.key ? 'Uloženo. Klíč zůstává jen v telefonu.' : 'Klíč smazán.';
+  apiUi();
+}
+function apiUi() {
+  const on = !!apiCfg.key;
+  if ($('apiEstBtn')) $('apiEstBtn').style.display = on ? '' : 'none';
+  if ($('apiLabBtn')) $('apiLabBtn').style.display = on ? '' : 'none';
+}
+async function apiTest() {
+  const key = ($('apiKey').value || '').trim();
+  if (!key) { $('apiMsg').textContent = 'Nejdřív vlož klíč.'; return; }
+  $('apiMsg').textContent = 'Zkouším…';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/models?limit=1', {
+      headers: {
+        'x-api-key': key, 'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      }
+    });
+    if (res.status === 401) { $('apiMsg').textContent = '✕ Klíč je neplatný nebo zrušený.'; return; }
+    if (!res.ok) { $('apiMsg').textContent = '✕ Server odpověděl HTTP ' + res.status + '.'; return; }
+    $('apiMsg').textContent = '✓ Klíč funguje.';
+  } catch (e) {
+    $('apiMsg').textContent = '✕ Nepodařilo se spojit (' + (e.message || 'síť') + '). Jsi online?';
+  }
+}
+/* zmenší fotku na max 1024 px a vrátí base64 JPEG — šetří data i cenu dotazu */
+function shrinkPhoto(file, maxPx) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, (maxPx || 1024) / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      res(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+    };
+    img.onerror = () => rej(new Error('fotku nejde načíst'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function apiAsk(file, prompt) {
+  const data = await shrinkPhoto(file, 1024);
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 60000);
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', signal: ctrl.signal,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiCfg.key, 'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: apiCfg.model, max_tokens: 1200,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data } },
+          { type: 'text', text: prompt }
+        ]}]
+      })
+    });
+    const j = await res.json().catch(() => null);
+    if (res.status === 401) throw new Error('neplatný klíč — zkontroluj ho v Nastavení');
+    if (res.status === 429) throw new Error('příliš mnoho dotazů, zkus to za chvíli');
+    if (res.status === 400 && j && /credit/i.test(JSON.stringify(j))) throw new Error('došel kredit na console.anthropic.com');
+    if (!res.ok) throw new Error((j && j.error && j.error.message) || ('HTTP ' + res.status));
+    return (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+  } finally { clearTimeout(to); }
+}
+/* pro API vždy plné zadání (režim projektu se týká jen sdílení do chatu) */
+function apiPrompt(kind) {
+  const base = kind === 'label' ? LABEL_PROMPT : AI_PROMPT;
+  const note = (kind === 'label' ? '' : (($('photoNote') || {}).value || '')).trim();
+  return note ? base + '\n\nDoplňující informace ode mě: ' + note : base;
+}
+async function apiEstimate() {
+  if (!photoFile) { toast('Nejdřív vyfoť jídlo'); return; }
+  const btn = $('apiEstBtn'), msg = $('apiEstMsg');
+  btn.disabled = true; btn.textContent = 'Ptám se Claude…';
+  msg.style.display = ''; msg.textContent = 'Fotka se zmenšuje a odesílá — obvykle do 10 vteřin.';
+  try {
+    const txt = await apiAsk(photoFile, apiPrompt('meal'));
+    $('aiIn').value = txt;
+    processAI();
+    msg.style.display = 'none';
+  } catch (e) {
+    msg.textContent = '✕ ' + (e.name === 'AbortError' ? 'vypršel čas — zkus to znovu' : e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '✨ Odhadnout hned (Claude API)';
+  }
+}
+async function apiLabel() {
+  if (!labelFile) { toast('Nejdřív vyfoť tabulku'); return; }
+  const btn = $('apiLabBtn');
+  btn.disabled = true; btn.textContent = 'Čtu etiketu…';
+  try {
+    const txt = await apiAsk(labelFile, apiPrompt('label'));
+    $('labIn').value = txt;
+    processLabel();
+  } catch (e) {
+    toast('✕ ' + (e.name === 'AbortError' ? 'vypršel čas' : e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = '✨ Přečíst hned (Claude API)';
+  }
 }
 
 /* ---------------- foto etikety → formulář ---------------- */
