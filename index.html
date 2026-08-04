@@ -17,6 +17,8 @@
 html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
   font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+.tajne{-webkit-text-security:disc;text-security:disc}
+.tajne.videt{-webkit-text-security:none;text-security:none}
 h1,h2,h3{margin:0 0 8px;font-weight:600}
 h2{font-size:17px}h3{font-size:14px;color:var(--dim);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
@@ -676,10 +678,19 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div class="card">
     <h3>Rozbor od Claude</h3>
-    <button class="btn pri full" style="margin-bottom:8px" onclick="copySummary()">Zkopírovat souhrn do schránky</button>
-    <button class="btn full" onclick="dlSummary()">Stáhnout jako soubor</button>
-    <p class="tiny muted" style="margin:8px 0 0">Vlož souhrn do chatu s Claudem a napiš, na co se chceš zeptat.
-      Souhrn neobsahuje nic osobního nad rámec těchhle čísel.</p>
+    <button class="btn pri full" style="margin-bottom:8px" id="rozborBtn" onclick="rozborRun()">✨ Vyhodnotit období</button>
+    <p class="tiny muted" id="rozborMsg" style="margin:0 0 8px"></p>
+    <div id="rozborOut" style="display:none;white-space:pre-wrap;font-size:13px;line-height:1.5;
+      background:var(--card2);border-radius:12px;padding:12px;margin-bottom:8px"></div>
+    <details><summary class="tiny muted" style="cursor:pointer">Radši ručně, bez API klíče</summary>
+      <div style="margin-top:10px">
+        <button class="btn full" style="margin-bottom:8px" onclick="copySummary()">Zkopírovat souhrn do schránky</button>
+        <button class="btn full" onclick="dlSummary()">Stáhnout jako soubor</button>
+        <p class="tiny muted" style="margin:8px 0 0">Vlož souhrn do chatu s Claudem a napiš, na co se chceš zeptat.</p>
+      </div>
+    </details>
+    <p class="tiny muted" style="margin:8px 0 0">Odešle se souhrn za zvolené období a text z Nastavení →
+      O mně. Nic jiného. Rozbor je názor podle čísel, ne lékařská rada.</p>
   </div>
 </section>
 
@@ -775,6 +786,16 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>O mně — kontext pro rozbor</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Připojí se k číslům, když si na Statistikách necháš
+      udělat rozbor. Napiš, kdo jsi a čeho chceš dosáhnout — věk, výška, jak se hýbeš, co řešíš,
+      na co si dát pozor. Nemusíš to pak psát pokaždé znovu.</p>
+    <div class="fld"><textarea id="gProfil" rows="4" oninput="gSave()"
+      placeholder="Např.: 42 let, 178 cm, sedavá práce, 2x týdně posilovna a o víkendu delší chůze s batohem. Chci zhubnout na 72 kg a udržet sílu. Špatně spím, když jím pozdě."></textarea></div>
+    <p class="tiny muted" style="margin:-4px 0 0">Uloží se samo. Posílá se jen tehdy, když si rozbor sám vyžádáš.</p>
+  </div>
+
+  <div class="card">
     <h3>Alkohol</h3>
     <div class="fld"><label>Limit — průměr za posledních 30 dní (g čistého alkoholu na den, 0 = vypnuto)</label>
       <input id="gAlcDay" type="number" inputmode="decimal" step="0.5" oninput="gSave()"></div>
@@ -788,7 +809,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       Claudovi přímo a rozpis se vyplní sám. Klíč zůstává jen v tomhle telefonu
       a <b>není součástí zálohy</b>. Bez klíče funguje původní postup přes chat.</p>
     <div class="fld"><label>API klíč (sk-ant-…)</label>
-      <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-api03-…"
+      <input id="apiKey" type="text" class="tajne" autocomplete="off" data-lpignore="true"
+        data-1p-ignore spellcheck="false" placeholder="sk-ant-api03-…"
         onchange="saveApi()"></div>
     <div class="fld"><label>Model</label>
       <select id="apiModel" onchange="saveApi()">
@@ -807,7 +829,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <div class="fld"><label>Repozitář (uživatel/název)</label>
       <input id="syRepo" autocomplete="off" placeholder="jmeno/kalorie-data" onchange="sySave()"></div>
     <div class="fld"><label>Token (github_pat_…, oprávnění Contents: Read and write)</label>
-      <input id="syTok" type="password" autocomplete="off" placeholder="github_pat_…" onchange="sySave()"></div>
+      <input id="syTok" type="text" class="tajne" autocomplete="off" data-lpignore="true"
+        data-1p-ignore spellcheck="false" placeholder="github_pat_…" onchange="sySave()"></div>
+    <button class="btn sm" style="margin:-4px 0 8px" onclick="vidTajne('syTok', this)">Ukázat token</button>
     <button class="btn full" style="margin-bottom:8px" onclick="syTest()">Vyzkoušet spojení</button>
     <button class="btn pri full" style="margin-bottom:8px" id="sySyncBtn" onclick="syncNow(true)">Synchronizovat teď</button>
     <p class="tiny muted" id="syMsg" style="margin:0 0 8px"></p>
@@ -818,7 +842,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       do repozitáře ukládají zašifrovaná — bez hesla je nikdo nepřečte, ani kdyby se k souboru dostal.
       <b>Heslo si zapiš</b>, nikde jinde než v těchhle zařízeních není a nedá se obnovit.</p>
     <div class="fld"><label>Heslo (aspoň 8 znaků, na obou zařízeních stejné)</label>
-      <input id="syPass" type="password" autocomplete="off" placeholder="…"></div>
+      <input id="syPass" type="text" class="tajne" autocomplete="off" data-lpignore="true"
+        data-1p-ignore spellcheck="false" placeholder="…"></div>
     <button class="btn full" style="margin-bottom:8px" onclick="syPassSave()">Zapnout šifrování</button>
     <p class="tiny muted" id="syPassMsg" style="margin:0 0 8px"></p>
     <button class="btn full" style="margin-bottom:8px" id="syPassOff" onclick="syPassOff()">Vypnout šifrování</button>
@@ -1019,7 +1044,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.04-49';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.04-50';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1112,6 +1137,21 @@ function req(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.r
 const dbGet = (s, k) => req(tx(s, 'readonly').get(k));
 const dbAll = s => req(tx(s, 'readonly').getAll());
 const dbByIdx = (s, i, v) => req(tx(s, 'readonly').index(i).getAll(v));
+
+/* Citlivá pole nejsou type="password" schválně: Chrome kolem takového pole
+   hlídá celý formulář a nabízel ukládání hesla i při psaní čísel jinam.
+   Maskujeme tedy přes CSS; kde to prohlížeč neumí, vrátíme se k type="password". */
+function tajnaPoleUi() {
+  const umi = window.CSS && CSS.supports && (CSS.supports('-webkit-text-security', 'disc') || CSS.supports('text-security', 'disc'));
+  if (umi) return;
+  document.querySelectorAll('input.tajne').forEach(el => { if (!el.classList.contains('videt')) el.type = 'password'; });
+}
+function vidTajne(id, btn) {
+  const el = $(id); if (!el) return;
+  const videt = el.classList.toggle('videt');
+  if (el.type === 'password' || (videt && el.type !== 'text')) el.type = videt ? 'text' : 'password';
+  if (btn) btn.textContent = videt ? 'Skrýt token' : 'Ukázat token';
+}
 
 /* ---------------- synchronizace: identita záznamů ----------------
    Každý synchronizovaný záznam má `upd` (čas poslední změny) a stabilní `uid`,
@@ -1353,6 +1393,8 @@ function offCachePut(k, v) {
   await loadApi();
   await loadSync();
   await loadCrypt();
+  tajnaPoleUi();
+  await loadRozbor();
   await renderDay();
   checkBackup();
   obCheck();
@@ -2631,6 +2673,7 @@ function fillGoals() {
   dynUi();
   $('gFib').value = goals.fib || 30; $('gSalt').value = goals.salt || 5;
   if ($('gProj')) $('gProj').checked = !!goals.proj;
+  if ($('gProfil')) $('gProfil').value = goals.profil || '';
   rmrWarnUi();
   projUi();
 }
@@ -2647,7 +2690,8 @@ async function saveGoals() {
     pKg: ($('gPKg') && n($('gPKg').value)) || 2.0,
     fKg: ($('gFKg') && n($('gFKg').value)) || 0.9,
     fib: n($('gFib').value) || 30, salt: n($('gSalt').value) || 5,
-    proj: $('gProj') ? $('gProj').checked : !!goals.proj
+    proj: $('gProj') ? $('gProj').checked : !!goals.proj,
+    profil: $('gProfil') ? $('gProfil').value.trim() : (goals.profil || '')
   };
   await dbPut('meta', { k: 'goals', v: goals });
   rmrWarnUi();
@@ -3712,6 +3756,83 @@ function summaryText() {
     top.forEach(([nm, k]) => L.push('  ' + nm + ': ' + r0(k) + ' kcal'));
   }
   return L.join('\n');
+}
+/* --- rozbor období přes Claude API --- */
+async function apiText(prompt, maxTok) {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', signal: ctrl.signal,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiCfg.key, 'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: apiCfg.model, max_tokens: maxTok || 1500,
+        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }]
+      })
+    });
+    const j = await res.json().catch(() => null);
+    if (res.status === 401) throw new Error('neplatný klíč — zkontroluj ho v Nastavení');
+    if (res.status === 429) throw new Error('příliš mnoho dotazů, zkus to za chvíli');
+    if (res.status === 400 && j && /credit/i.test(JSON.stringify(j))) throw new Error('došel kredit na console.anthropic.com');
+    if (!res.ok) throw new Error((j && j.error && j.error.message) || ('HTTP ' + res.status));
+    return (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+  } finally { clearTimeout(to); }
+}
+function rozborPrompt() {
+  const kdo = (goals.profil || '').trim();
+  return [
+    'Jsi výživový a tréninkový poradce. Odpovídej česky, věcně a stručně, bez frází a bez chválení.',
+    'Dostáváš souhrn z aplikace na sledování jídla, pohybu a alkoholu.',
+    '',
+    kdo ? 'O UŽIVATELI (napsal sám):\n' + kdo : 'O uživateli nevíme nic nad rámec čísel níže.',
+    '',
+    summaryText(),
+    '',
+    'Napiš rozbor v tomhle pořadí a nic nepřidávej:',
+    '1) JAK TO DOPADLO — tři až pět vět o tom, co čísla za období říkají.',
+    '2) CO STOJÍ ZA POZORNOST — konkrétní věci, dobré i špatné, vždy s číslem z dat.',
+    '3) NA PŘÍŠTĚ — tři až pět doporučení, každé jednou větou a proveditelné do týdne.',
+    '',
+    'Pravidla: opírej se jen o data výše, nedomýšlej si. Když něco nejde z dat určit, řekni to.',
+    'Nedoporučuj krajní kroky (hladovky, velmi nízký příjem, drastické zvýšení objemu tréninku).',
+    'Když je příjem dlouhodobě velmi nízký, hubnutí příliš rychlé nebo alkohol vysoký, řekni to na rovinu.',
+    'Nediagnostikuj a u zdravotních věcí odkaž na lékaře. Nepiš úvod ani závěrečné shrnutí.'
+  ].join('\n');
+}
+async function rozborRun() {
+  if (!apiCfg.key) { rozborNote('✕ Nejdřív vlož klíč ke Claude API v Nastavení.'); return; }
+  if (!statCache) { rozborNote('✕ Nejdřív si nech spočítat statistiky.'); return; }
+  if (!statCache.a.logged) { rozborNote('✕ Za tohle období nejsou žádné záznamy.'); return; }
+  const btn = $('rozborBtn');
+  btn.disabled = true; btn.textContent = 'Přemýšlím…';
+  rozborNote('Posílám souhrn za ' + period + ' dní…');
+  try {
+    const txt = await apiText(rozborPrompt());
+    rozborShow(txt);
+    await dbPut('meta', { k: 'rozbor', v: { txt: txt, kdy: Date.now(), dny: period } });
+    rozborNote('Rozbor za ' + period + ' dní · ' + new Date().toLocaleString('cs-CZ'));
+  } catch (e) {
+    rozborNote('✕ Nepovedlo se: ' + (e.name === 'AbortError' ? 'vypršel čas' : e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = '✨ Vyhodnotit období';
+  }
+}
+function rozborNote(t) { if ($('rozborMsg')) $('rozborMsg').textContent = t; }
+function rozborShow(t) {
+  const el = $('rozborOut'); if (!el) return;
+  el.textContent = t || '';
+  el.style.display = t ? '' : 'none';
+}
+async function loadRozbor() {
+  const m = await dbGet('meta', 'rozbor');
+  if (m && m.v && m.v.txt) {
+    rozborShow(m.v.txt);
+    rozborNote('Rozbor za ' + m.v.dny + ' dní · ' + new Date(m.v.kdy).toLocaleString('cs-CZ'));
+  }
 }
 async function copySummary() {
   const t = summaryText(); if (!t) { toast('Nejdřív otevři statistiky'); return; }
