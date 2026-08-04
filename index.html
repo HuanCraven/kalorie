@@ -200,13 +200,10 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
-    <h3>Výdej a váha</h3>
-    <div class="grid2">
-      <div class="fld"><label>Aktivní kcal z hodinek</label>
-        <input id="dBurn" type="number" inputmode="numeric" placeholder="0" onchange="saveDaily()"></div>
-      <div class="fld"><label>Váha (kg)</label>
-        <input id="dWeight" type="number" inputmode="decimal" step="0.1" placeholder="—" onchange="saveDaily()"></div>
-    </div>
+    <h3>Váha a bilance</h3>
+    <div class="fld"><label>Váha (kg)</label>
+      <input id="dWeight" type="number" inputmode="decimal" step="0.1" placeholder="—" onchange="saveDaily()"></div>
+    <p class="tiny muted" style="margin:-4px 0 10px">Aktivní kcal z hodinek se zapisují na záložce Pohyb.</p>
     <div class="row" style="justify-content:space-between">
       <span class="tiny muted" id="balExp">—</span>
       <b class="mono" id="balVal">—</b>
@@ -608,6 +605,15 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>Z hodinek</h3>
+    <div class="fld"><label>Aktivní kcal za celý den</label>
+      <input id="dBurn" type="number" inputmode="numeric" placeholder="0" onchange="saveDaily()"></div>
+    <p class="tiny muted" style="margin:-4px 0 0">Číslo z hodinek nebo z fitness aplikace za den, který máš
+      nastavený nahoře. Přičítá se ke klidovému výdeji stejně jako aktivity zapsané níž — nezapisuj
+      tedy totéž dvakrát.</p>
+  </div>
+
+  <div class="card">
     <h3 id="fitListHead">Dnešní aktivity</h3>
     <div id="fitList"></div>
   </div>
@@ -749,6 +755,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <h3>Klidový výdej</h3>
     <div class="fld"><label>Bazální metabolismus (kcal/den)</label>
       <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750" oninput="gSave()"></div>
+    <p class="tiny" id="gRmrWarn" style="margin:-4px 0 0;color:var(--warn);display:none"></p>
     <details>
       <summary class="tiny muted" style="cursor:pointer">Neznám ho — spočítat</summary>
       <div style="margin-top:10px">
@@ -1012,7 +1019,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.04-48';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.04-49';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -2564,7 +2571,13 @@ function openEdit(id, presetCode) {
   $('edServ').value = p && p.serving ? p.serving : '';
   $('edDel').style.display = p ? '' : 'none';
   $('modEdit').classList.add('on');
-  if (!p) setTimeout(() => $('edName').focus(), 120);
+  // kurzor do názvu, ale jen když uživatel mezitím nezačal psát jinam —
+  // jinak by odložené přeskočení fokusu přepsalo rozepsané pole (kód skončil v názvu)
+  if (!p) setTimeout(() => {
+    const a = document.activeElement;
+    if (a && a !== document.body && $('modEdit').contains(a)) return;
+    $('edName').focus();
+  }, 120);
 }
 async function saveProduct() {
   const name = $('edName').value.trim();
@@ -2602,6 +2615,12 @@ async function deleteProduct() {
 }
 
 /* ---------------- goals ---------------- */
+function rmrWarnUi() {
+  const el = $('gRmrWarn'); if (!el) return;
+  const chyba = goals.rmr ? mimoMeze('rmr', goals.rmr) : null;
+  el.textContent = chyba || '';
+  el.style.display = chyba ? '' : 'none';
+}
 function fillGoals() {
   $('gKcal').value = goals.kcal; $('gP').value = goals.p; $('gC').value = goals.c;
   $('gF').value = goals.f; $('gAlcDay').value = goals.alcDay || 0;
@@ -2612,6 +2631,7 @@ function fillGoals() {
   dynUi();
   $('gFib').value = goals.fib || 30; $('gSalt').value = goals.salt || 5;
   if ($('gProj')) $('gProj').checked = !!goals.proj;
+  rmrWarnUi();
   projUi();
 }
 /* autosave nastavení: uloží se 0,6 s po poslední změně, žádné tlačítko */
@@ -2630,6 +2650,7 @@ async function saveGoals() {
     proj: $('gProj') ? $('gProj').checked : !!goals.proj
   };
   await dbPut('meta', { k: 'goals', v: goals });
+  rmrWarnUi();
   dynUi(); renderDay(); toast('Uloženo');
 }
 
@@ -3197,14 +3218,30 @@ async function loadDaily() {
   $('dBurn').value = (typeof d.burn === 'number') ? d.burn : '';
   $('dWeight').value = (typeof d.weight === 'number') ? d.weight : '';
 }
+/* Meze, za kterými hodnota skoro jistě není to, co do políčka patří. Chybný vstup
+   se jinak projeví až o dvě obrazovky dál (váha 1800 kg → cíl 3600 g bílkovin). */
+const MEZE = { burn: [0, 10000, 'Aktivní kcal'], weight: [25, 350, 'Váha'], rmr: [600, 5000, 'Klidový výdej'] };
+function mimoMeze(pole, v) {
+  const m = MEZE[pole];
+  return (v < m[0] || v > m[1]) ? m[2] + ' mimo rozsah ' + m[0] + '–' + m[1] + ' — ' + v + ' nevypadá správně' : null;
+}
 async function saveDaily() {
   const burn = $('dBurn').value.trim(), w = $('dWeight').value.trim();
   const rec = { date: curDate };
-  if (burn !== '') rec.burn = n(burn);
-  if (w !== '') rec.weight = n(w);
+  if (burn !== '') {
+    const b = n(burn), chyba = mimoMeze('burn', b);
+    if (chyba) { toast(chyba); await loadDaily(); return; }
+    rec.burn = b;
+  }
+  if (w !== '') {
+    const kg = n(w), chyba = mimoMeze('weight', kg);
+    if (chyba) { toast(chyba); await loadDaily(); return; }
+    rec.weight = kg;
+  }
   await dbPut('daily', rec);
   toast('Uloženo');
   renderDay();
+  if ($('p-fit').classList.contains('on')) renderFit();
 }
 async function setMode(dyn) {
   goals.dyn = !!dyn;
@@ -4810,6 +4847,7 @@ async function workoutByDay() {
 }
 async function renderFit() {
   syncAddDate();
+  await loadDaily();
   ruckRestore();
   const by = await workoutByDay();
   const sum = k => {
