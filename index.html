@@ -17,6 +17,8 @@
 html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
   font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+.tajne{-webkit-text-security:disc;text-security:disc}
+.tajne.videt{-webkit-text-security:none;text-security:none}
 h1,h2,h3{margin:0 0 8px;font-weight:600}
 h2{font-size:17px}h3{font-size:14px;color:var(--dim);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
@@ -163,6 +165,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="row" style="margin-bottom:10px">
     <button class="btn sm" id="dayPrev" onclick="shiftDay(-1)">‹</button>
     <div class="grow" style="text-align:center"><b id="dayLabel"></b></div>
+    <button class="btn sm" id="daySync" onclick="syncNow(true)" style="display:none"
+      title="Sladit s druhým zařízením" aria-label="Synchronizovat">⟳</button>
     <button class="btn sm" id="dayNext" onclick="shiftDay(1)">›</button>
   </div>
 
@@ -198,19 +202,15 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
-    <h3>Výdej a váha</h3>
-    <div class="grid2">
-      <div class="fld"><label>Aktivní kcal z hodinek</label>
-        <input id="dBurn" type="number" inputmode="numeric" placeholder="0" oninput="dSave()"></div>
-      <div class="fld"><label>Váha (kg)</label>
-        <input id="dWeight" type="number" inputmode="decimal" step="0.1" placeholder="—" oninput="dSave()"></div>
-    </div>
+    <h3>Váha a bilance</h3>
+    <div class="fld"><label>Váha (kg)</label>
+      <input id="dWeight" type="number" inputmode="decimal" step="0.1" placeholder="—" onchange="saveDaily()"></div>
+    <p class="tiny muted" style="margin:-4px 0 10px">Aktivní kcal z hodinek se zapisují na záložce Pohyb.</p>
     <div class="row" style="justify-content:space-between">
       <span class="tiny muted" id="balExp">—</span>
       <b class="mono" id="balVal">—</b>
     </div>
     <p class="tiny muted" id="balHint" style="margin:6px 0 0"></p>
-    <div id="rmrWarnDay" style="display:none;margin-top:10px"></div>
   </div>
 
   <div class="card compact" onclick="go('alc')" style="cursor:pointer">
@@ -607,6 +607,15 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>Z hodinek</h3>
+    <div class="fld"><label>Aktivní kcal za celý den</label>
+      <input id="dBurn" type="number" inputmode="numeric" placeholder="0" onchange="saveDaily()"></div>
+    <p class="tiny muted" style="margin:-4px 0 0">Číslo z hodinek nebo z fitness aplikace za den, který máš
+      nastavený nahoře. Přičítá se ke klidovému výdeji stejně jako aktivity zapsané níž — nezapisuj
+      tedy totéž dvakrát.</p>
+  </div>
+
+  <div class="card">
     <h3 id="fitListHead">Dnešní aktivity</h3>
     <div id="fitList"></div>
   </div>
@@ -669,10 +678,19 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div class="card">
     <h3>Rozbor od Claude</h3>
-    <button class="btn pri full" style="margin-bottom:8px" onclick="copySummary()">Zkopírovat souhrn do schránky</button>
-    <button class="btn full" onclick="dlSummary()">Stáhnout jako soubor</button>
-    <p class="tiny muted" style="margin:8px 0 0">Vlož souhrn do chatu s Claudem a napiš, na co se chceš zeptat.
-      Souhrn neobsahuje nic osobního nad rámec těchhle čísel.</p>
+    <button class="btn pri full" style="margin-bottom:8px" id="rozborBtn" onclick="rozborRun()">✨ Vyhodnotit období</button>
+    <p class="tiny muted" id="rozborMsg" style="margin:0 0 8px"></p>
+    <div id="rozborOut" style="display:none;white-space:pre-wrap;font-size:13px;line-height:1.5;
+      background:var(--card2);border-radius:12px;padding:12px;margin-bottom:8px"></div>
+    <details><summary class="tiny muted" style="cursor:pointer">Radši ručně, bez API klíče</summary>
+      <div style="margin-top:10px">
+        <button class="btn full" style="margin-bottom:8px" onclick="copySummary()">Zkopírovat souhrn do schránky</button>
+        <button class="btn full" onclick="dlSummary()">Stáhnout jako soubor</button>
+        <p class="tiny muted" style="margin:8px 0 0">Vlož souhrn do chatu s Claudem a napiš, na co se chceš zeptat.</p>
+      </div>
+    </details>
+    <p class="tiny muted" style="margin:8px 0 0">Odešle se souhrn za zvolené období a text z Nastavení →
+      O mně. Nic jiného. Rozbor je názor podle čísel, ne lékařská rada.</p>
   </div>
 </section>
 
@@ -709,41 +727,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
 <!-- ============ NASTAVENÍ ============ -->
 <section id="p-set" class="page">
-  <div class="seg" id="setSeg">
-    <button data-t="ja" class="on" onclick="setSetTab('ja')">Já</button>
-    <button data-t="data" onclick="setSetTab('data')">Data</button>
-    <button data-t="app" onclick="setSetTab('app')">Aplikace</button>
-  </div>
-
-  <!-- ---------- JÁ ---------- -->
-  <div class="pane on" id="t-ja">
-  <div class="card">
-    <h3>Moje údaje</h3>
-    <div class="grid2">
-      <div class="fld"><label>Pohlaví</label>
-        <select id="cSex" onchange="gSave()"><option value="m">muž</option><option value="f">žena</option></select></div>
-      <div class="fld"><label>Věk</label>
-        <input id="cAge" type="number" inputmode="numeric" oninput="gSave()"></div>
-      <div class="fld"><label>Výška (cm)</label>
-        <input id="cH" type="number" inputmode="numeric" oninput="gSave()"></div>
-      <div class="fld"><label>Váha (kg)</label>
-        <input id="cW" type="number" inputmode="decimal" oninput="gSave()"></div>
-    </div>
-    <p class="tiny muted" style="margin:0">Váha se sama přebírá z posledního vážení na hlavní stránce.
-      Z těchhle údajů se počítá klidový výdej.</p>
-  </div>
-
-  <div class="card">
-    <h3>Klidový výdej</h3>
-    <div class="fld"><label>Bazální metabolismus (kcal/den)</label>
-      <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750" oninput="gSave()"></div>
-    <button class="btn full" onclick="calcRmr()">Spočítat z mých údajů</button>
-    <div id="rmrWarn" style="display:none;margin-top:10px"></div>
-    <p class="tiny muted" style="margin:10px 0 0">Mifflin–St Jeor, odhad s chybou kolem 10 %.
-      Používá se na výpočet bilance a v režimu „podle zátěže" i na denní cíl energie.
-      Statistiky ho po pár týdnech porovnají se skutečnou změnou váhy.</p>
-  </div>
-
   <div class="card">
     <h3>Jak počítat cíle</h3>
     <div class="seg" id="modeSeg" style="margin-bottom:12px">
@@ -780,52 +763,54 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>Klidový výdej</h3>
+    <div class="fld"><label>Bazální metabolismus (kcal/den)</label>
+      <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750" oninput="gSave()"></div>
+    <p class="tiny" id="gRmrWarn" style="margin:-4px 0 0;color:var(--warn);display:none"></p>
+    <details>
+      <summary class="tiny muted" style="cursor:pointer">Neznám ho — spočítat</summary>
+      <div style="margin-top:10px">
+        <div class="grid2">
+          <div class="fld"><label>Pohlaví</label><select id="cSex"><option value="m">muž</option><option value="f">žena</option></select></div>
+          <div class="fld"><label>Věk</label><input id="cAge" type="number" inputmode="numeric"></div>
+          <div class="fld"><label>Výška (cm)</label><input id="cH" type="number" inputmode="numeric"></div>
+          <div class="fld"><label>Váha (kg)</label><input id="cW" type="number" inputmode="decimal"></div>
+        </div>
+        <button class="btn full" onclick="calcRmr()">Spočítat a doplnit</button>
+        <p class="tiny muted" style="margin:8px 0 0">Mifflin–St Jeor, odhad s chybou kolem 10 %.
+          Statistiky ho po pár týdnech porovnají se skutečnou změnou váhy.</p>
+      </div>
+    </details>
+    <p class="tiny muted" style="margin:10px 0 0">Používá se na výpočet bilance a v režimu
+      „podle zátěže" i na denní cíl energie.</p>
+  </div>
+
+  <div class="card">
+    <h3>O mně — kontext pro rozbor</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Připojí se k číslům, když si na Statistikách necháš
+      udělat rozbor. Napiš, kdo jsi a čeho chceš dosáhnout — věk, výška, jak se hýbeš, co řešíš,
+      na co si dát pozor. Nemusíš to pak psát pokaždé znovu.</p>
+    <div class="fld"><textarea id="gProfil" rows="4" oninput="gSave()"
+      placeholder="Např.: 42 let, 178 cm, sedavá práce, 2x týdně posilovna a o víkendu delší chůze s batohem. Chci zhubnout na 72 kg a udržet sílu. Špatně spím, když jím pozdě."></textarea></div>
+    <p class="tiny muted" style="margin:-4px 0 0">Uloží se samo. Posílá se jen tehdy, když si rozbor sám vyžádáš.</p>
+  </div>
+
+  <div class="card">
     <h3>Alkohol</h3>
     <div class="fld"><label>Limit — průměr za posledních 30 dní (g čistého alkoholu na den, 0 = vypnuto)</label>
       <input id="gAlcDay" type="number" inputmode="decimal" step="0.5" oninput="gSave()"></div>
     <p class="tiny muted" style="margin:-4px 0 0">Aplikace pak počítá, kolik ti do limitu ještě zbývá,
       a řekne ti to v pivech. Orientačně: 10 g/den ≈ pivo 12° obden. Změna se uloží sama.</p>
   </div>
-  </div>
 
-  <!-- ---------- DATA ---------- -->
-  <div class="pane" id="t-data">
-  <div class="card">
-    <h3>Záloha a export</h3>
-    <button class="btn full" style="margin-bottom:8px" onclick="exportData()">Export zálohy (JSON)</button>
-    <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('impFile').click()">Import zálohy</button>
-    <input type="file" id="impFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
-    <button class="btn full" onclick="exportCsv()">Export deníku (CSV)</button>
-    <p class="tiny muted" style="margin:8px 0 0">Data žijí jen v tomhle telefonu. Bez zálohy o ně
-      přijdeš při vyčištění prohlížeče i při přechodu na nový telefon. Záloha neobsahuje API klíč.</p>
-  </div>
-
-  <div class="card">
-    <h3>Externí databáze potravin</h3>
-    <p class="tiny muted" style="margin:0 0 8px" id="extInfo"></p>
-    <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('extFile').click()">
-      Načíst databázi z CSV</button>
-    <input type="file" id="extFile" accept=".csv,.txt,*/*" style="display:none" onchange="readExt(this)">
-    <div id="extRes" class="tiny muted"></div>
-  </div>
-
-  <div class="card" style="border-color:#4a2b2b">
-    <h3>Nevratné operace</h3>
-    <button class="btn dan full" onclick="wipe()">Smazat všechna data</button>
-    <p class="tiny muted" style="margin:8px 0 0">Smaže deník, potraviny, cvičení i nastavení.
-      Nejde vzít zpět — napřed si udělej zálohu.</p>
-  </div>
-  </div>
-
-  <!-- ---------- APLIKACE ---------- -->
-  <div class="pane" id="t-app">
   <div class="card">
     <h3>Claude API — odhad z fotky bez kopírování</h3>
     <p class="tiny muted" style="margin:0 0 10px">S vlastním API klíčem pošle aplikace fotku
       Claudovi přímo a rozpis se vyplní sám. Klíč zůstává jen v tomhle telefonu
       a <b>není součástí zálohy</b>. Bez klíče funguje původní postup přes chat.</p>
     <div class="fld"><label>API klíč (sk-ant-…)</label>
-      <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-api03-…"
+      <input id="apiKey" type="text" class="tajne" autocomplete="off" data-lpignore="true"
+        data-1p-ignore spellcheck="false" placeholder="sk-ant-api03-…"
         onchange="saveApi()"></div>
     <div class="fld"><label>Model</label>
       <select id="apiModel" onchange="saveApi()">
@@ -837,6 +822,75 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>Synchronizace mezi zařízeními</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Data se slučují přes jediný soubor v <b>tvém privátním
+      repozitáři</b> na GitHubu. Nikam jinam neodcházejí. Na obou zařízeních zadej stejný repozitář
+      a token — pak už se všechno srovnává samo.</p>
+    <div class="fld"><label>Repozitář (uživatel/název)</label>
+      <input id="syRepo" autocomplete="off" placeholder="jmeno/kalorie-data" onchange="sySave()"></div>
+    <div class="fld"><label>Token (github_pat_…, oprávnění Contents: Read and write)</label>
+      <input id="syTok" type="text" class="tajne" autocomplete="off" data-lpignore="true"
+        data-1p-ignore spellcheck="false" placeholder="github_pat_…" onchange="sySave()"></div>
+    <button class="btn sm" style="margin:-4px 0 8px" onclick="vidTajne('syTok', this)">Ukázat token</button>
+    <button class="btn full" style="margin-bottom:8px" onclick="syTest()">Vyzkoušet spojení</button>
+    <button class="btn pri full" style="margin-bottom:8px" id="sySyncBtn" onclick="syncNow(true)">Synchronizovat teď</button>
+    <p class="tiny muted" id="syMsg" style="margin:0 0 8px"></p>
+
+    <div class="hr"></div>
+    <h3 style="margin-top:0">Šifrování</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Heslo zadáš na každém zařízení jednou. Data se pak
+      do repozitáře ukládají zašifrovaná — bez hesla je nikdo nepřečte, ani kdyby se k souboru dostal.
+      <b>Heslo si zapiš</b>, nikde jinde než v těchhle zařízeních není a nedá se obnovit.</p>
+    <div class="fld"><label>Heslo (aspoň 8 znaků, na obou zařízeních stejné)</label>
+      <input id="syPass" type="text" class="tajne" autocomplete="off" data-lpignore="true"
+        data-1p-ignore spellcheck="false" placeholder="…"></div>
+    <button class="btn full" style="margin-bottom:8px" onclick="syPassSave()">Zapnout šifrování</button>
+    <p class="tiny muted" id="syPassMsg" style="margin:0 0 8px"></p>
+    <button class="btn full" style="margin-bottom:8px" id="syPassOff" onclick="syPassOff()">Vypnout šifrování</button>
+
+    <div class="hr"></div>
+    <h3 style="margin-top:0">Párování telefonu</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Aby ses nemusel na telefonu trápit s opisováním tokenu:
+      na počítači si nech zobrazit kód a telefonem ho naskenuj. <b>Kód obsahuje token</b> — nefoť ho
+      a nenech si ho přes rameno přečíst.</p>
+    <button class="btn full" style="margin-bottom:8px" onclick="syQrShow()">Zobrazit kód pro spárování</button>
+    <div id="syQr" style="text-align:center"></div>
+    <button class="btn full" style="margin-bottom:8px" onclick="syScanToggle()" id="syScanBtn">Načíst nastavení z kódu</button>
+    <video id="syVid" playsinline muted style="display:none;width:100%;border-radius:12px"></video>
+    <p class="tiny muted" id="syScanMsg" style="margin:0 0 8px"></p>
+
+    <details><summary class="tiny muted">Jak si to jednou nastavit</summary>
+      <ol class="tiny muted" style="margin:8px 0 0;padding-left:18px">
+        <li>Na GitHubu založ <b>privátní</b> repozitář, třeba <span class="mono">kalorie-data</span>. Prázdný stačí.</li>
+        <li>Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> →
+          Generate new token. Expiration klidně <b>No expiration</b>.</li>
+        <li>Repository access → Only select repositories → vyber ten nový repozitář.</li>
+        <li>Permissions → Repository permissions → <b>Contents: Read and write</b>.</li>
+        <li>Vygenerovaný token vlož sem. Totéž zopakuj na druhém zařízení.</li>
+      </ol></details>
+    <div class="hr"></div>
+    <button class="btn dan full" onclick="syLogout()">Odpojit toto zařízení</button>
+  </div>
+
+  <div class="card">
+    <h3>Data</h3>
+    <button class="btn full" style="margin-bottom:8px" onclick="exportData()">Export zálohy (JSON)</button>
+    <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('impFile').click()">Import zálohy</button>
+    <input type="file" id="impFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
+    <button class="btn full" style="margin-bottom:8px" onclick="exportCsv()">Export deníku (CSV)</button>
+    <div class="hr"></div>
+    <h3>Externí databáze potravin</h3>
+    <p class="tiny muted" style="margin:0 0 8px" id="extInfo"></p>
+    <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('extFile').click()">
+      Načíst databázi z CSV</button>
+    <input type="file" id="extFile" accept=".csv,.txt,*/*" style="display:none" onchange="readExt(this)">
+    <div id="extRes" class="tiny muted"></div>
+    <p class="tiny muted" style="margin:8px 0 0">Všechna data jsou jen v tomhle telefonu. Zálohuj si je občas.</p>
+    <div class="hr"></div>
+    <button class="btn dan full" onclick="wipe()">Smazat všechna data</button>
+  </div>
+
+  <div class="card">
     <h3>Verze a aktualizace</h3>
     <div class="row" style="justify-content:space-between;margin-bottom:10px">
       <span class="tiny muted">Nainstalovaná verze</span>
@@ -845,9 +899,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button class="btn pri full" onclick="checkUpdate()">Zkontrolovat aktualizaci</button>
     <p class="tiny muted" id="updMsg" style="margin:8px 0 0">
       Stáhne novou verzi ze serveru a restartuje aplikaci. Data zůstanou.</p>
-    <div class="hr"></div>
-    <p class="tiny muted" id="infoTxt"></p>
   </div>
+
+  <div class="card">
+    <h3>Info</h3>
+    <p class="tiny muted" id="infoTxt"></p>
   </div>
 </section>
 
@@ -988,7 +1044,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.04-45';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.04-50';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1029,7 +1085,7 @@ const pctTxt = v => v > 0 && v < 0.5 ? '<1 %' : r0(v) + ' %';
 let db = null;
 function openDB() {
   return new Promise((res, rej) => {
-    const rq = indexedDB.open('kaltrack', 4);
+    const rq = indexedDB.open('kaltrack', 5);
     rq.onupgradeneeded = e => {
       const d = e.target.result;
       if (!d.objectStoreNames.contains('ext')) d.createObjectStore('ext', { keyPath: 'id' });
@@ -1047,6 +1103,30 @@ function openDB() {
         s.createIndex('date', 'date');
       }
       if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'k' });
+      // v5: náhrobky smazaných záznamů + doplnění uid/upd do starých dat
+      if (!d.objectStoreNames.contains('tomb')) d.createObjectStore('tomb', { keyPath: 'k' });
+      if (e.oldVersion && e.oldVersion < 5) {
+        const t = e.target.transaction;
+        for (const s of ['log', 'workout']) {
+          if (!d.objectStoreNames.contains(s)) continue;
+          t.objectStore(s).openCursor().onsuccess = ev => {
+            const c = ev.target.result; if (!c) return;
+            const v = c.value;
+            if (!v.uid) v.uid = 'm' + (v.ts || 0).toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+            if (!v.upd) v.upd = v.ts || 1;
+            c.update(v); c.continue();
+          };
+        }
+        for (const s of ['products', 'daily', 'ext']) {
+          if (!d.objectStoreNames.contains(s)) continue;
+          t.objectStore(s).openCursor().onsuccess = ev => {
+            const c = ev.target.result; if (!c) return;
+            const v = c.value;
+            if (!v.upd) { v.upd = 1; c.update(v); }   // 1 = „prastaré", cokoli novějšího vyhraje
+            c.continue();
+          };
+        }
+      }
     };
     rq.onsuccess = () => res(rq.result);
     rq.onerror = () => rej(rq.error);
@@ -1056,9 +1136,177 @@ function tx(store, mode) { return db.transaction(store, mode).objectStore(store)
 function req(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 const dbGet = (s, k) => req(tx(s, 'readonly').get(k));
 const dbAll = s => req(tx(s, 'readonly').getAll());
-const dbPut = (s, v) => req(tx(s, 'readwrite').put(v));
-const dbDel = (s, k) => req(tx(s, 'readwrite').delete(k));
 const dbByIdx = (s, i, v) => req(tx(s, 'readonly').index(i).getAll(v));
+
+/* Citlivá pole nejsou type="password" schválně: Chrome kolem takového pole
+   hlídá celý formulář a nabízel ukládání hesla i při psaní čísel jinam.
+   Maskujeme tedy přes CSS; kde to prohlížeč neumí, vrátíme se k type="password". */
+function tajnaPoleUi() {
+  const umi = window.CSS && CSS.supports && (CSS.supports('-webkit-text-security', 'disc') || CSS.supports('text-security', 'disc'));
+  if (umi) return;
+  document.querySelectorAll('input.tajne').forEach(el => { if (!el.classList.contains('videt')) el.type = 'password'; });
+}
+function vidTajne(id, btn) {
+  const el = $(id); if (!el) return;
+  const videt = el.classList.toggle('videt');
+  if (el.type === 'password' || (videt && el.type !== 'text')) el.type = videt ? 'text' : 'password';
+  if (btn) btn.textContent = videt ? 'Skrýt token' : 'Ukázat token';
+}
+
+/* ---------------- synchronizace: identita záznamů ----------------
+   Každý synchronizovaný záznam má `upd` (čas poslední změny) a stabilní `uid`,
+   který platí napříč zařízeními. Mazání zanechá náhrobek ve store `tomb`,
+   jinak by se smazaný záznam při dalším sloučení vrátil z druhého zařízení. */
+const SYNC_STORES = ['log', 'workout', 'products', 'daily', 'ext'];
+const SYNC_META = ['goals', 'drinks'];        // klíč `api` se vědomě nesynchronizuje
+const GEN_UID = ['log', 'workout'];           // stores, kde uid musíme vyrobit
+const TOMB_KEEP = 180 * 86400000;             // náhrobky starší než půl roku zahodíme
+
+var syReady = false;            // true až po načtení nastavení synchronizace
+let lastTs = 0;
+/* nikdy nevrátí stejnou hodnotu dvakrát — dvě změny v téže milisekundě
+   by jinak měly shodné `upd` a slučování by nevědělo, která je novější */
+function nowTs() { const t = Math.max(Date.now(), lastTs + 1); lastTs = t; return t; }
+function newUid() { return nowTs().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
+function uidOf(store, rec) {
+  if (store === 'daily') return rec.date;
+  if (store === 'products' || store === 'ext') return rec.id;
+  return rec.uid;
+}
+const tombKey = (store, uid) => store + '|' + uid;
+
+async function dbPut(s, v) {
+  if (SYNC_STORES.indexOf(s) >= 0) {
+    if (GEN_UID.indexOf(s) >= 0) {
+      // řádek bez lokálního id je nový — nesmí zdědit uid předlohy (kopie jídla ap.)
+      if (v.id === undefined) { delete v.id; v.uid = newUid(); }
+      else if (!v.uid) v.uid = newUid();
+    }
+    v.upd = nowTs();
+    if (syReady) syLater();
+  } else if (s === 'meta' && SYNC_META.indexOf(v.k) >= 0) {
+    v.upd = nowTs();
+    if (syReady) syLater();
+  }
+  return req(tx(s, 'readwrite').put(v));
+}
+async function dbDel(s, k) {
+  if (SYNC_STORES.indexOf(s) >= 0) {
+    const rec = await dbGet(s, k);
+    const u = rec && uidOf(s, rec);
+    if (u) await req(tx('tomb', 'readwrite').put({ k: tombKey(s, u), store: s, uid: u, ts: nowTs() }));
+    if (syReady) syLater();
+  }
+  return req(tx(s, 'readwrite').delete(k));
+}
+/* mazání bez náhrobku — pro lokální úklid, který se nemá šířit na druhé zařízení */
+const dbDelLocal = (s, k) => req(tx(s, 'readwrite').delete(k));
+
+/* ---------------- synchronizace: slučování stavů ----------------
+   Model je „úplný stav + náhrobky", ne přírůstky: sloučení dvou stavů dá vždy
+   týž výsledek bez ohledu na pořadí a na to, kolikrát proběhne. Pravidlo je
+   „vyhrává novější `upd`", náhrobek vyhrává nad záznamem starším než on sám. */
+async function collectState() {
+  const st = { v: 5, ts: Date.now(), meta: {}, tomb: await dbAll('tomb') };
+  for (const s of SYNC_STORES) {
+    const rows = await dbAll(s);
+    // lokální autoIncrement id nemá na druhém zařízení význam — ven neposíláme
+    st[s] = GEN_UID.indexOf(s) >= 0 ? rows.map(r => { const c = Object.assign({}, r); delete c.id; return c; }) : rows;
+  }
+  for (const k of SYNC_META) {
+    const m = await dbGet('meta', k);
+    if (m) st.meta[k] = { v: m.v, upd: m.upd || 1 };
+  }
+  return st;
+}
+
+function mergeState(a, b, now) {
+  now = now || Date.now();
+  const out = { v: 5, ts: now, meta: {}, tomb: [] };
+  /* Data, kterým tahle verze nerozumí (nový store z novější verze aplikace),
+     přeneseme beze změny. Bez toho by starší zařízení novinku ze souboru smazalo. */
+  const zname = SYNC_STORES.concat(['v', 'ts', 'meta', 'tomb']);
+  for (const st of [a, b]) {
+    for (const k in st) if (zname.indexOf(k) < 0) out[k] = st[k];
+  }
+  const tm = new Map();
+  for (const t of (a.tomb || []).concat(b.tomb || [])) {
+    if (!t || !t.k || now - t.ts > TOMB_KEEP) continue;
+    const p = tm.get(t.k);
+    if (!p || t.ts > p.ts) tm.set(t.k, { k: t.k, store: t.store, uid: t.uid, ts: t.ts });
+  }
+  for (const s of SYNC_STORES) {
+    const m = new Map();
+    const take = arr => {
+      for (const r of (arr || [])) {
+        const u = uidOf(s, r); if (!u) continue;
+        const up = r.upd || 1, p = m.get(u);
+        if (!p || up > p.upd) m.set(u, Object.assign({}, r, { upd: up }));   // shoda → drží se první (a)
+      }
+    };
+    take(a[s]); take(b[s]);
+    for (const u of Array.from(m.keys())) {
+      const t = tm.get(tombKey(s, u));
+      if (t && t.ts >= m.get(u).upd) m.delete(u);
+    }
+    out[s] = Array.from(m.values());
+  }
+  for (const k of SYNC_META) {
+    const x = (a.meta || {})[k], y = (b.meta || {})[k];
+    const pick = !x ? y : !y ? x : ((y.upd || 1) > (x.upd || 1) ? y : x);
+    if (pick) out.meta[k] = pick;
+  }
+  out.tomb = Array.from(tm.values());
+  return out;
+}
+
+/* Zapíše sloučený stav do lokální DB. Volat VÝHRADNĚ s výstupem mergeState,
+   který obsahuje i vlastní data — jinak by se lokální záznamy smazaly. */
+async function applyState(st) {
+  let ch = 0;
+  for (const s of SYNC_STORES) {
+    const local = await dbAll(s);
+    const lm = new Map();
+    for (const r of local) lm.set(uidOf(s, r), r);
+    const seen = new Set();
+    for (const r of (st[s] || [])) {
+      const u = uidOf(s, r); if (!u) continue;
+      seen.add(u);
+      const cur = lm.get(u);
+      if (cur && (cur.upd || 1) >= (r.upd || 1)) continue;
+      const rec = Object.assign({}, r);
+      if (GEN_UID.indexOf(s) >= 0) { if (cur) rec.id = cur.id; else delete rec.id; }
+      await req(tx(s, 'readwrite').put(rec));    // schválně mimo dbPut — `upd` se přebírá
+      ch++;
+    }
+    for (const [u, r] of lm) {
+      if (seen.has(u)) continue;
+      await dbDelLocal(s, s === 'daily' ? r.date : r.id);
+      ch++;
+    }
+  }
+  for (const k of SYNC_META) {
+    const n = st.meta && st.meta[k]; if (!n) continue;
+    const cur = await dbGet('meta', k);
+    if (cur && (cur.upd || 1) >= (n.upd || 1)) continue;
+    await req(tx('meta', 'readwrite').put({ k: k, v: n.v, upd: n.upd || 1 }));
+    ch++;
+  }
+  await req(tx('tomb', 'readwrite').clear());
+  for (const t of (st.tomb || [])) await req(tx('tomb', 'readwrite').put(t));
+  return ch;
+}
+
+/* po sloučení je potřeba obnovit paměťové kopie a překreslit */
+async function reloadAfterSync() {
+  products = await dbAll('products');
+  extFoods = await dbAll('ext');
+  const g = await dbGet('meta', 'goals'); if (g && g.v) goals = Object.assign(goals, g.v);
+  const d = await dbGet('meta', 'drinks'); if (d && Array.isArray(d.v) && d.v.length) drinks = d.v;
+  fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info(); extInfoTxt();
+  if ($('p-fit') && $('p-fit').classList.contains('on')) renderFit();
+  if ($('p-alc').classList.contains('on')) renderAlc();
+}
 
 /* ---------------- state ---------------- */
 let products = [];            // cache
@@ -1138,18 +1386,36 @@ function offCachePut(k, v) {
   products = await dbAll('products');
   try { extFoods = await dbAll('ext'); } catch (e) { extFoods = []; }
   fillGoals();
-  fillProfileWeight();
   renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
   // po prvním úspěšném zpracování fotky se návody sbalí — tlačítka zůstávají
   const fotoOk = await dbGet('meta', 'fotoOk');
   if (fotoOk) ['fotoHelp1', 'fotoHelp2'].forEach(id => { if ($(id)) $(id).removeAttribute('open'); });
   await loadApi();
+  await loadSync();
+  await loadCrypt();
+  tajnaPoleUi();
+  await loadRozbor();
   await renderDay();
   checkBackup();
   obCheck();
   renderDb();
   info();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (syCfg.on) syncNow(false);
+  document.addEventListener('visibilitychange', () => {
+    // návrat k aplikaci: srovnat, ale ne častěji než jednou za minutu
+    if (!document.hidden && syCfg.on && Date.now() - (syCfg.last || 0) > 60000) syncNow(false);
+  });
+  window.addEventListener('online', () => { if (syCfg.on) syLater(); });
+  window.addEventListener('focus', () => {
+    if (syCfg.on && Date.now() - (syCfg.last || 0) > 30000) syncNow(false);
+  });
+  /* Otevřené okno, na které se člověk dívá, se samo nedozví o zápisu z druhého
+     zařízení — proto se jednou za dvě minuty zeptá. Když se nic nezměnilo,
+     je to jen dotaz, žádný commit. */
+  setInterval(() => {
+    if (syCfg.on && !document.hidden && !sySyncing && Date.now() - (syCfg.last || 0) > 120000) syncNow(false);
+  }, 60000);
   // požádej prohlížeč, ať úložiště nemaže při nedostatku místa
   if (navigator.storage && navigator.storage.persist) {
     try {
@@ -1223,18 +1489,10 @@ function go(p) {
   if (p === 'stats') renderStats();
   if (p === 'alc') renderAlc();
   if (p === 'fit') renderFit();
-  // Víc se vždy otevře na kartě Já — Data a Aplikace jsou jen občasné návštěvy
-  if (p === 'set') { setSetTab('ja'); dynUi(); fillProfileWeight(); rmrCheck(); }
+  if (p === 'set') dynUi();
   window.scrollTo(0, 0);
 }
 function closeMod(id) { $(id).classList.remove('on'); }
-
-/* podzáložky na stránce Víc: Já · Data · Aplikace */
-function setSetTab(t) {
-  document.querySelectorAll('#p-set .pane').forEach(e => e.classList.toggle('on', e.id === 't-' + t));
-  document.querySelectorAll('#setSeg button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
-  window.scrollTo(0, 0);
-}
 
 /* podzáložky na stránce Zadat */
 function setAdd(k) {
@@ -1400,7 +1658,6 @@ async function renderDay() {
 
   await loadDaily();
   await renderBalance(t.k, wkToday);
-  rmrCheck();
 
   // alkohol: dnes + posledních 7 dní
   const wStart = new Date(curDate + 'T12:00:00'); wStart.setDate(wStart.getDate() - 6);
@@ -1422,7 +1679,6 @@ async function renderDay() {
     `<button class="btn sm" onclick="openPortion('${sid(p.id)}')">${esc(p.name)}</button>`).join('')
     : '<span class="tiny muted">Nejpoužívanější položky se objeví tady.</span>';
 }
-async function delLog(id) { await dbDel('log', id); renderDay(); }
 /* smazání s možností vrátit — záznam se podrží v paměti po dobu toastu */
 async function delLogUndo(id) {
   const rec = await dbGet('log', id);
@@ -1923,7 +2179,7 @@ async function saveRecipe(alsoAdd) {
   const w = n($('recW').value) || t.g;
   if (w <= 0) { toast('Nulová hmotnost'); return; }
   const p = {
-    id: 'r' + Date.now().toString(36), barcode: null, name, brand: 'recept', unit: 'g',
+    id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), barcode: null, name, brand: 'recept', unit: 'g',
     kcal: r1(t.kcal / w * 100), p: r1(t.p / w * 100), c: r1(t.c / w * 100), f: r1(t.f / w * 100),
     fib: r1(t.fib / w * 100), salt: r1(t.salt / w * 100), serving: r0(w), source: 'recipe',
     ing: recIngs.map(x => ({ nazev: x.nazev, mn: x.mn })),
@@ -2329,7 +2585,8 @@ async function copyMeal(mealKey) {
   const src = (await dbByIdx('log', 'date', dstr(y))).filter(r => (r.meal || '') === mealKey);
   if (!src.length) { toast('Včera v tomhle jídle nic nebylo'); return; }
   for (const r of src) {
-    const c = Object.assign({}, r); delete c.id; c.date = curDate; c.ts = Date.now();
+    const c = Object.assign({}, r); delete c.id; delete c.uid; delete c.upd;   // kopie = nový záznam
+    c.date = curDate; c.ts = Date.now();
     await dbPut('log', c);
   }
   toast('Zkopírováno: ' + src.length + ' ' + plur(src.length, 'položka', 'položky', 'položek'));
@@ -2356,7 +2613,13 @@ function openEdit(id, presetCode) {
   $('edServ').value = p && p.serving ? p.serving : '';
   $('edDel').style.display = p ? '' : 'none';
   $('modEdit').classList.add('on');
-  if (!p) setTimeout(() => $('edName').focus(), 120);
+  // kurzor do názvu, ale jen když uživatel mezitím nezačal psát jinam —
+  // jinak by odložené přeskočení fokusu přepsalo rozepsané pole (kód skončil v názvu)
+  if (!p) setTimeout(() => {
+    const a = document.activeElement;
+    if (a && a !== document.body && $('modEdit').contains(a)) return;
+    $('edName').focus();
+  }, 120);
 }
 async function saveProduct() {
   const name = $('edName').value.trim();
@@ -2394,6 +2657,12 @@ async function deleteProduct() {
 }
 
 /* ---------------- goals ---------------- */
+function rmrWarnUi() {
+  const el = $('gRmrWarn'); if (!el) return;
+  const chyba = goals.rmr ? mimoMeze('rmr', goals.rmr) : null;
+  el.textContent = chyba || '';
+  el.style.display = chyba ? '' : 'none';
+}
 function fillGoals() {
   $('gKcal').value = goals.kcal; $('gP').value = goals.p; $('gC').value = goals.c;
   $('gF').value = goals.f; $('gAlcDay').value = goals.alcDay || 0;
@@ -2404,20 +2673,9 @@ function fillGoals() {
   dynUi();
   $('gFib').value = goals.fib || 30; $('gSalt').value = goals.salt || 5;
   if ($('gProj')) $('gProj').checked = !!goals.proj;
-  // profil: pohlaví, věk, výška se pamatují; váha se přebírá z posledního vážení
-  if ($('cSex')) {
-    $('cSex').value = goals.sex || 'm';
-    $('cAge').value = goals.age || '';
-    $('cH').value = goals.height || '';
-    if (goals.w && !$('cW').value) $('cW').value = goals.w;
-  }
+  if ($('gProfil')) $('gProfil').value = goals.profil || '';
+  rmrWarnUi();
   projUi();
-}
-/* váhu v profilu drží deník — poslední vážení přepíše ručně zadanou hodnotu */
-async function fillProfileWeight() {
-  if (!$('cW')) return;
-  const w = await lastWeight(dstr(new Date()));
-  if (w) $('cW').value = r1(w);
 }
 /* autosave nastavení: uloží se 0,6 s po poslední změně, žádné tlačítko */
 let gSaveT = null;
@@ -2433,15 +2691,11 @@ async function saveGoals() {
     fKg: ($('gFKg') && n($('gFKg').value)) || 0.9,
     fib: n($('gFib').value) || 30, salt: n($('gSalt').value) || 5,
     proj: $('gProj') ? $('gProj').checked : !!goals.proj,
-    // profil — potřebný pro výpočet i pro hlídání změny váhy
-    sex: $('cSex') ? $('cSex').value : (goals.sex || 'm'),
-    age: $('cAge') ? n($('cAge').value) : (goals.age || 0),
-    height: $('cH') ? n($('cH').value) : (goals.height || 0),
-    w: $('cW') ? n($('cW').value) : (goals.w || 0),
-    rmrW: goals.rmrW || 0            // váha, při které byl klidový výdej naposledy spočítán
+    profil: $('gProfil') ? $('gProfil').value.trim() : (goals.profil || '')
   };
   await dbPut('meta', { k: 'goals', v: goals });
-  dynUi(); renderDay(); rmrCheck(); toast('Uloženo');
+  rmrWarnUi();
+  dynUi(); renderDay(); toast('Uloženo');
 }
 
 /* ---------------- export / import ---------------- */
@@ -2469,9 +2723,9 @@ async function checkBackup() {
 
 async function exportData() {
   const data = {
-    v: 4, exported: new Date().toISOString(), goals, drinks,
+    v: 5, exported: new Date().toISOString(), goals, drinks,
     products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily'),
-    ext: await dbAll('ext'), workout: await dbAll('workout')
+    ext: await dbAll('ext'), workout: await dbAll('workout'), tomb: await dbAll('tomb')
   };
   dl('kalorie-zaloha-' + dstr(new Date()) + '.json', JSON.stringify(data, null, 1));
   await dbPut('meta', { k: 'lastBackup', v: Date.now() });
@@ -2495,30 +2749,54 @@ function importData(inp) {
     try {
       const d = JSON.parse(fr.result);
       let np = 0, nl = 0, skip = 0;
-      for (const p of (d.products || [])) { await dbPut('products', p); np++; }
-      // otisk záznamu — brání zdvojení při opakovaném importu téže zálohy
-      const sig = r => [r.date, r.ts, r.name, r1(r.amount), r0(r.kcal)].join('|');
-      const have = new Set((await dbAll('log')).map(sig));
-      for (const l of (d.log || [])) {
-        const c = Object.assign({}, l); delete c.id;
-        if (have.has(sig(c))) { skip++; continue; }
-        have.add(sig(c));
-        await dbPut('log', c); nl++;
+      for (const p of (d.products || [])) {
+        const old = await dbGet('products', p.id);
+        if (old && (old.upd || 1) >= (p.upd || 1)) continue;
+        await req(tx('products', 'readwrite').put(Object.assign({ upd: 1 }, p)));
+        np++;
       }
-      for (const x of (d.daily || [])) await dbPut('daily', x);
-      // cvičení — otisk brání zdvojení při opakovaném importu
-      const wsig = r => [r.date, r.ts, r.name, r0(r.kcal)].join('|');
-      const whave = new Set((await dbAll('workout')).map(wsig));
-      for (const x of (d.workout || [])) {
-        const c = Object.assign({}, x); delete c.id;
-        if (whave.has(wsig(c))) continue;
-        whave.add(wsig(c));
-        await dbPut('workout', c);
+      // uid rozpozná týž záznam i po opravě; u starých záloh bez uid slouží otisk
+      const impRows = async (store, sig) => {
+        const cur = await dbAll(store);
+        const byUid = new Map(), bySig = new Set();
+        for (const r of cur) { if (r.uid) byUid.set(r.uid, r); bySig.add(sig(r)); }
+        let n = 0, sk = 0;
+        for (const x of (d[store] || [])) {
+          const c = Object.assign({}, x); delete c.id;
+          const old = c.uid && byUid.get(c.uid);
+          if (old) {
+            if ((old.upd || 1) >= (c.upd || 1)) { sk++; continue; }   // lokální je novější
+            c.id = old.id;
+          } else if (!c.uid && bySig.has(sig(c))) { sk++; continue; }
+          if (!c.uid) c.uid = newUid();
+          if (!c.upd) c.upd = c.ts || 1;
+          bySig.add(sig(c));
+          if (c.uid) byUid.set(c.uid, c);
+          c.id = await req(tx(store, 'readwrite').put(c));   // mimo dbPut — `upd` ze zálohy zůstává
+          n++;
+        }
+        return [n, sk];
+      };
+      const [nlog, slog] = await impRows('log', r => [r.date, r.ts, r.name, r1(r.amount), r0(r.kcal)].join('|'));
+      nl = nlog; skip = slog;
+      await impRows('workout', r => [r.date, r.ts, r.name, r0(r.kcal)].join('|'));
+      for (const x of (d.daily || [])) {
+        const old = await dbGet('daily', x.date);
+        if (old && (old.upd || 1) >= (x.upd || 1)) continue;
+        await req(tx('daily', 'readwrite').put(Object.assign({ upd: 1 }, x)));
       }
+      for (const t of (d.tomb || [])) if (t && t.k) await req(tx('tomb', 'readwrite').put(t));
       if (Array.isArray(d.ext) && d.ext.length) {
-        for (const x of d.ext) await dbPut('ext', x);
+        for (const x of d.ext) {
+          const old = await dbGet('ext', x.id);
+          if (old && (old.upd || 1) >= (x.upd || 1)) continue;
+          await req(tx('ext', 'readwrite').put(Object.assign({ upd: 1 }, x)));
+        }
         extFoods = await dbAll('ext'); extInfoTxt();
       }
+      // náhrobky ze zálohy uplatníme na výsledek — sloučení stavu se sebou samým
+      const selfSt = await collectState();
+      await applyState(mergeState(selfSt, selfSt));
       if (d.goals) { goals = Object.assign(goals, d.goals); await dbPut('meta', { k: 'goals', v: goals }); fillGoals(); }
       if (Array.isArray(d.drinks) && d.drinks.length) {
         drinks = d.drinks; await dbPut('meta', { k: 'drinks', v: drinks });
@@ -2534,16 +2812,54 @@ function importData(inp) {
   fr.readAsText(file);
 }
 async function wipe() {
-  if (!confirm('Opravdu smazat úplně všechno? Nejde vrátit.')) return;
+  // Se zapnutou synchronizací je „smazat všechno" zavádějící: v telefonu se sice
+  // smaže, ale druhé zařízení má data pořád a při dalším sladění je pošle zpátky.
+  // Smazat je opravdu všude jde jen tak, že se ke každému záznamu pošle náhrobek.
+  let vsude = false;
+  if (syCfg.on) {
+    if (!confirm('Smazat data v tomhle zařízení?\n\nPozor: máš zapnutou synchronizaci. ' +
+      'Druhé zařízení data pořád má a po připojení se sem vrátí.')) return;
+    vsude = confirm('Smazat je i na ostatních zařízeních?\n\n' +
+      'OK = smaže se všude, jakmile se ostatní zařízení připojí. Nejde vrátit.\n' +
+      'Zrušit = smaže se jen tady a toto zařízení se odpojí od synchronizace.');
+    if (vsude && !(await wipeVsude())) return;
+  } else if (!confirm('Opravdu smazat úplně všechno? Nejde vrátit.')) return;
   await new Promise(r => {
-    const t = db.transaction(['products', 'log', 'meta', 'daily', 'ext', 'workout'], 'readwrite');
+    const t = db.transaction(['products', 'log', 'meta', 'daily', 'ext', 'workout', 'tomb'], 'readwrite');
     t.objectStore('products').clear(); t.objectStore('log').clear();
     t.objectStore('meta').clear(); t.objectStore('daily').clear();
-    t.objectStore('ext').clear(); t.objectStore('workout').clear(); t.oncomplete = r;
+    t.objectStore('ext').clear(); t.objectStore('workout').clear();
+    t.objectStore('tomb').clear(); t.oncomplete = r;
   });
+  syCfg = { repo: '', token: '', path: 'kalorie-sync.json', last: 0, on: false };
+  syReady = false; syKey = null; sySalt = null; syKeyRead = null; syUi(); syPassNote(''); syCryptUi();
+  if ($('syRepo')) { $('syRepo').value = ''; $('syTok').value = ''; }
   products = []; extFoods = []; goals = { kcal: 2000, p: 130, c: 220, f: 65, alcDay: 0, rmr: 0, fib: 30, salt: 5 }; drinks = DEF_DRINKS.slice();
   fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info();
-  extInfoTxt(); toast('Smazáno');
+  extInfoTxt(); toast(vsude ? 'Smazáno všude' : 'Smazáno');
+}
+/* ke každému záznamu vyrobí náhrobek a pošle je nahoru — teprve to smaže data
+   i na ostatních zařízeních; vrací false, když se nepodařilo nahrát */
+async function wipeVsude() {
+  const st = await collectState();
+  const cas = nowTs();
+  const klice = [];
+  for (const s of SYNC_STORES) {
+    for (const r of (st[s] || [])) {
+      const u = uidOf(s, r); if (!u) continue;
+      const k = tombKey(s, u);
+      await req(tx('tomb', 'readwrite').put({ k: k, store: s, uid: u, ts: cas }));
+      klice.push(k);
+    }
+  }
+  if (!klice.length) return true;
+  const ok = await syncNow(true);
+  if (!ok) {
+    // náhrobky musí pryč, jinak by příští sladění data smazalo bez zeptání
+    for (const k of klice) await req(tx('tomb', 'readwrite').delete(k));
+    toast('Nepodařilo se spojit — nemazal jsem nic. Zkus to online.');
+  }
+  return ok;
 }
 
 /* ---------------- foto → AI odhad ---------------- */
@@ -2911,7 +3227,7 @@ async function aiSave(asRecipe) {
   if (asRecipe) {
     if (s.g <= 0) { toast('Nulová hmotnost'); return; }
     const p = {
-      id: 'r' + Date.now().toString(36), barcode: null, name, brand: 'recept', unit: 'g',
+      id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), barcode: null, name, brand: 'recept', unit: 'g',
       kcal: r1(s.k / s.g * 100), p: r1(s.p / s.g * 100), c: r1(s.c / s.g * 100), f: r1(s.f / s.g * 100),
       fib: 0, salt: 0, serving: r0(s.g), source: 'recipe',
       ing: aiItems.slice(), uses: 1, createdAt: Date.now(), updatedAt: Date.now()
@@ -2946,17 +3262,30 @@ async function loadDaily() {
   $('dBurn').value = (typeof d.burn === 'number') ? d.burn : '';
   $('dWeight').value = (typeof d.weight === 'number') ? d.weight : '';
 }
-/* autosave výdeje a váhy — uloží se 0,6 s po dopsání, ať se nic neztratí při zamknutí telefonu */
-let dSaveT = null;
-function dSave() { clearTimeout(dSaveT); dSaveT = setTimeout(saveDaily, 600); }
+/* Meze, za kterými hodnota skoro jistě není to, co do políčka patří. Chybný vstup
+   se jinak projeví až o dvě obrazovky dál (váha 1800 kg → cíl 3600 g bílkovin). */
+const MEZE = { burn: [0, 10000, 'Aktivní kcal'], weight: [25, 350, 'Váha'], rmr: [600, 5000, 'Klidový výdej'] };
+function mimoMeze(pole, v) {
+  const m = MEZE[pole];
+  return (v < m[0] || v > m[1]) ? m[2] + ' mimo rozsah ' + m[0] + '–' + m[1] + ' — ' + v + ' nevypadá správně' : null;
+}
 async function saveDaily() {
   const burn = $('dBurn').value.trim(), w = $('dWeight').value.trim();
   const rec = { date: curDate };
-  if (burn !== '') rec.burn = n(burn);
-  if (w !== '') rec.weight = n(w);
+  if (burn !== '') {
+    const b = n(burn), chyba = mimoMeze('burn', b);
+    if (chyba) { toast(chyba); await loadDaily(); return; }
+    rec.burn = b;
+  }
+  if (w !== '') {
+    const kg = n(w), chyba = mimoMeze('weight', kg);
+    if (chyba) { toast(chyba); await loadDaily(); return; }
+    rec.weight = kg;
+  }
   await dbPut('daily', rec);
   toast('Uloženo');
   renderDay();
+  if ($('p-fit').classList.contains('on')) renderFit();
 }
 async function setMode(dyn) {
   goals.dyn = !!dyn;
@@ -2982,46 +3311,13 @@ async function dynUi() {
         'kolik ten den spálíš. Pevné cíle výše se v tomhle režimu nepoužijí.';
 }
 
-/* Mifflin–St Jeor z uložených údajů profilu */
-function bmrFor(w) {
-  if (!w || !goals.age || !goals.height) return 0;
-  return r0(10 * w + 6.25 * goals.height - 5 * goals.age + (goals.sex === 'f' ? -161 : 5));
-}
 function calcRmr() {
   const s = $('cSex').value, a = n($('cAge').value), h = n($('cH').value), w = n($('cW').value);
   if (!a || !h || !w) { toast('Vyplň věk, výšku a váhu'); return; }
   const bmr = 10 * w + 6.25 * h - 5 * a + (s === 'm' ? 5 : -161);
   $('gRmr').value = r0(bmr);
-  goals.rmrW = w;                       // zapamatuj váhu, ať poznáme pozdější změnu
   saveGoals();                          // autosave — žádné tlačítko Uložit už není
-  toast('Spočítáno a uloženo: ' + r0(bmr) + ' kcal');
-}
-/* Váha se od posledního výpočtu posunula? Nabídni přepočet — automaticky nic neměníme. */
-async function applyRmr(v, w) {
-  goals.rmr = v; goals.rmrW = w;
-  if ($('gRmr')) $('gRmr').value = v;
-  await dbPut('meta', { k: 'goals', v: goals });
-  toast('Klidový výdej přepočítán na ' + v + ' kcal');
-  renderDay(); rmrCheck();
-}
-async function rmrCheck() {
-  const boxes = [$('rmrWarn'), $('rmrWarnDay')].filter(Boolean);
-  if (!boxes.length) return;
-  const hide = () => boxes.forEach(b => { b.style.display = 'none'; b.innerHTML = ''; });
-  const w = await lastWeight(dstr(new Date()));
-  const base = goals.rmrW || 0;
-  if (!goals.rmr || !base || !w || !goals.age || !goals.height) { hide(); return; }
-  const d = w - base;
-  if (Math.abs(d) < 2) { hide(); return; }
-  const nv = bmrFor(w);
-  if (!nv || nv === r0(goals.rmr)) { hide(); return; }
-  const html = '<div class="card" style="margin:0;padding:10px;background:#241f14;border-color:#4a3a20">' +
-    '<p class="tiny" style="margin:0 0 8px">Od posledního výpočtu ' +
-    (d < 0 ? 'jsi zhubl o ' : 'jsi přibral ') + r1(Math.abs(d)) + ' kg (' + r1(base) + ' → ' + r1(w) +
-    ' kg). Klidový výdej podle nové váhy vychází na <b style="color:var(--fg)">' + nv + ' kcal</b>, ' +
-    'teď počítáš s ' + r0(goals.rmr) + '.</p>' +
-    '<button class="btn sm pri full" onclick="applyRmr(' + nv + ',' + w + ')">Přepočítat na ' + nv + ' kcal</button></div>';
-  boxes.forEach(b => { b.innerHTML = html; b.style.display = ''; });
+  toast('Doplněno a uloženo: ' + r0(bmr) + ' kcal');
 }
 async function renderBalance(intake, wk) {
   const d = await dbGet('daily', curDate) || {};
@@ -3461,6 +3757,83 @@ function summaryText() {
   }
   return L.join('\n');
 }
+/* --- rozbor období přes Claude API --- */
+async function apiText(prompt, maxTok) {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', signal: ctrl.signal,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiCfg.key, 'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: apiCfg.model, max_tokens: maxTok || 1500,
+        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }]
+      })
+    });
+    const j = await res.json().catch(() => null);
+    if (res.status === 401) throw new Error('neplatný klíč — zkontroluj ho v Nastavení');
+    if (res.status === 429) throw new Error('příliš mnoho dotazů, zkus to za chvíli');
+    if (res.status === 400 && j && /credit/i.test(JSON.stringify(j))) throw new Error('došel kredit na console.anthropic.com');
+    if (!res.ok) throw new Error((j && j.error && j.error.message) || ('HTTP ' + res.status));
+    return (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+  } finally { clearTimeout(to); }
+}
+function rozborPrompt() {
+  const kdo = (goals.profil || '').trim();
+  return [
+    'Jsi výživový a tréninkový poradce. Odpovídej česky, věcně a stručně, bez frází a bez chválení.',
+    'Dostáváš souhrn z aplikace na sledování jídla, pohybu a alkoholu.',
+    '',
+    kdo ? 'O UŽIVATELI (napsal sám):\n' + kdo : 'O uživateli nevíme nic nad rámec čísel níže.',
+    '',
+    summaryText(),
+    '',
+    'Napiš rozbor v tomhle pořadí a nic nepřidávej:',
+    '1) JAK TO DOPADLO — tři až pět vět o tom, co čísla za období říkají.',
+    '2) CO STOJÍ ZA POZORNOST — konkrétní věci, dobré i špatné, vždy s číslem z dat.',
+    '3) NA PŘÍŠTĚ — tři až pět doporučení, každé jednou větou a proveditelné do týdne.',
+    '',
+    'Pravidla: opírej se jen o data výše, nedomýšlej si. Když něco nejde z dat určit, řekni to.',
+    'Nedoporučuj krajní kroky (hladovky, velmi nízký příjem, drastické zvýšení objemu tréninku).',
+    'Když je příjem dlouhodobě velmi nízký, hubnutí příliš rychlé nebo alkohol vysoký, řekni to na rovinu.',
+    'Nediagnostikuj a u zdravotních věcí odkaž na lékaře. Nepiš úvod ani závěrečné shrnutí.'
+  ].join('\n');
+}
+async function rozborRun() {
+  if (!apiCfg.key) { rozborNote('✕ Nejdřív vlož klíč ke Claude API v Nastavení.'); return; }
+  if (!statCache) { rozborNote('✕ Nejdřív si nech spočítat statistiky.'); return; }
+  if (!statCache.a.logged) { rozborNote('✕ Za tohle období nejsou žádné záznamy.'); return; }
+  const btn = $('rozborBtn');
+  btn.disabled = true; btn.textContent = 'Přemýšlím…';
+  rozborNote('Posílám souhrn za ' + period + ' dní…');
+  try {
+    const txt = await apiText(rozborPrompt());
+    rozborShow(txt);
+    await dbPut('meta', { k: 'rozbor', v: { txt: txt, kdy: Date.now(), dny: period } });
+    rozborNote('Rozbor za ' + period + ' dní · ' + new Date().toLocaleString('cs-CZ'));
+  } catch (e) {
+    rozborNote('✕ Nepovedlo se: ' + (e.name === 'AbortError' ? 'vypršel čas' : e.message));
+  } finally {
+    btn.disabled = false; btn.textContent = '✨ Vyhodnotit období';
+  }
+}
+function rozborNote(t) { if ($('rozborMsg')) $('rozborMsg').textContent = t; }
+function rozborShow(t) {
+  const el = $('rozborOut'); if (!el) return;
+  el.textContent = t || '';
+  el.style.display = t ? '' : 'none';
+}
+async function loadRozbor() {
+  const m = await dbGet('meta', 'rozbor');
+  if (m && m.v && m.v.txt) {
+    rozborShow(m.v.txt);
+    rozborNote('Rozbor za ' + m.v.dny + ' dní · ' + new Date(m.v.kdy).toLocaleString('cs-CZ'));
+  }
+}
 async function copySummary() {
   const t = summaryText(); if (!t) { toast('Nejdřív otevři statistiky'); return; }
   try { await navigator.clipboard.writeText(t); toast('Souhrn zkopírován'); }
@@ -3475,6 +3848,418 @@ function dlSummary() {
   dl('kalorie-souhrn-' + period + 'd-' + dstr(new Date()) + '.txt', t, 'text/plain');
   toast('Staženo');
 }
+
+/* ---------------- synchronizace přes GitHub ----------------
+   Jeden soubor v privátním repozitáři drží sloučený stav. Postup je vždy
+   stáhnout → sloučit → zapsat lokálně → nahrát, a zápis se posílá se `sha`
+   staženého souboru: kdyby mezitím psalo druhé zařízení, GitHub zápis odmítne
+   a kolo se zopakuje. Díky tomu se nemůže stát, že jeden přepíše druhého. */
+let syCfg = { repo: '', token: '', path: 'kalorie-sync.json', last: 0, on: false };
+let sySyncing = false, syDirty = false, syTimer = null;
+
+async function loadSync() {
+  const m = await dbGet('meta', 'sync');
+  if (m && m.v) syCfg = Object.assign(syCfg, m.v);
+  syCfg.on = !!(syCfg.repo && syCfg.token);
+  if ($('syRepo')) { $('syRepo').value = syCfg.repo || ''; $('syTok').value = syCfg.token || ''; }
+  syReady = syCfg.on;
+  syUi();
+}
+async function syStore() { await dbPut('meta', { k: 'sync', v: syCfg }); }
+async function sySave() {
+  syCfg.repo = ($('syRepo').value || '').trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
+  syCfg.token = ($('syTok').value || '').trim();
+  syCfg.on = !!(syCfg.repo && syCfg.token);
+  syReady = syCfg.on;
+  await syStore(); syUi();
+  syNote(syCfg.on ? 'Uloženo. Zkus Vyzkoušet spojení.' : 'Vyplň repozitář i token.');
+}
+async function syLogout() {
+  if (!confirm('Odpojit? Data v telefonu zůstanou, jen se přestanou synchronizovat.')) return;
+  syCfg = { repo: '', token: '', path: 'kalorie-sync.json', last: 0, on: false };
+  syReady = false;
+  await syStore();
+  syKey = null; sySalt = null; syKeyRead = null;
+  await dbDelLocal('meta', 'crypt');       // heslo se po odpojení zadává znovu
+  if ($('syRepo')) { $('syRepo').value = ''; $('syTok').value = ''; }
+  syUi(); syPassNote(''); syCryptUi(); syNote('Odpojeno.');
+}
+function syNote(t) { if ($('syMsg')) $('syMsg').textContent = t; }
+function syUi() {
+  if ($('daySync')) $('daySync').style.display = syCfg.on ? '' : 'none';
+  if (!$('sySyncBtn')) return;
+  $('sySyncBtn').disabled = !syCfg.on;
+  if (!sySyncing && syCfg.last) syNote('Naposledy sladěno ' + new Date(syCfg.last).toLocaleString('cs-CZ') + '.');
+}
+/* stav tlačítka na hlavní stránce: klid ⟳ · probíhá ⟳… · povedlo se ✓ · nepovedlo ✕ */
+function syBtn(stav) {
+  const b = $('daySync'); if (!b) return;
+  b.textContent = stav === 'bezi' ? '⟳…' : stav === 'ok' ? '✓' : stav === 'chyba' ? '✕' : '⟳';
+  b.disabled = stav === 'bezi';
+  if (stav === 'ok' || stav === 'chyba') setTimeout(() => { if (!sySyncing) syBtn(); }, 2500);
+}
+
+/* ---- převody: text ↔ bajty ↔ base64 ---- */
+function b64FromBytes(u8) {
+  let s = '';
+  for (let i = 0; i < u8.length; i += 8192) s += String.fromCharCode.apply(null, u8.subarray(i, i + 8192));
+  return btoa(s);
+}
+function bytesFromB64(b64) {
+  const s = atob(b64.replace(/\s+/g, ''));
+  const u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+  return u;
+}
+async function syGzip(u8) {
+  if (typeof CompressionStream === 'undefined') return null;
+  const cs = new CompressionStream('gzip');
+  const buf = await new Response(new Blob([u8]).stream().pipeThrough(cs)).arrayBuffer();
+  return new Uint8Array(buf);
+}
+async function syGunzip(u8) {
+  const ds = new DecompressionStream('gzip');
+  const buf = await new Response(new Blob([u8]).stream().pipeThrough(ds)).arrayBuffer();
+  return new Uint8Array(buf);
+}
+
+/* ---- šifrování ----------------------------------------------------
+   Klíč se odvodí z hesla (PBKDF2) a uloží se do IndexedDB jako CryptoKey,
+   který nejde přečíst — v úložišti tedy neleží heslo ani klíč v čitelné podobě.
+   Sůl si drží soubor v repozitáři, aby druhé zařízení odvodilo tentýž klíč. */
+let syKey = null, sySalt = null;
+/* klíč jen pro čtení: po vypnutí šifrování je pořád potřeba přečíst starý
+   zašifrovaný soubor, jinak by ho zařízení nemělo jak přepsat */
+let syKeyRead = null;
+const SY_ITER = 200000;
+
+async function syDerive(heslo, salt) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(heslo), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: SY_ITER, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function loadCrypt() {
+  const m = await dbGet('meta', 'crypt');
+  if (m && m.v && m.v.key) { syKey = m.v.key; sySalt = new Uint8Array(m.v.salt); }
+  syCryptUi();
+}
+function syCryptUi() {
+  if (!$('syPassOff')) return;
+  $('syPassOff').style.display = syKey ? '' : 'none';
+  if ($('syPassMsg') && !$('syPassMsg').textContent)
+    $('syPassMsg').textContent = syKey ? '✓ Šifrování je zapnuté.' : 'Zatím se ukládá nezašifrovaně.';
+}
+function syPassNote(t) { if ($('syPassMsg')) $('syPassMsg').textContent = t; }
+
+async function syPassSave() {
+  const heslo = ($('syPass').value || '');
+  if (heslo.length < 8) { syPassNote('✕ Heslo musí mít aspoň 8 znaků.'); return; }
+  syPassNote('Odvozuji klíč…');
+  try {
+    // sůl bere ze souboru, pokud už nějaký zašifrovaný v repozitáři je
+    let salt = null, kontrola = null;
+    if (syCfg.on && navigator.onLine) {
+      const f = await syFetch();
+      if (f) {
+        const o = JSON.parse(f.text);
+        if (o && o.enc) { salt = bytesFromB64(o.salt); kontrola = o; }
+      }
+    }
+    if (!salt) salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await syDerive(heslo, salt);
+    if (kontrola) {
+      // ověříme, že heslo sedí — jinak by se stav rozpadl až při prvním sladění
+      try {
+        await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytesFromB64(kontrola.iv) }, key, bytesFromB64(kontrola.d));
+      } catch (e) { syPassNote('✕ Tímhle heslem soubor otevřít nejde. Zadej stejné jako na druhém zařízení.'); return; }
+    }
+    syKey = key; sySalt = salt;
+    await dbPut('meta', { k: 'crypt', v: { salt: salt, key: key } });
+    $('syPass').value = '';
+    syPassNote('✓ Šifrování zapnuto. Heslo drží, dokud zařízení neodpojíš.');
+    syCryptUi();
+    if (syCfg.on) syLater();
+  } catch (e) {
+    syPassNote('✕ Nepodařilo se nastavit šifrování (' + (e.message || 'chyba') + ').');
+  }
+}
+async function syPassOff() {
+  if (!confirm('Vypnout šifrování? Data se do repozitáře začnou ukládat nezašifrovaně.\n' +
+    'Na ostatních zařízeních bude potřeba udělat totéž.')) return;
+  syKeyRead = syKey;                      // ještě jím přečteme starý soubor
+  syKey = null; sySalt = null;
+  await dbDelLocal('meta', 'crypt');
+  syPassNote('Šifrování vypnuto.');
+  syCryptUi();
+  if (syCfg.on) { if (await syncNow(true)) syKeyRead = null; }
+}
+
+/* obálka souboru */
+async function syEncode(state) {
+  const raw = new TextEncoder().encode(JSON.stringify(state));
+  const gz = await syGzip(raw);
+  const data = gz || raw;
+  if (!syKey) return JSON.stringify({ f: 'kal-sync', v: 1, gz: gz ? 1 : 0, enc: 0, d: b64FromBytes(data) });
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, syKey, data));
+  return JSON.stringify({ f: 'kal-sync', v: 1, gz: gz ? 1 : 0, enc: 1,
+    salt: b64FromBytes(sySalt), iv: b64FromBytes(iv), d: b64FromBytes(ct) });
+}
+async function syDecode(text) {
+  const o = JSON.parse(text);
+  if (!o || o.f !== 'kal-sync') throw new Error('cizí soubor');
+  let bytes = bytesFromB64(o.d);
+  if (o.enc) {
+    const k = syKey || syKeyRead;
+    if (!k) throw new Error('✕ Soubor je zašifrovaný. Zadej heslo v nastavení.');
+    try {
+      bytes = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytesFromB64(o.iv) }, k, bytes));
+    } catch (e) { throw new Error('✕ Nesedí heslo k šifrování — zadej ho znovu.'); }
+  }
+  if (o.gz) bytes = await syGunzip(bytes);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+/* ---- volání GitHubu ---- */
+function syUrl() { return 'https://api.github.com/repos/' + syCfg.repo + '/contents/' + syCfg.path; }
+function syHead() {
+  return { 'Authorization': 'Bearer ' + syCfg.token, 'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28' };
+}
+function syErrText(st) {
+  if (st === 401) return '✕ Token je neplatný nebo mu vypršela platnost.';
+  if (st === 403) return '✕ Token nemá oprávnění Contents pro tenhle repozitář (nebo jsi vyčerpal limit dotazů). Zkus Vyzkoušet spojení.';
+  if (st === 404) return '✕ Repozitář nenalezen — zkontroluj tvar uživatel/název a přístup tokenu.';
+  if (st === 409 || st === 422) return '✕ Soubor se mezitím změnil, zkouším znovu.';
+  return '✕ GitHub odpověděl HTTP ' + st + '.';
+}
+/* Skutečná zkouška zápisu. `permissions` v odpovědi o repozitáři popisuje práva
+   uživatele, ne tokenu — vlastník tam má `push: true`, i když token na obsah nesmí.
+   Proto pošleme zápis se záměrně neplatným `sha`: GitHub ho odmítne (409/422), takže
+   nic nevznikne, ale odmítne ho až POTÉ, co ověří oprávnění. Bez práva zápisu vrátí 403.
+   Míří na jiný soubor než na data, aby se jich zkouška nemohla dotknout. */
+async function syTestZapis() {
+  try {
+    const r = await fetch('https://api.github.com/repos/' + syCfg.repo + '/contents/' + syCfg.path + '.zkouska', {
+      method: 'PUT', headers: syHead(),
+      body: JSON.stringify({ message: 'zkouska opravneni', content: b64FromBytes(new TextEncoder().encode('x')),
+        sha: '0000000000000000000000000000000000000000' })
+    });
+    if (r.status === 409 || r.status === 422) return '✓ Token smí zapisovat, hotovo.';
+    if (r.status === 403) return '✕ Token NEMÁ oprávnění Contents pro tenhle repozitář. ' +
+      'V nastavení tokenu: Repository access → vyber ten repozitář, Permissions → Contents: Read and write.';
+    if (r.status === 404) return '✕ Token na tenhle repozitář nevidí — v Repository access musí být vybraný.';
+    if (r.ok) {   // nemělo by nastat; kdyby ano, uklidíme po sobě
+      let sha = null;
+      try { sha = (await r.json()).content.sha; } catch (e) {}
+      if (sha) await fetch('https://api.github.com/repos/' + syCfg.repo + '/contents/' + syCfg.path + '.zkouska', {
+        method: 'DELETE', headers: syHead(), body: JSON.stringify({ message: 'úklid po zkoušce', sha: sha }) });
+      return '✓ Token smí zapisovat, hotovo.';
+    }
+    return syErrText(r.status);
+  } catch (e) { return '✕ Zápis se nepodařilo ověřit (' + (e.message || 'síť') + ').'; }
+}
+
+/* vrací text hlášky, aby šel výsledek zjistit i jinak než čtením z obrazovky */
+async function syTest() {
+  if (!syCfg.on) { syNote('Vyplň repozitář i token.'); return 'Vyplň repozitář i token.'; }
+  syNote('Zkouším…');
+  try {
+    const r = await fetch('https://api.github.com/repos/' + syCfg.repo, { headers: syHead() });
+    if (!r.ok) { syNote(syErrText(r.status)); return syErrText(r.status); }
+    const j = await r.json();
+    const soukr = j.private ? '✓ Repozitář je privátní.'
+      : '⚠ Repozitář je VEŘEJNÝ — přepni ho na privátní.';
+    const prava = ' ' + await syTestZapis();
+    syNote(soukr + prava);
+    return soukr + prava;
+  } catch (e) {
+    const m = '✕ Nepodařilo se spojit (' + (e.message || 'síť') + '). Jsi online?';
+    syNote(m); return m;
+  }
+}
+/* stáhne obsah souboru bez rozbalení; vrací null, když soubor ještě neexistuje */
+async function syFetch() {
+  const r = await fetch(syUrl() + '?ref=HEAD&t=' + Date.now(), { headers: syHead(), cache: 'no-store' });
+  if (r.status === 404) {
+    // 404 znamená „soubor ještě není" i „repozitář neexistuje" — rozlišíme doptáním
+    const rr = await fetch('https://api.github.com/repos/' + syCfg.repo, { headers: syHead() });
+    if (!rr.ok) { const e = new Error(syErrText(rr.status === 404 ? 404 : rr.status)); e.status = rr.status; throw e; }
+    return null;
+  }
+  if (!r.ok) { const e = new Error(syErrText(r.status)); e.status = r.status; throw e; }
+  const j = await r.json();
+  if (!j.content && j.size > 0) throw new Error('✕ Soubor je příliš velký pro rozhraní GitHubu.');
+  return { text: new TextDecoder().decode(bytesFromB64(j.content || '')), sha: j.sha };
+}
+async function syPull() {
+  const f = await syFetch();
+  if (!f) return null;
+  let enc = 0;
+  try { enc = JSON.parse(f.text).enc ? 1 : 0; } catch (e) {}
+  return { state: await syDecode(f.text), sha: f.sha, enc: enc };
+}
+async function syPush(state, sha) {
+  const body = { message: 'kalorie ' + dstr(new Date()), content: b64FromBytes(new TextEncoder().encode(await syEncode(state))) };
+  if (sha) body.sha = sha;
+  const r = await fetch(syUrl(), { method: 'PUT', headers: syHead(), body: JSON.stringify(body) });
+  if (r.status === 409 || r.status === 422) return { conflict: true };
+  if (!r.ok) { const e = new Error(syErrText(r.status)); e.status = r.status; throw e; }
+  const j = await r.json();
+  return { sha: j.content && j.content.sha };
+}
+/* otisk stavu — když se shoduje, nemá smysl posílat zápis */
+function syPrint(st) {
+  const parts = [];
+  for (const s of SYNC_STORES) {
+    parts.push(s + ':' + (st[s] || []).map(r => uidOf(s, r) + '@' + (r.upd || 1)).sort().join(','));
+  }
+  for (const k of SYNC_META) parts.push(k + '@' + (((st.meta || {})[k] || {}).upd || 0));
+  parts.push('t:' + (st.tomb || []).map(t => t.k + '@' + t.ts).sort().join(','));
+  return parts.join('|');
+}
+
+/* ---- párování přes QR ---------------------------------------------
+   Kód nese jen nastavení spojení (repozitář, token, cesta), ne data ani heslo
+   k šifrování — to se na druhém zařízení zadává zvlášť, aby token a heslo
+   nikdy neputovaly pohromadě. */
+function syQrData() {
+  return JSON.stringify({ kal: 1, repo: syCfg.repo, tok: syCfg.token, path: syCfg.path });
+}
+async function syQrShow() {
+  if (!syCfg.on) { syScanNote('Nejdřív vyplň repozitář a token.'); return; }
+  const box = $('syQr');
+  if (box.firstChild) { box.innerHTML = ''; return; }        // druhé klepnutí kód schová
+  try {
+    await loadZXing();
+    if (!window.ZXing || !window.ZXing.BrowserQRCodeSvgWriter) throw new Error('generátor nedostupný');
+    const w = new window.ZXing.BrowserQRCodeSvgWriter();
+    const svg = w.write(syQrData(), 260, 260);
+    svg.setAttribute('style', 'background:#fff;padding:10px;border-radius:12px;max-width:280px');
+    box.innerHTML = ''; box.appendChild(svg);
+    syScanNote('Naskenuj telefonem. Klepnutím kód schováš.');
+  } catch (e) { syScanNote('✕ Kód se nepodařilo vytvořit (' + (e.message || 'chyba') + ').'); }
+}
+function syScanNote(t) { if ($('syScanMsg')) $('syScanMsg').textContent = t; }
+
+/* přijme obsah naskenovaného kódu; vrací true, když nastavení sedělo */
+async function syQrUse(text) {
+  let o = null;
+  try { o = JSON.parse(text); } catch (e) { return false; }
+  if (!o || o.kal !== 1 || !o.repo || !o.tok) return false;
+  $('syRepo').value = o.repo;
+  $('syTok').value = o.tok;
+  await sySave();
+  if (o.path) { syCfg.path = o.path; await syStore(); }
+  syScanNote('✓ Nastavení načteno. Zbývá zadat heslo k šifrování, pokud ho používáš.');
+  return true;
+}
+
+let syScanStream = null, syScanning = false, syScanDet = null;
+async function syScanToggle() {
+  if (syScanning) { syScanStop(); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    syScanNote('✕ Kamera není dostupná (je stránka na https?).'); return;
+  }
+  try {
+    syScanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } }, audio: false });
+  } catch (e) { syScanNote('✕ Kamera odmítnuta: ' + e.name); return; }
+  const v = $('syVid');
+  v.style.display = ''; v.srcObject = syScanStream; await v.play().catch(() => {});
+  syScanning = true;
+  $('syScanBtn').textContent = 'Zastavit skenování';
+  syScanNote('Namiř na kód na druhém zařízení.');
+  if ('BarcodeDetector' in window) {
+    try { syScanDet = new window.BarcodeDetector({ formats: ['qr_code'] }); }
+    catch (e) { syScanDet = new window.BarcodeDetector(); }
+    syScanLoop();
+  } else {
+    await loadZXing();
+    if (!window.ZXing) { syScanNote('✕ Čtečka není dostupná — vlož token ručně.'); syScanStop(); return; }
+    const H = new Map();
+    H.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [window.ZXing.BarcodeFormat.QR_CODE]);
+    const rd = new window.ZXing.BrowserMultiFormatReader(H, 200);
+    try {
+      const res = await rd.decodeOnceFromVideoElement(v);
+      if (res && await syQrUse(res.getText())) syScanStop(true);
+      else { syScanNote('✕ Tohle není párovací kód aplikace.'); syScanStop(); }
+    } catch (e) { if (syScanning) { syScanNote('✕ Kód se nepodařilo přečíst.'); syScanStop(); } }
+    finally { try { rd.reset(); } catch (e) {} }
+  }
+}
+async function syScanLoop() {
+  if (!syScanning || !syScanDet) return;
+  try {
+    const nalez = await syScanDet.detect($('syVid'));
+    if (nalez && nalez.length) {
+      if (await syQrUse(nalez[0].rawValue)) { syScanStop(true); return; }
+      syScanNote('✕ Tohle není párovací kód aplikace.');
+    }
+  } catch (e) {}
+  if (syScanning) setTimeout(syScanLoop, 250);
+}
+function syScanStop(uspech) {
+  syScanning = false; syScanDet = null;
+  if (syScanStream) { syScanStream.getTracks().forEach(t => t.stop()); syScanStream = null; }
+  const v = $('syVid'); if (v) { v.srcObject = null; v.style.display = 'none'; }
+  if ($('syScanBtn')) $('syScanBtn').textContent = 'Načíst nastavení z kódu';
+  if (!uspech && $('syScanMsg') && $('syScanMsg').textContent.indexOf('✕') < 0) syScanNote('');
+}
+
+/* Ruční sladění se nesmí vzdát jen proto, že zrovna běží kolo na pozadí —
+   počká si na ně a udělá vlastní. Automatické se jen poznamená jako „ještě jednou". */
+let syRun = null;
+async function syncNow(manual) {
+  if (!syCfg.on) { if (manual) syNote('Nejdřív vyplň repozitář a token.'); return false; }
+  if (sySyncing) {
+    if (!manual) { syDirty = true; return false; }
+    try { await syRun; } catch (e) {}
+  }
+  syRun = syncRun(manual);
+  return syRun;
+}
+async function syncRun(manual) {
+  if (!navigator.onLine) { if (manual) syNote('✕ Jsi offline. Zkusím to, až budeš online.'); return false; }
+  sySyncing = true; syNote('Slaďuji…'); syBtn('bezi');
+  let ok = false;
+  try {
+    for (let pokus = 0; pokus < 3; pokus++) {
+      const rem = await syPull();
+      const local = await collectState();
+      const merged = mergeState(local, rem ? rem.state : { tomb: [] });
+      await applyState(merged);
+      await reloadAfterSync();
+      // shodný obsah nestačí — po zapnutí či vypnutí šifrování se musí přepsat i obálka
+      if (rem && syPrint(rem.state) === syPrint(merged) && !!rem.enc === !!syKey) { ok = true; break; }
+      const res = await syPush(merged, rem ? rem.sha : '');
+      if (res.conflict) continue;                 // druhé zařízení psalo dřív — celé kolo znovu
+      ok = true; break;
+    }
+    if (ok) { syCfg.last = Date.now(); await syStore(); syNote('✓ Sladěno ' + new Date(syCfg.last).toLocaleTimeString('cs-CZ') + '.'); }
+    else syNote('✕ Nepodařilo se doladit, zkus to za chvíli znovu.');
+  } catch (e) {
+    syNote(e.message && e.message[0] === '✕' ? e.message : '✕ Chyba spojení (' + (e.message || 'síť') + ').');
+  } finally {
+    sySyncing = false;
+    syBtn(ok ? 'ok' : 'chyba');
+    if (syDirty) { syDirty = false; syLater(); }
+  }
+  return ok;
+}
+/* Změna dat se nesynchronizuje hned — počká se, jestli jich nepřijde víc.
+   Každý zápis je commit, takže mezi automatickými koly držíme odstup aspoň
+   minutu; ruční tlačítko Synchronizovat teď tímhle omezené není. */
+const SY_DEBOUNCE = 6000, SY_MIN_ODSTUP = 60000;
+function syCekani() {
+  return Math.max(SY_DEBOUNCE, SY_MIN_ODSTUP - (Date.now() - (syCfg.last || 0)));
+}
+function syLater() {
+  if (!syCfg.on) return;
+  clearTimeout(syTimer);
+  syTimer = setTimeout(() => syncNow(false), syCekani());
+}
+
 
 /* ---------------- Claude API (vlastní klíč) ----------------
    Volá se přímo z prohlížeče (hlavička anthropic-dangerous-direct-browser-access).
@@ -4183,6 +4968,7 @@ async function workoutByDay() {
 }
 async function renderFit() {
   syncAddDate();
+  await loadDaily();
   ruckRestore();
   const by = await workoutByDay();
   const sum = k => {
