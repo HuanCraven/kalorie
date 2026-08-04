@@ -1010,7 +1010,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.04-46';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.04-47';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3851,11 +3851,38 @@ function syHead() {
 }
 function syErrText(st) {
   if (st === 401) return '✕ Token je neplatný nebo mu vypršela platnost.';
-  if (st === 403) return '✕ Token nemá oprávnění Contents: Read and write, nebo jsi vyčerpal limit dotazů.';
+  if (st === 403) return '✕ Token nemá oprávnění Contents pro tenhle repozitář (nebo jsi vyčerpal limit dotazů). Zkus Vyzkoušet spojení.';
   if (st === 404) return '✕ Repozitář nenalezen — zkontroluj tvar uživatel/název a přístup tokenu.';
   if (st === 409 || st === 422) return '✕ Soubor se mezitím změnil, zkouším znovu.';
   return '✕ GitHub odpověděl HTTP ' + st + '.';
 }
+/* Skutečná zkouška zápisu. `permissions` v odpovědi o repozitáři popisuje práva
+   uživatele, ne tokenu — vlastník tam má `push: true`, i když token na obsah nesmí.
+   Proto pošleme zápis se záměrně neplatným `sha`: GitHub ho odmítne (409/422), takže
+   nic nevznikne, ale odmítne ho až POTÉ, co ověří oprávnění. Bez práva zápisu vrátí 403.
+   Míří na jiný soubor než na data, aby se jich zkouška nemohla dotknout. */
+async function syTestZapis() {
+  try {
+    const r = await fetch('https://api.github.com/repos/' + syCfg.repo + '/contents/' + syCfg.path + '.zkouska', {
+      method: 'PUT', headers: syHead(),
+      body: JSON.stringify({ message: 'zkouska opravneni', content: b64FromBytes(new TextEncoder().encode('x')),
+        sha: '0000000000000000000000000000000000000000' })
+    });
+    if (r.status === 409 || r.status === 422) return '✓ Token smí zapisovat, hotovo.';
+    if (r.status === 403) return '✕ Token NEMÁ oprávnění Contents pro tenhle repozitář. ' +
+      'V nastavení tokenu: Repository access → vyber ten repozitář, Permissions → Contents: Read and write.';
+    if (r.status === 404) return '✕ Token na tenhle repozitář nevidí — v Repository access musí být vybraný.';
+    if (r.ok) {   // nemělo by nastat; kdyby ano, uklidíme po sobě
+      let sha = null;
+      try { sha = (await r.json()).content.sha; } catch (e) {}
+      if (sha) await fetch('https://api.github.com/repos/' + syCfg.repo + '/contents/' + syCfg.path + '.zkouska', {
+        method: 'DELETE', headers: syHead(), body: JSON.stringify({ message: 'úklid po zkoušce', sha: sha }) });
+      return '✓ Token smí zapisovat, hotovo.';
+    }
+    return syErrText(r.status);
+  } catch (e) { return '✕ Zápis se nepodařilo ověřit (' + (e.message || 'síť') + ').'; }
+}
+
 /* vrací text hlášky, aby šel výsledek zjistit i jinak než čtením z obrazovky */
 async function syTest() {
   if (!syCfg.on) { syNote('Vyplň repozitář i token.'); return 'Vyplň repozitář i token.'; }
@@ -3864,13 +3891,9 @@ async function syTest() {
     const r = await fetch('https://api.github.com/repos/' + syCfg.repo, { headers: syHead() });
     if (!r.ok) { syNote(syErrText(r.status)); return syErrText(r.status); }
     const j = await r.json();
-    // token jen pro čtení projde na GET a selže až při prvním zápisu — zjistíme to hned
-    const zapis = j.permissions ? !!j.permissions.push : null;
     const soukr = j.private ? '✓ Repozitář je privátní.'
       : '⚠ Repozitář je VEŘEJNÝ — přepni ho na privátní.';
-    const prava = zapis === true ? ' Token smí zapisovat, hotovo.'
-      : zapis === false ? ' ✕ Token ale NEMÁ právo zápisu — přidej mu Contents: Read and write.'
-      : ' Právo zápisu se nepodařilo ověřit; pozná se při prvním sladění.';
+    const prava = ' ' + await syTestZapis();
     syNote(soukr + prava);
     return soukr + prava;
   } catch (e) {
