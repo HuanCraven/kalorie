@@ -163,6 +163,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="row" style="margin-bottom:10px">
     <button class="btn sm" id="dayPrev" onclick="shiftDay(-1)">‹</button>
     <div class="grow" style="text-align:center"><b id="dayLabel"></b></div>
+    <button class="btn sm" id="daySync" onclick="syncNow(true)" style="display:none"
+      title="Sladit s druhým zařízením" aria-label="Synchronizovat">⟳</button>
     <button class="btn sm" id="dayNext" onclick="shiftDay(1)">›</button>
   </div>
 
@@ -1010,7 +1012,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.04-47';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.04-48';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1356,6 +1358,15 @@ function offCachePut(k, v) {
     if (!document.hidden && syCfg.on && Date.now() - (syCfg.last || 0) > 60000) syncNow(false);
   });
   window.addEventListener('online', () => { if (syCfg.on) syLater(); });
+  window.addEventListener('focus', () => {
+    if (syCfg.on && Date.now() - (syCfg.last || 0) > 30000) syncNow(false);
+  });
+  /* Otevřené okno, na které se člověk dívá, se samo nedozví o zápisu z druhého
+     zařízení — proto se jednou za dvě minuty zeptá. Když se nic nezměnilo,
+     je to jen dotaz, žádný commit. */
+  setInterval(() => {
+    if (syCfg.on && !document.hidden && !sySyncing && Date.now() - (syCfg.last || 0) > 120000) syncNow(false);
+  }, 60000);
   // požádej prohlížeč, ať úložiště nemaže při nedostatku místa
   if (navigator.storage && navigator.storage.persist) {
     try {
@@ -3717,9 +3728,17 @@ async function syLogout() {
 }
 function syNote(t) { if ($('syMsg')) $('syMsg').textContent = t; }
 function syUi() {
+  if ($('daySync')) $('daySync').style.display = syCfg.on ? '' : 'none';
   if (!$('sySyncBtn')) return;
   $('sySyncBtn').disabled = !syCfg.on;
   if (!sySyncing && syCfg.last) syNote('Naposledy sladěno ' + new Date(syCfg.last).toLocaleString('cs-CZ') + '.');
+}
+/* stav tlačítka na hlavní stránce: klid ⟳ · probíhá ⟳… · povedlo se ✓ · nepovedlo ✕ */
+function syBtn(stav) {
+  const b = $('daySync'); if (!b) return;
+  b.textContent = stav === 'bezi' ? '⟳…' : stav === 'ok' ? '✓' : stav === 'chyba' ? '✕' : '⟳';
+  b.disabled = stav === 'bezi';
+  if (stav === 'ok' || stav === 'chyba') setTimeout(() => { if (!sySyncing) syBtn(); }, 2500);
 }
 
 /* ---- převody: text ↔ bajty ↔ base64 ---- */
@@ -4044,7 +4063,7 @@ async function syncNow(manual) {
 }
 async function syncRun(manual) {
   if (!navigator.onLine) { if (manual) syNote('✕ Jsi offline. Zkusím to, až budeš online.'); return false; }
-  sySyncing = true; syNote('Slaďuji…');
+  sySyncing = true; syNote('Slaďuji…'); syBtn('bezi');
   let ok = false;
   try {
     for (let pokus = 0; pokus < 3; pokus++) {
@@ -4065,6 +4084,7 @@ async function syncRun(manual) {
     syNote(e.message && e.message[0] === '✕' ? e.message : '✕ Chyba spojení (' + (e.message || 'síť') + ').');
   } finally {
     sySyncing = false;
+    syBtn(ok ? 'ok' : 'chyba');
     if (syDirty) { syDirty = false; syLater(); }
   }
   return ok;
