@@ -727,6 +727,13 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
 <!-- ============ NASTAVENÍ ============ -->
 <section id="p-set" class="page">
+  <div class="seg" id="setSeg">
+    <button data-t="ja" class="on" onclick="setSetMode('ja')">Já</button>
+    <button data-t="prop" onclick="setSetMode('prop')">Propojení</button>
+    <button data-t="data" onclick="setSetMode('data')">Data</button>
+  </div>
+
+  <div id="setJa">
   <div class="card">
     <h3>Jak počítat cíle</h3>
     <div class="seg" id="modeSeg" style="margin-bottom:12px">
@@ -803,6 +810,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       a řekne ti to v pivech. Orientačně: 10 g/den ≈ pivo 12° obden. Změna se uloží sama.</p>
   </div>
 
+  </div><!-- /setJa -->
+
+  <div id="setProp" style="display:none">
   <div class="card">
     <h3>Claude API — odhad z fotky bez kopírování</h3>
     <p class="tiny muted" style="margin:0 0 10px">S vlastním API klíčem pošle aplikace fotku
@@ -872,6 +882,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button class="btn dan full" onclick="syLogout()">Odpojit toto zařízení</button>
   </div>
 
+  </div><!-- /setProp -->
+
+  <div id="setData" style="display:none">
   <div class="card">
     <h3>Data</h3>
     <button class="btn full" style="margin-bottom:8px" onclick="exportData()">Export zálohy (JSON)</button>
@@ -905,6 +918,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <h3>Info</h3>
     <p class="tiny muted" id="infoTxt"></p>
   </div>
+  </div><!-- /setData -->
 </section>
 
 </div>
@@ -923,7 +937,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <button data-p="stats" onclick="go('stats')">
     <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Staty</button>
   <button data-p="set" onclick="go('set')">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Víc</button>
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Nastavení</button>
 </nav>
 
 <!-- portion sheet -->
@@ -1044,7 +1058,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.04-50';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.04-51';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1738,6 +1752,18 @@ document.addEventListener('click', e => {
 
 /* ---------------- database view ---------------- */
 let dbMode = 'moje';
+/* Nastavení má tři skupiny podle toho, jak často se do nich chodí:
+   Já (občas) · Propojení (jednou při zapínání) · Data (výjimečně). */
+let nastSkupina = 'ja';
+function setSetMode(m) {
+  nastSkupina = m;
+  ['ja', 'prop', 'data'].forEach(x => {
+    const box = $(x === 'ja' ? 'setJa' : x === 'prop' ? 'setProp' : 'setData');
+    if (box) box.style.display = x === m ? '' : 'none';
+  });
+  document.querySelectorAll('#setSeg button').forEach(b => b.classList.toggle('on', b.dataset.t === m));
+  window.scrollTo(0, 0);
+}
 function setDbMode(m) {
   dbMode = m;
   document.querySelectorAll('#dbSeg button').forEach(b => b.classList.toggle('on', b.dataset.d === m));
