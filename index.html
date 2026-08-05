@@ -490,17 +490,23 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div class="card">
       <div class="lbl-s">Denní průměr</div>
+  <div class="seg" id="alcSeg" style="margin-bottom:12px">
+    <button data-a="7" onclick="setAlcPeriod(7)">7 dní</button>
+    <button data-a="30" class="on" onclick="setAlcPeriod(30)">30 dní</button>
+    <button data-a="90" onclick="setAlcPeriod(90)">90 dní</button>
+  </div>
+
   <div class="row" style="gap:10px;margin:0 0 10px">
     <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted">7 dní</div><b class="mono" id="alcA7" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
-    <div class="card grow" style="margin:0;background:#22303f;text-align:center;padding:10px;border-color:#33405a">
-      <div class="tiny muted">30 dní</div><b class="mono" id="alcA30" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
+      <div class="tiny muted">průměr</div><b class="mono" id="alcAvgP" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+      <div class="tiny muted">celkem</div><b class="mono" id="alcSumP" style="font-size:19px">0</b><div class="tiny muted">g</div></div>
   </div>
-  <div class="row" style="gap:10px;margin:0 0 8px">
+  <div class="row" style="gap:10px;margin:0 0 10px">
+    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
+      <div class="tiny muted">dní bez alkoholu</div><b class="mono" id="alcDry" style="font-size:19px">0</b><div class="tiny muted" id="alcDryOf">z 30</div></div>
     <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
       <div class="tiny muted">od začátku měření</div><b class="mono" id="alcAAll" style="font-size:19px">0</b><div class="tiny muted">g/den</div></div>
-    <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
-      <div class="tiny muted">dní bez alkoholu</div><b class="mono" id="alcDry" style="font-size:19px">0</b><div class="tiny muted">z 30</div></div>
   </div>
   <p class="tiny muted" id="alcAvgNote" style="margin:0 0 14px"></p>
 
@@ -519,10 +525,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
         <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
           <div class="tiny muted">30 dní</div><b class="mono" id="alc30" style="font-size:18px">0</b><div class="tiny muted">g</div></div>
       </div>
-      <h3>Kdy a kolik — posledních 21 dní</h3>
-      <div id="alcChart" style="margin:8px 0 4px"></div>
     </div>
   </details>
+
+  <h3 style="margin-top:16px" id="alcChartHead">Kdy a kolik — 30 dní</h3>
+  <div id="alcChart" style="margin:8px 0 4px"></div>
 
   <h3 style="margin-top:16px" id="alcListHead">Dnešní záznamy</h3>
   <div id="alcList"></div>
@@ -643,16 +650,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
-    <h3>Denní příjem</h3>
+    <h3>Denní příjem proti výdeji</h3>
     <div id="chKcal"></div>
-  </div>
-
-  <div class="card">
-    <h3>Denní bilance</h3>
-    <div id="chBal"></div>
     <p class="tiny muted" style="margin:8px 0 0">
-      <span style="color:#2f8fe6">▬</span> deficit &nbsp;
-      <span style="color:#e0574d">▬</span> přebytek</p>
+      <span style="color:#2f8fe6">▬</span> pod výdejem &nbsp;
+      <span style="color:#e0574d">▬</span> nad výdejem &nbsp; ┄ výdej toho dne</p>
   </div>
 
   <div class="card">
@@ -1014,6 +1016,10 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
         <option value="g">g</option><option value="ml">ml</option></select></div>
       <div class="fld"><label>Porce (<span class="edu">g</span>)</label><input id="edServ" type="number" inputmode="decimal" placeholder="volitelné"></div>
     </div>
+    <div class="fld"><label>Alkohol (% obj.)</label>
+      <input id="edAbv" type="number" inputmode="decimal" step="0.1" placeholder="0 = nealko"></div>
+    <p class="tiny muted" style="margin:-4px 0 12px">Vyplň u piva, vína nebo destilátu. Zapsaná porce
+      se pak započítá i do alkoholu — nemusíš ji zadávat zvlášť na záložce Alkohol.</p>
     <div class="row">
       <button class="btn grow" onclick="closeMod('modEdit')">Zrušit</button>
       <button class="btn pri grow" onclick="saveProduct()">Uložit</button>
@@ -1058,7 +1064,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.04-51';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.04-53';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1194,7 +1200,12 @@ async function dbPut(s, v) {
     if (GEN_UID.indexOf(s) >= 0) {
       // řádek bez lokálního id je nový — nesmí zdědit uid předlohy (kopie jídla ap.)
       if (v.id === undefined) { delete v.id; v.uid = newUid(); }
-      else if (!v.uid) v.uid = newUid();
+      else if (!v.uid) {
+        // úprava existujícího řádku: formuláře staví objekt znovu a uid v něm chybí.
+        // Kdyby dostal nové, druhé zařízení by starý záznam po sloučení vrátilo zpátky.
+        const stary = await dbGet(s, v.id);
+        v.uid = (stary && stary.uid) || newUid();
+      }
     }
     v.upd = nowTs();
     if (syReady) syLater();
@@ -2520,7 +2531,7 @@ function addToMeal(k) {
 async function editLog(id) {
   const r = await dbGet('log', id);
   if (!r) return;
-  if (r.alc) { editDrink(r); return; }
+  if (r.alc && r.productId === 'alk') { editDrink(r); return; }   // potravina s alkoholem se edituje jako potravina
   const p = products.find(x => x.id === r.productId);
   editLogId = id;
   curProduct = p || {
@@ -2582,6 +2593,12 @@ async function addPortion() {
     kcal: curProduct.kcal * a, p: curProduct.p * a, c: curProduct.c * a, f: curProduct.f * a,
     fib: (curProduct.fib || 0) * a, salt: (curProduct.salt || 0) * a, ts: Date.now()
   };
+  // potravina s obsahem alkoholu se započítá i do alkoholu; množství bereme jako mililitry
+  // (u piva i vína je hustota blízká vodě, u destilátů je odchylka menší než chyba odhadu porce)
+  if (curProduct.abv > 0) {
+    rec.abv = curProduct.abv;
+    rec.alc = alcG({ ml: amt, abv: curProduct.abv });
+  }
   if (editLogId) {
     const old = await dbGet('log', editLogId);
     rec.id = editLogId; rec.ts = old.ts;
@@ -2628,6 +2645,7 @@ function openEdit(id, presetCode) {
   $('edName').value = p ? p.name : '';
   $('edBrand').value = p ? (p.brand || '') : '';
   $('edCode').value = p ? (p.barcode || '') : (presetCode || '');
+  $('edAbv').value = p && p.abv ? p.abv : '';
   $('edKcal').value = p ? p.kcal : '';
   $('edP').value = p ? p.p : '';
   $('edC').value = p ? p.c : '';
@@ -2663,6 +2681,7 @@ async function saveProduct() {
     kcal: pos($('edKcal').value), p: pos($('edP').value), c: pos($('edC').value), f: pos($('edF').value),
     fib: pos($('edFib').value), salt: pos($('edSalt').value),
     serving: pos($('edServ').value) || null,
+    abv: pos($('edAbv').value) || 0,        // % objemových; >0 = počítá se i do alkoholu
     source: old.source === 'off' ? 'off' : 'manual',
     uses: old.uses || 0, createdAt: old.createdAt || Date.now(), updatedAt: Date.now()
   };
@@ -3450,48 +3469,47 @@ function agg(list, w0) {
 }
 
 /* --- grafy (SVG) --- */
+/* Sloupec = snědeno, čára = výdej toho dne (klid + hodinky + cvičení).
+   Sloupec nad čarou je přebytek, pod ní deficit — díky tomu není potřeba
+   samostatný graf bilance. Bez zadaného klidového výdeje se vrátíme k čáře cíle. */
 function svgBars(list, a) {
   const W = 320, H = 110, pad = 4;
+  const rmr = goals.rmr || 0;
+  const vydej = list.map(d => rmr ? rmr + (d.burn || 0) : null);
   const cil = a.tK || goals.kcal;
-  const top = Math.max(cil || 0, a.maxK) * 1.12 || 100;
+  const top = Math.max(cil || 0, a.maxK, ...vydej.filter(v => v !== null)) * 1.12 || 100;
   const bw = (W - pad * 2) / list.length;
   const gy = H - (cil / top) * H;
   const bars = list.map((d, i) => {
     const h = d.logged ? Math.max(1.5, d.k / top * H) : 0;
     const x = pad + i * bw, y = H - h;
+    const nad = vydej[i] !== null && d.k > vydej[i];
     return d.logged
       ? `<rect x="${x + 1}" y="${y}" width="${Math.max(1.5, bw - 2)}" height="${h}" rx="${Math.min(2, bw / 3)}"
-          fill="${C_DEF}" onclick="stTip(${i})"/>`
+          fill="${rmr ? (nad ? C_SUR : C_DEF) : C_DEF}" onclick="stTip(${i})"/>`
       : `<rect x="${x + 1}" y="${H - 2}" width="${Math.max(1.5, bw - 2)}" height="2" fill="${C_GRID}"/>`;
   }).join('');
-  const goal = cil ? `<line x1="0" y1="${gy}" x2="${W}" y2="${gy}" stroke="${C_INK}"
+  let goal = '';
+  if (rmr) {
+    // schodová čára — výdej se den ode dne liší
+    let dd = '';
+    vydej.forEach((v, i) => {
+      const x1 = pad + i * bw, x2 = x1 + bw, y = H - (v / top) * H;
+      dd += (i ? ' L' + x1 + ' ' + r1(y) : 'M' + x1 + ' ' + r1(y)) + ' L' + x2 + ' ' + r1(y);
+    });
+    const konec = H - (vydej[vydej.length - 1] / top) * H;
+    goal = `<path d="${dd}" fill="none" stroke="${C_INK}" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="${W - 2}" y="${Math.max(8, konec - 3)}" fill="${C_INK}" font-size="8" text-anchor="end">výdej</text>`;
+  } else if (cil) {
+    goal = `<line x1="0" y1="${gy}" x2="${W}" y2="${gy}" stroke="${C_INK}"
       stroke-width="1" stroke-dasharray="4 3"/>
-      <text x="${W - 2}" y="${gy - 3}" fill="${C_INK}" font-size="8" text-anchor="end">${
-        a.dyn ? 'ø cíl ' : 'cíl '}${r0(cil)}</text>` : '';
+      <text x="${W - 2}" y="${gy - 3}" fill="${C_INK}" font-size="8" text-anchor="end">cíl ${r0(cil)}</text>`;
+  }
   return `<svg viewBox="0 0 ${W} ${H + 14}" style="width:100%;height:auto;overflow:visible">
       ${bars}${goal}
       <text x="0" y="${H + 11}" fill="${C_INK}" font-size="8">${czd(list[0].date)}</text>
       <text x="${W}" y="${H + 11}" fill="${C_INK}" font-size="8" text-anchor="end">dnes</text>
     </svg><div class="tiny muted" id="stTipTxt" style="margin-top:6px">Klepni na sloupec pro detail.</div>`;
-}
-function svgDiverging(list, a) {
-  const W = 320, H = 96;
-  const vals = a.balDays;
-  const mx = Math.max(200, ...vals.filter(v => v !== null).map(v => Math.abs(v))) * 1.1;
-  const mid = H / 2, bw = W / list.length;
-  const bars = vals.map((v, i) => {
-    if (v === null) return '';
-    const h = Math.max(1.5, Math.abs(v) / mx * (H / 2));
-    const y = v >= 0 ? mid - h : mid;
-    return `<rect x="${i * bw + 1}" y="${y}" width="${Math.max(1.5, bw - 2)}" height="${h}" rx="1.5"
-       fill="${v >= 0 ? C_SUR : C_DEF}"/>`;
-  }).join('');
-  return `<svg viewBox="0 0 ${W} ${H + 14}" style="width:100%;height:auto;overflow:visible">
-      ${bars}<line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="${C_INK}" stroke-width="1"/>
-      <text x="0" y="${mid - 4}" fill="${C_INK}" font-size="8">+${r0(mx)}</text>
-      <text x="0" y="${H + 11}" fill="${C_INK}" font-size="8">−${r0(mx)}</text>
-      <text x="${W}" y="${H + 11}" fill="${C_INK}" font-size="8" text-anchor="end">dnes</text>
-    </svg>`;
 }
 /* Odpovídá na otázku „můžu si ještě dát?" — spočítá, kde by byl 30denní průměr
    po jednom dalším nápoji. Rozpočet v gramech je až druhotná informace. */
@@ -3644,8 +3662,6 @@ async function renderStats() {
     : 'Kompletní data za celé období.';
 
   $('chKcal').innerHTML = a.logged ? svgBars(list, a) : '<p class="tiny muted">Zatím žádná data.</p>';
-  $('chBal').innerHTML = a.rmr ? svgDiverging(list, a)
-    : '<p class="tiny muted">Nastav klidový výdej v Nastavení.</p>';
   $('chWeight').innerHTML = svgWeight(list, a);
   $('stWeightTxt').innerHTML = a.wFirst !== null && a.wLast !== null
     ? 'Od ' + r1(a.wFirst) + ' na ' + r1(a.wLast) + ' kg (' + (a.dKg > 0 ? '+' : '') + r1(a.wLast - a.wFirst) + ' kg)'
@@ -4779,7 +4795,7 @@ async function alcStats() {
   }
   const days = [];
   const base = new Date(curDate + 'T12:00:00');
-  for (let i = 29; i >= 0; i--) {
+  for (let i = 89; i >= 0; i--) {
     const x = new Date(base); x.setDate(x.getDate() - i);
     const k = dstr(x); days.push({ d: k, g: byDay[k] || 0 });
   }
@@ -4804,7 +4820,7 @@ async function alcStats() {
     .filter(([k]) => k <= curDate).reduce((a, [, v]) => a + v, 0);
 
   return {
-    days, d7: sum(7), d30: sum(30), dry: days.filter(x => x.g === 0).length,
+    days, d7: sum(7), d30: sum(30), dry: days.slice(-alcPeriod).filter(x => x.g === 0).length,
     today: byDay[curDate] || 0,
     avg7: sum(7) / 7, avg30: sum(30) / 30,
     mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
@@ -4824,11 +4840,21 @@ async function alcStats() {
     allSum, allDays, avgAll: allSum / allDays, first
   };
 }
+let alcPeriod = 30;
+function setAlcPeriod(dny) {
+  alcPeriod = dny;
+  document.querySelectorAll('#alcSeg button').forEach(b => b.classList.toggle('on', +b.dataset.a === dny));
+  renderAlc();
+}
 async function renderAlc() {
   const s = await alcStats();
   $('alc7').textContent = r0(s.d7); $('alc30').textContent = r0(s.d30); $('alcDry').textContent = s.dry;
-  $('alcA7').textContent = r1(s.avg7);
-  $('alcA30').textContent = r1(s.avg30);
+  const obd = s.days.slice(-alcPeriod);
+  const sumObd = obd.reduce((a, x) => a + x.g, 0);
+  $('alcAvgP').textContent = r1(sumObd / alcPeriod);
+  $('alcSumP').textContent = r0(sumObd);
+  $('alcDryOf').textContent = 'z ' + alcPeriod;
+  $('alcChartHead').textContent = 'Kdy a kolik — ' + alcPeriod + ' dní';
   $('alcAM').textContent = r1(s.avgM);
   $('alcMName').textContent = s.mName;
   $('alcAAll').textContent = r1(s.avgAll);
@@ -4838,7 +4864,7 @@ async function renderAlc() {
   $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : '<p class="tiny muted" style="margin:0">' +
     'Limit není nastavený (Víc → Alkohol).</p>';
   $('alcTrend').innerHTML = svgAlcTrend(s.long, s.trend, s.lim);
-  $('alcChart').innerHTML = svgAlcBars(s.days.slice(-21));
+  $('alcChart').innerHTML = svgAlcBars(obd);
   syncAddDate();
   const allLog = await dbAll('log');
   s.ref = refDrink(allLog.filter(r => r.date > dstr(new Date(Date.now() - 60 * 86400000))));
