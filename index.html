@@ -248,7 +248,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="seg" id="addSeg">
     <button data-s="find" class="on" onclick="setAdd('find')">Hledat</button>
     <button data-s="code" onclick="setAdd('code')">Kód</button>
-    <button data-s="photo" onclick="setAdd('photo')">Foto</button>
+    <button data-s="photo" onclick="setAdd('photo')">Popsat</button>
     <button data-s="man" onclick="setAdd('man')">Ručně</button>
     <button data-s="rec" onclick="setAdd('rec')">Recept</button>
   </div>
@@ -306,26 +306,33 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div class="pane" id="s-photo">
   <div class="card">
-    <h3>1 · Vyfoť jídlo</h3>
+    <h3>Napiš, co jsi jedl</h3>
+    <div class="fld" style="margin-bottom:6px">
+      <textarea id="photoNote" rows="3"
+        placeholder="k obědu 150 g kuřecích prsou, 200 g rýže a lžíce oleje"></textarea>
+    </div>
+    <p class="tiny muted" style="margin:0 0 10px">Stačí běžná věta. Co se najde v tvé databázi, se
+      z ní vezme — je to přesnější než odhad.</p>
+
+    <div class="lbl-s">Fotka (nepovinná)</div>
     <div class="row" style="margin-bottom:10px">
-      <button class="btn pri grow" onclick="document.getElementById('camFile').click()">📷 Vyfotit</button>
+      <button class="btn grow" onclick="document.getElementById('camFile').click()">📷 Vyfotit</button>
       <button class="btn grow" onclick="document.getElementById('galFile').click()">Z galerie</button>
     </div>
     <input type="file" id="camFile" accept="image/*" capture="environment" style="display:none" onchange="gotPhoto(this)">
     <input type="file" id="galFile" accept="image/*" style="display:none" onchange="gotPhoto(this)">
     <img id="photoPrev" style="display:none;width:100%;border-radius:12px;margin-bottom:10px">
-    <div class="fld" style="margin-bottom:6px">
-      <label>Popis (nepovinné, ale hodně pomůže)</label>
-      <input id="photoNote" placeholder="burek z T Marketu, dlouhý asi 15 cm, vedle je 10Kč">
-    </div>
-    <p class="tiny muted" style="margin:0">Vyfoť talíř shora nebo pod úhlem 45°. Napiš, co na fotce
-      nejde poznat — velikost, čím je to plněné, kolik oleje. Odhad se tím zpřesní víc než čímkoli jiným.</p>
+    <p class="tiny muted" style="margin:0">Fotka pomůže tam, kde neznáš gramáž — talíř vyfoť shora
+      nebo pod úhlem 45°. Jde použít samotná věta, samotná fotka i obojí; nejlíp funguje obojí,
+      protože věta doplní to, co z obrázku poznat nejde.</p>
     <button class="btn pri full" id="apiEstBtn" style="margin-top:10px;display:none"
-      onclick="apiEstimate()">✨ Odhadnout hned (Claude API)</button>
+      onclick="apiEstimate()">✨ Rozebrat (Claude API)</button>
     <p class="tiny muted" id="apiEstMsg" style="margin:8px 0 0;display:none"></p>
   </div>
 
-  <div class="card">
+  <details class="card" id="rucniCesta" open>
+    <summary class="tiny muted" style="cursor:pointer">Bez API klíče — poslat do chatu ručně</summary>
+    <div style="margin-top:12px">
     <div class="lbl-s">Způsob odesílání</div>
     <label class="row" style="gap:8px;align-items:flex-start;margin-bottom:10px">
       <input type="checkbox" id="gProj" style="width:auto;margin-top:2px" onchange="saveProj()">
@@ -348,7 +355,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <p class="tiny muted" style="margin:0 0 8px">Bez projektu se musí ke každé fotce poslat i zadání.
         Zaškrtnutím výše se postup zjednoduší.</p>
     </div>
-    <h3 style="margin-top:14px">2 · Pošli to Claudeovi</h3>
+    <div class="lbl-s" style="margin-top:14px">Poslat do chatu</div>
     <button class="btn pri full" id="shareBtn" style="margin-bottom:8px" onclick="shareToClaude()">Odeslat fotku do Claude</button>
     <button class="btn full" onclick="copyPrompt()">Zkopírovat jen zadání</button>
     <details id="fotoHelp2" open style="margin:10px 0 0">
@@ -357,10 +364,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
         Zadání se proto vždycky kopíruje i do schránky — <b style="color:var(--fg)">v Claude ho dlouhým
         stiskem vlož do zprávy k fotce</b>, teprve pak odešli. Bez zadání odpoví větou místo dat.</p>
     </details>
-  </div>
-
-  <div class="card">
-    <h3>3 · Vlož odpověď</h3>
+    <div class="lbl-s">Vložit odpověď</div>
     <textarea id="aiIn" rows="4" placeholder='Sem vlož odpověď z chatu (celou, i s textem okolo)'
       style="width:100%;font:13px/1.4 ui-monospace,monospace;color:var(--fg);background:var(--card2);
       border:1px solid var(--line);border-radius:10px;padding:11px"></textarea>
@@ -369,9 +373,10 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <button class="btn" onclick="pasteAI()">Vložit ze schránky</button>
     </div>
   </div>
+  </details>
 
   <div class="card" id="aiCard" style="display:none">
-    <h3>4 · Zkontroluj a uprav</h3>
+    <h3>Zkontroluj a uprav</h3>
     <div id="aiList"></div>
     <p class="tiny muted" id="aiNote" style="margin:10px 0 0"></p>
     <div class="hr"></div>
@@ -382,7 +387,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <span class="muted tiny">B / S / T</span><span class="mono" id="aiTotM">0 / 0 / 0 g</span>
     </div>
     <div class="fld"><label>Název jídla</label><input id="aiName" placeholder="Kuřecí s rýží"></div>
-    <button class="btn pri full" style="margin-bottom:8px" onclick="aiSave(false)">Přidat do dneška</button>
+    <button class="btn pri full" style="margin-bottom:8px" onclick="aiSaveItems()">Přidat po položkách</button>
+    <button class="btn full" style="margin-bottom:8px" onclick="aiSave(false)">Přidat jako jedno jídlo</button>
     <button class="btn full" onclick="aiSave(true)">Přidat + uložit jako recept</button>
     <p class="tiny muted" style="margin:8px 0 0">Recept se uloží do databáze jako jedna položka —
       příště ho přidáš jedním klepnutím bez focení.</p>
@@ -676,6 +682,25 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="card">
     <h3>Nejčastější zdroje kalorií</h3>
     <div id="stTop"></div>
+  </div>
+
+  <div class="card">
+    <h3>Hledat v deníku</h3>
+    <div class="row" style="gap:8px">
+      <input class="grow" id="hlQ" placeholder="název jídla nebo nápoje" oninput="hlLater()">
+      <button class="btn sm" onclick="document.getElementById('hlQ').value='';hledejDenik()">✕</button>
+    </div>
+    <div id="hlOut" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <h3>Hledat v deníku</h3>
+    <div class="row" style="margin-bottom:8px">
+      <input id="denikQ" class="grow" placeholder="např. svíčková" oninput="denikHledej()" autocomplete="off">
+      <button class="btn sm" onclick="document.getElementById('denikQ').value='';denikHledej()">✕</button>
+    </div>
+    <div id="denikOut"><p class="tiny muted" style="margin:0">Napiš část názvu a uvidíš, kdy jsi to
+      naposledy jedl a jak často. Prohledává se celý deník, ne jen zvolené období.</p></div>
   </div>
 
   <div class="card">
@@ -988,7 +1013,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <h3 style="margin-bottom:8px">Vyplnit z fotky etikety</h3>
       <div class="row" style="margin-bottom:8px">
         <button class="btn sm grow" onclick="document.getElementById('labFile').click()">📷 Vyfotit tabulku</button>
-        <button class="btn sm grow pri" id="labShare" onclick="shareLabel()">Poslat Claudeovi</button>
+        <button class="btn sm grow pri" onclick="shareLabel()">Poslat Claudeovi</button>
       </div>
       <input type="file" id="labFile" accept="image/*" capture="environment" style="display:none" onchange="gotLabel(this)">
       <img id="labPrev" style="display:none;width:100%;border-radius:10px;margin-bottom:8px">
@@ -1064,7 +1089,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.04-53';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.04-56';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1420,6 +1445,9 @@ function offCachePut(k, v) {
   await loadCrypt();
   tajnaPoleUi();
   await loadRozbor();
+  // zkratky z ikony aplikace (?jdi=scan|alc|fit) — dlouhý stisk ikony vede rovnou sem
+  const jdi = new URLSearchParams(location.search).get('jdi');
+  if (jdi && $('p-' + jdi)) { go(jdi); if (jdi === 'scan') setAdd('find'); }
   await renderDay();
   checkBackup();
   obCheck();
@@ -2910,6 +2938,23 @@ async function wipeVsude() {
 /* ---------------- foto → AI odhad ---------------- */
 let photoFile = null, aiItems = [], aiNote = '';
 
+const VETA_PROMPT =
+`Rozeber následující český popis jídla na jednotlivé suroviny.
+
+Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
+{"jidlo":"krátký název jídla","polozky":[{"nazev":"surovina","mn":150,"kcal":165,"b":31,"s":0,"t":3.6,"abv":0}],"pozn":"co je nejisté"}
+
+Pravidla:
+- mn = množství té suroviny v gramech (u nápojů v mililitrech)
+- kcal, b, s, t = hodnoty na 100 g/ml SUROVINY, ne za porci
+- abv = obsah alkoholu v procentech, u nealkoholických 0
+- domácí míry odhadni: lžíce oleje ≈ 10 g, lžíce cukru ≈ 15 g, plátek chleba ≈ 40 g, sklenice ≈ 250 ml
+- názvy piš česky, obecně a bez značky („kuřecí prsa", ne „kuřecí prsa Vodňany")
+- když množství není uvedené, odhadni běžnou porci
+- nevymýšlej položky, které v popisu nejsou
+- ČÍSLA PIŠ S TEČKOU (3.6), ne s čárkou
+- žádný text před ani za JSON blokem`;
+
 const AI_PROMPT =
 `Odhadni výživové hodnoty tohoto jídla z fotky.
 
@@ -3038,7 +3083,8 @@ function tryJson(src) {
       kcal: pick(x, ['kcal', 'energie', 'energy', 'kalorie']),
       b: pick(x, ['b', 'bilkoviny', 'bílkoviny', 'protein', 'proteins']),
       s: pick(x, ['s', 'sacharidy', 'carbs', 'carbohydrates']),
-      t: pick(x, ['t', 'tuky', 'fat', 'fats'])
+      t: pick(x, ['t', 'tuky', 'fat', 'fats']),
+      abv: pick(x, ['abv', 'alkohol', 'alcohol']) || 0
     }))
   };
 }
@@ -3216,6 +3262,18 @@ function parseAI(txt) {
   return d;
 }
 
+/* Přebrat hodnoty z databáze smíme jen při jisté shodě: název z databáze musí
+   být celý obsažený v tom, co se rozebíralo. Volné hledání by „rýži" napojilo
+   na první podobnou položku — a mezi rýží vařenou (130) a syrovou (360 kcal)
+   je trojnásobný rozdíl. Když si nejsme jistí, zůstane odhad. */
+function aiMatch(nazev) {
+  const q = norm(nazev).trim();
+  if (q.length < 3) return null;
+  return localMatches(nazev).find(m => {
+    const nm = norm(m.name).trim();
+    return nm === q || q.indexOf(nm) >= 0;
+  }) || null;
+}
 function processAI() {
   let d;
   try { d = parseAI($('aiIn').value); }
@@ -3232,7 +3290,17 @@ function processAI() {
     $('aiNote').textContent = ''; $('aiTotK').textContent = '—'; $('aiTotM').textContent = '—';
     return;
   }
-  aiItems = d.items; aiNote = d.note;
+  aiItems = d.items.map(it => {
+    // co je ve vlastní databázi, má přesnější čísla než jakýkoli odhad
+    const m = aiMatch(String(it.nazev || ''));
+    if (!m) return Object.assign({}, it, { zdroj: 'odhad' });
+    return Object.assign({}, it, {
+      nazev: m.name, kcal: m.kcal, b: m.p, s: m.c, t: m.f,
+      fib: m.fib || 0, salt: m.salt || 0, pid: m.id, jd: m.unit,
+      zdroj: m.brand || 'databáze'
+    });
+  });
+  aiNote = d.note;
   $('aiName').value = d.name || 'Jídlo z fotky';
   $('aiNote').textContent = d.note ? '⚠ ' + d.note : '';
   $('aiCard').style.display = '';
@@ -3245,7 +3313,9 @@ function renderAI() {
     <div class="item" style="align-items:flex-start">
       <div class="grow">
         <div class="nm">${esc(it.nazev)}</div>
-        <div class="sub">${r0(it.kcal)} kcal/100 g · B ${r1(it.b)} · S ${r1(it.s)} · T ${r1(it.t)}</div>
+        <div class="sub">${r0(it.kcal)} kcal/100 ${esc(it.jd || 'g')} · B ${r1(it.b)} · S ${r1(it.s)} · T ${r1(it.t)}
+          ${it.abv ? '· ' + r1(it.abv) + ' % alk. ' : ''}·
+          <span style="color:${it.zdroj === 'odhad' ? 'var(--warn)' : 'var(--dim)'}">${esc(it.zdroj || 'odhad')}</span></div>
       </div>
       <input type="number" inputmode="decimal" value="${r1(it.mn)}" style="width:74px;padding:7px 8px;text-align:right"
         oninput="aiItems[${i}].mn=n(this.value);aiTot()"><span class="tiny muted" style="align-self:center">g</span>
@@ -3263,6 +3333,29 @@ function aiTot() {
   const s = aiSum();
   $('aiTotK').textContent = r0(s.k) + ' kcal';
   $('aiTotM').textContent = r1(s.p) + ' / ' + r1(s.c) + ' / ' + r1(s.f) + ' g';
+}
+
+/* každou surovinu zvlášť — v deníku je pak vidět a dá se příště použít samostatně */
+async function aiSaveItems() {
+  if (!aiItems.length) { toast('Nejsou žádné položky'); return; }
+  for (const it of aiItems) {
+    const a = (it.mn || 0) / 100;
+    if (a <= 0) continue;
+    const rec = {
+      date: curDate, productId: it.pid || 'popis', name: it.nazev, unit: it.jd || 'g',
+      meal: defaultMeal(), amount: it.mn, ts: Date.now(),
+      kcal: it.kcal * a, p: it.b * a, c: it.s * a, f: it.t * a,
+      fib: (it.fib || 0) * a, salt: (it.salt || 0) * a
+    };
+    if (it.abv > 0) { rec.abv = it.abv; rec.alc = alcG({ ml: it.mn, abv: it.abv }); }
+    await dbPut('log', rec);
+  }
+  const kolik = aiItems.length;
+  aiItems = []; $('aiCard').style.display = 'none'; $('aiIn').value = '';
+  $('photoPrev').style.display = 'none'; photoFile = null;
+  if ($('photoNote')) $('photoNote').value = '';
+  toast('Zapsáno: ' + kolik + ' ' + plur(kolik, 'položka', 'položky', 'položek'));
+  renderDay();
 }
 
 async function aiSave(asRecipe) {
@@ -3799,6 +3892,40 @@ function summaryText() {
   }
   return L.join('\n');
 }
+/* --- hledání v deníku ---------------------------------------------
+   Prohledává zapsané záznamy, ne databázi potravin: zajímá nás „kdy jsem tohle
+   naposledy jedl a kolikrát", ne „mám to uložené". */
+let hlT = null;
+function hlLater() { clearTimeout(hlT); hlT = setTimeout(hledejDenik, 300); }
+async function hledejDenik() {
+  const q = ($('hlQ').value || '').trim().toLowerCase();
+  const out = $('hlOut');
+  if (q.length < 2) { out.innerHTML = '<p class="tiny muted" style="margin:0">Napiš aspoň dvě písmena.</p>'; return; }
+  const vse = (await dbAll('log')).filter(r => (r.name || '').toLowerCase().indexOf(q) >= 0 && r.date <= curDate);
+  if (!vse.length) { out.innerHTML = '<p class="tiny muted" style="margin:0">Nic takového jsi nezapsal.</p>'; return; }
+  vse.sort((a, b) => (b.date + ' ' + b.ts).localeCompare(a.date + ' ' + a.ts));
+  const dni = new Set(vse.map(r => r.date));
+  const posl = vse[0];
+  const odKdy = Math.round((new Date(curDate + 'T12:00:00') - new Date(posl.date + 'T12:00:00')) / 86400000);
+  const kcal = vse.reduce((a, r) => a + (r.kcal || 0), 0);
+  const alc = vse.reduce((a, r) => a + (r.alc || 0), 0);
+  const m30 = vse.filter(r => r.date > dstr(new Date(new Date(curDate + 'T12:00:00') - 30 * 86400000))).length;
+  out.innerHTML = `
+    <p class="tiny" style="margin:0 0 8px">
+      <b>${vse.length}×</b> celkem${vse.length !== dni.size ? ' (' + dnu(dni.size) + ')' : ''} ·
+      <b>${m30}×</b> za posledních 30 dní ·
+      naposledy <b>${odKdy === 0 ? 'dnes' : odKdy === 1 ? 'včera' : 'před ' + dnu(odKdy)}</b><br>
+      celkem ${r0(kcal)} kcal${alc > 0 ? ' · ' + r1(alc) + ' g alkoholu' : ''}
+    </p>` +
+    vse.slice(0, 12).map(r => `
+      <div class="item" onclick="skocNaDen('${r.date}')" style="cursor:pointer">
+        <div class="grow"><div class="nm">${esc(r.name)}</div>
+          <div class="sub">${czd(r.date)} · ${r0(r.amount)} ${r.unit || 'g'}${r.meal ? ' · ' + mealName(r.meal) : ''}</div></div>
+        <div class="kc">${r0(r.kcal)}<span class="tiny muted"> kcal</span></div></div>`).join('') +
+    (vse.length > 12 ? '<p class="tiny muted" style="margin:8px 0 0">Zobrazeno 12 nejnovějších z ' + vse.length + '.</p>' : '');
+}
+function skocNaDen(d) { curDate = d; go('day'); renderDay(); }
+
 /* --- rozbor období přes Claude API --- */
 async function apiText(prompt, maxTok) {
   const ctrl = new AbortController();
@@ -3876,6 +4003,43 @@ async function loadRozbor() {
     rozborNote('Rozbor za ' + m.v.dny + ' dní · ' + new Date(m.v.kdy).toLocaleString('cs-CZ'));
   }
 }
+/* --- hledání v deníku ---------------------------------------------
+   Seskupuje podle názvu přes celý deník: kdy naposledy, kolikrát, kolik toho bylo. */
+let denikT = null;
+function denikHledej() { clearTimeout(denikT); denikT = setTimeout(denikRun, 250); }
+async function denikRun() {
+  const q = ($('denikQ').value || '').trim();
+  const box = $('denikOut');
+  if (q.length < 2) {
+    box.innerHTML = '<p class="tiny muted" style="margin:0">Napiš aspoň dvě písmena.</p>';
+    return;
+  }
+  const vse = (await dbAll('log')).filter(r => matchWords(r.name, q));
+  if (!vse.length) {
+    box.innerHTML = '<p class="tiny muted" style="margin:0">Nic takového jsi nezapsal.</p>';
+    return;
+  }
+  const sk = {};
+  vse.forEach(r => {
+    const g = sk[r.name] || (sk[r.name] = { n: r.name, kolik: 0, kcal: 0, mn: 0, jd: r.unit || 'g', posl: '', prvni: '9999' });
+    g.kolik++; g.kcal += r.kcal || 0; g.mn += r.amount || 0;
+    if (r.date > g.posl) g.posl = r.date;
+    if (r.date < g.prvni) g.prvni = r.date;
+  });
+  const dnes = new Date(curDate + 'T12:00:00');
+  const radky = Object.values(sk).sort((a, b) => b.posl.localeCompare(a.posl)).slice(0, 25);
+  box.innerHTML = radky.map(g => {
+    const odstup = Math.round((dnes - new Date(g.posl + 'T12:00:00')) / 86400000);
+    const kdy = odstup <= 0 ? 'dnes' : odstup === 1 ? 'včera' : 'před ' + dnu(odstup);
+    return `<div class="item"><div class="grow">
+      <div class="nm">${esc(g.n)}</div>
+      <div class="sub">naposledy ${kdy} (${czd(g.posl)}) · ${g.kolik}× ·
+        ø ${r0(g.mn / g.kolik)} ${esc(g.jd)} · celkem ${r0(g.kcal)} kcal</div></div>
+      <div class="kc">${r0(g.kcal / g.kolik)}<span class="tiny muted"> kcal</span></div></div>`;
+  }).join('') +
+    (Object.keys(sk).length > 25 ? '<p class="tiny muted" style="margin:8px 0 0">Zobrazeno prvních 25.</p>' : '');
+}
+
 async function copySummary() {
   const t = summaryText(); if (!t) { toast('Nejdřív otevři statistiky'); return; }
   try { await navigator.clipboard.writeText(t); toast('Souhrn zkopírován'); }
@@ -4325,6 +4489,8 @@ function apiUi() {
   const on = !!apiCfg.key;
   if ($('apiEstBtn')) $('apiEstBtn').style.display = on ? '' : 'none';
   if ($('apiLabBtn')) $('apiLabBtn').style.display = on ? '' : 'none';
+  // ruční posílání do chatu je náhrada za API — s klíčem jen překáží, bez klíče je potřeba
+  if ($('rucniCesta')) $('rucniCesta').open = !on;
 }
 async function apiTest() {
   const key = ($('apiKey').value || '').trim();
@@ -4394,20 +4560,27 @@ function apiPrompt(kind) {
   const note = (kind === 'label' ? '' : (($('photoNote') || {}).value || '')).trim();
   return note ? base + '\n\nDoplňující informace ode mě: ' + note : base;
 }
+/* Jedna cesta pro obojí: věta, fotka, nebo obojí zároveň. Fotka bez věty je
+   původní odhad z talíře, věta bez fotky rozbor popisu, dohromady je to nejpřesnější. */
 async function apiEstimate() {
-  if (!photoFile) { toast('Nejdřív vyfoť jídlo'); return; }
+  const veta = (($('photoNote') || {}).value || '').trim();
+  if (!apiCfg.key) { toast('Nejdřív vlož klíč ke Claude API v Nastavení → Propojení'); return; }
+  if (!photoFile && veta.length < 3) { toast('Napiš, co jsi jedl, nebo přilož fotku'); return; }
   const btn = $('apiEstBtn'), msg = $('apiEstMsg');
   btn.disabled = true; btn.textContent = 'Ptám se Claude…';
-  msg.style.display = ''; msg.textContent = 'Fotka se zmenšuje a odesílá — obvykle do 10 vteřin.';
+  msg.style.display = '';
+  msg.textContent = photoFile ? 'Fotka se zmenšuje a odesílá — obvykle do 10 vteřin.' : 'Rozebírám popis…';
   try {
-    const txt = await apiAsk(photoFile, apiPrompt('meal'));
+    const txt = photoFile
+      ? await apiAsk(photoFile, apiPrompt('meal'))
+      : await apiText(VETA_PROMPT + '\n\nPopis: ' + veta, 1200);
     $('aiIn').value = txt;
     processAI();
     msg.style.display = 'none';
   } catch (e) {
     msg.textContent = '✕ ' + (e.name === 'AbortError' ? 'vypršel čas — zkus to znovu' : e.message);
   } finally {
-    btn.disabled = false; btn.textContent = '✨ Odhadnout hned (Claude API)';
+    btn.disabled = false; btn.textContent = '✨ Rozebrat (Claude API)';
   }
 }
 async function apiLabel() {
@@ -4821,7 +4994,6 @@ async function alcStats() {
 
   return {
     days, d7: sum(7), d30: sum(30), dry: days.slice(-alcPeriod).filter(x => x.g === 0).length,
-    today: byDay[curDate] || 0,
     avg7: sum(7) / 7, avg30: sum(30) / 30,
     mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
     long,
