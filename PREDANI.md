@@ -272,6 +272,21 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |
+| `SKILL.md` | záložní kopie skillu `kalorie-projekt` (viz níže) | ano |
+
+### Skill `kalorie-projekt`
+
+`SKILL.md` v kořeni je **kopie** skillu, který Claudovi říká pravidla tohoto projektu.
+Ostrá verze leží mimo repozitář, v uživatelově profilu:
+
+```
+%APPDATA%\Claude\local-agent-mode-sessions\skills-plugin\<id>\<id>\skills\kalorie-projekt\SKILL.md
+```
+
+Tam se načítá; kopie v repu je pojistka, kdyby se ta složka vyčistila
+(obnova = vrátit soubor zpátky do složky `kalorie-projekt`). **Mění-li se jeden,
+musí se změnit i druhý** — jinak bude Claude v příští session pracovat podle starých
+pravidel. Skill se načítá při startu session, takže se úprava projeví až v té příští.
 
 ## Pravidla, která se osvědčila
 
