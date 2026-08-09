@@ -56,6 +56,19 @@ nastav ho pro obojí.
   rozbalená — s klíčem by byla sbalená.
 - **Konzolové `ERR_FAILED` nemusí být závada.** Několik sad schválně shazuje požadavky
   na Open Food Facts (`route(…, r => r.abort())`), aby ověřily chování offline.
+- **Testy nesmí chodit na internet.** Mockuje se jen to, co čekáme; když aplikace složí
+  adresu jinak (třeba `api.github.com/repos//contents/…` při prázdném repozitáři), vzor
+  se netrefí a Playwright požadavek pustí ven — výsledek pak závisí na kvalitě připojení.
+  Použij `PROSTREDI.blokujVenek(ctx)` a **registruj ji jako první**: v Playwrightu má
+  přednost naposledy přidaná routa, takže záchytná musí přijít před konkrétními.
+- **Aplikace slaďuje i sama od sebe.** Kromě časovače (`syLater`) spouští kolo `onfocus`
+  (>30 s od posledního sladění), `visibilitychange` (>60 s) a `setInterval` (jednou za
+  dvě minuty) — první dva **okamžitě**, takže se nedají zrušit `clearTimeout`. Kdo počítá
+  přesné počty commitů, ať zakládá zařízení jako čerstvě sladěné (`last: Date.now()`),
+  jinak mu do měření vleze kolo navíc. Tohle byla příčina nestability `test50.js`.
+- **Vratký test neopravuj prodloužením čekání.** Zjisti, co ho rozhazuje, a udělej ho
+  deterministickým — zpomal mock, zastav samovolné dění, počkej na podmínku. A ověř, že
+  na rozbité verzi opravdu padá; jinak nic nedokazuje.
 - `runall.sh` hlásí pád jen na `TimeoutError`, `PAGEERROR`, `MODULE_NOT_FOUND`,
   `NEPROŠLO: [1-9]` nebo `Error:` na začátku řádku. Test, který jen tiše vypíše
   nesmysl, projde — proto testy končí kontrolou a slovem `NEPROŠLO`.

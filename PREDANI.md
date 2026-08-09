@@ -17,7 +17,54 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.04-56** (`APP_VERSION` v `index.html`, cache `kaltrack-v56` v `sw.js`).
+Aktuální verze: **2026.08.09-57** (`APP_VERSION` v `index.html`, cache `kaltrack-v57` v `sw.js`).
+
+### Novinky ve v57 — zkratky ikony aplikace
+Po podržení ikony na ploše telefonu nabídne systém tři zkratky, které pustí rovnou
+tam, kam se zapisuje: **Zapsat jídlo** (`./?jdi=scan`, otevře Zadat → Hledat),
+**Zapsat nápoj** (`./?jdi=alc`) a **Zapsat cvičení** (`./?jdi=fit`).
+
+Obsluha parametru `?jdi=` v `index.html` (kolem řádku 1448) **existovala od dřívějška
+a byla nasazená** — chyběl jen klíč `shortcuts` v `manifest.json`, takže o zkratkách
+telefon nevěděl. Tohle kolo tedy nepřidalo kód, jen zapnulo, co už bylo hotové.
+
+- každá zkratka má **vlastní ikonu** (vidlička s nožem, sklenice, činka) v barvách
+  aplikace: podklad `#12151a`, bílá `#e8ecf3`, modrá `#4ea3ff`. Dřív by všechny tři
+  nesly kopii ikony aplikace a v menu by se lišily jen popiskem.
+- ikony generuje `build/ikony-zkratek.py` (bez závislostí, vlastní rasterizér a zápis
+  PNG). `python build/ikony-zkratek.py <složka> --do-manifestu` je přegeneruje
+  a rovnou vloží do `manifest.json`; výstup je reprodukovatelný, opakované spuštění
+  dá bajt po bajtu tentýž manifest.
+- testy `test57.js` — ověřují manifest, že se ikony liší a jsou to platná PNG 512×512,
+  a že každý odkaz opravdu otevře svou stránku. Ověřeno i to, že na verzi bez zkratek
+  padá 8 tvrzení (jinak by test nic nedokazoval).
+
+#### Opraven vratký `test50.js` (tři nezávislé vady v testu, ne v aplikaci)
+
+1. **Tvrzení „během sladění" neověřovalo nic.** Sleduje stav tlačítka 60 ms po spuštění
+   sladění, jenže mock odpovídal okamžitě — na rychlém stroji bylo v tu chvíli hotovo
+   a tvrzení padalo *vždycky* (ověřeno: původní v56 padá 6× ze 6). Mock má nově řiditelné
+   `zpozdeni`, takže se měří skutečný průběh.
+2. **Test chodil na skutečný internet.** Krok 3 schválně nastaví prázdný repozitář, čímž
+   vznikne `api.github.com/repos//contents/…` — adresa, na kterou se mockované vzory
+   netrefí, takže požadavek odešel ven a výsledek závisel na kvalitě připojení. Nové
+   `PROSTREDI.blokujVenek(ctx)` zachytí všechno mimo `127.0.0.1`. **Musí se registrovat
+   jako první** — v Playwrightu má přednost naposledy přidaná routa.
+3. **Hlavní příčina nestability: aplikace slaďuje i sama od sebe.** `window.onfocus`
+   spustí kolo hned (>30 s od posledního), `visibilitychange` taky (>60 s) — a to
+   okamžitě, ne přes časovač, takže `clearTimeout(syTimer)` na to nestačí. Test zakládal
+   zařízení s `last: 0`, takže podmínka platila vždy, a zakládání dalšího okna ten fokus
+   vyvolalo. Podle časování se buď nahrál nejdřív prázdný stav (druhé zařízení pak
+   nenašlo nic), nebo vznikly dva commity místo jednoho. Padalo to v jednom běhu ze
+   čtyř, pokaždé na jiném tvrzení. **Řešení: zařízení se zakládá jako čerstvě sladěné**
+   (`last: Date.now()`); kroky 4 a 5 si `last` posunou samy. Po opravě 8 běhů z 8 čistých.
+
+**Pravidlo do budoucna:** kdo v testu počítá přesné počty commitů nebo dotazů, musí počítat
+i s tím, že si aplikace umí sladit sama — přes časovač (`syLater`), při fokusu, při návratu
+viditelnosti a jednou za dvě minuty. Nejjistější je založit zařízení jako čerstvě sladěné.
+
+`runall.sh` navíc ukládá výstup každé sady do `<KAL_DIR>/logy` a po pádu rovnou vypíše,
+která tvrzení padla — dřív hlásil jen počet, což k dohledání příčiny nestačilo.
 
 ### Novinky ve v56 — úklid
 Revize hledala mrtvý kód a zbytečnou složitost. Mrtvý kód se nenašel žádný (jediné dva nálezy
@@ -261,14 +308,15 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 |---|---|---|
 | `index.html` | celá aplikace (HTML + CSS + JS v jednom) | ano |
 | `sw.js` | service worker, offline cache | ano |
-| `manifest.json` | PWA manifest, ikony jako data URI | zřídka |
+| `manifest.json` | PWA manifest, ikony a zkratky jako data URI | zřídka |
 | `zaklad.js` | 294 základních surovin | ano |
 | `jidla.js` | 95 hotových jídel | **NE — generuje se** |
 | `zxing.js` | čtečka čárových kódů (bundlovaná) | ne |
 | `build/receptury.js` | receptury jídel (suroviny + výtěžnost) | ano |
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
-| `testy/` | 57 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
+| `testy/` | 58 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |

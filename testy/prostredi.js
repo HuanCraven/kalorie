@@ -27,4 +27,22 @@ const EXE = najdiProhlizec();
 const DIR = process.env.KAL_DIR || path.join(os.tmpdir(), 'kalorie-testy');
 fs.mkdirSync(DIR, { recursive: true });
 
-module.exports = { EXE, DIR };
+/* Zabrání testu sáhnout na skutečný internet.
+   Testy mockují jen adresy, které čekají — jenže když aplikace poskládá adresu jinak
+   (např. při prázdném repozitáři vznikne api.github.com/repos//contents/…), vzor se
+   netrefí a Playwright požadavek pustí ven. Pak výsledek závisí na kvalitě připojení.
+   Volat PŘED konkrétními routami: v Playwrightu má přednost naposledy registrovaná,
+   takže tahle záchytná musí být první, aby ji konkrétní routy přebily. */
+async function blokujVenek(ctx, onBlok) {
+  await ctx.route('**/*', route => {
+    const u = route.request().url();
+    if (u.startsWith('http://127.0.0.1') || u.startsWith('http://localhost') || u.startsWith('data:')) {
+      return route.continue();
+    }
+    if (onBlok) onBlok(route.request().method() + ' ' + u);
+    return route.fulfill({ status: 404, contentType: 'application/json',
+                           body: '{"message":"Not Found"}' });
+  });
+}
+
+module.exports = { EXE, DIR, blokujVenek };

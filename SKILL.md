@@ -37,14 +37,15 @@ Starší zipy jsou archiv — **nové se už nevytvářejí**.
 |---|---|---|
 | `index.html` | celá aplikace (HTML+CSS+JS v jednom, ~5400 řádků) | ano |
 | `sw.js` | service worker, cache `kaltrack-vNN` | ano |
-| `manifest.json` | PWA manifest, ikony jako data URI | zřídka |
+| `manifest.json` | PWA manifest, ikony a zkratky jako data URI | zřídka |
 | `zaklad.js` | základní suroviny (`window.ZAKLAD`, klíče n/k/e/p/c/f/v/s na 100 g) | ano |
 | `jidla.js` | hotová jídla (`window.JIDLA`) | **NE — generuje se** |
 | `zxing.js` | bundlovaná čtečka čárových kódů | ne |
 | `build/receptury.js` | receptury: `{n, k, w, sur:[[název,g],…], odkap?}` | ano |
 | `build/extra.js` | suroviny chybějící v zaklad.js | ano |
 | `build/build-jidla.js` | generátor jidla.js (Atwater, výtěžnost) | zřídka |
-| `testy/` | 57 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
+| `testy/` | 58 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -58,7 +59,7 @@ Starší zipy jsou archiv — **nové se už nevytvářejí**.
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   57 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   58 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts,
    takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
