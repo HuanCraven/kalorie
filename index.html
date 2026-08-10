@@ -1109,7 +1109,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.10-59';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.10-60';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1454,6 +1454,7 @@ function offCachePut(k, v) {
   const dk = await dbGet('meta', 'drinks');
   if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
   products = await dbAll('products');
+  await opravZastupnaId();
   try { extFoods = await dbAll('ext'); } catch (e) { extFoods = []; }
   fillGoals();
   renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
@@ -2607,11 +2608,41 @@ function addToMeal(k) {
   toast('Zapisuji do: ' + mealName(k));
 }
 
+/* Záznamy, které nevznikly z potraviny v databázi, nesou ZÁSTUPNÉ productId —
+   a to samé pro všechny: rychlý zápis 'quick', položky z popisu 'popis', jídlo
+   z fotky 'foto', recept 'recept', nápoj 'alk'. Není to identifikátor potraviny,
+   jen značka původu. Kdo podle nich hledá v databázi, najde cizí potravinu
+   a přepíše jí celý záznam — viz `neniPotravina` níže. */
+const ZASTUPNE_ID = ['quick', 'popis', 'foto', 'recept', 'alk'];
+const neniPotravina = id => !id || ZASTUPNE_ID.indexOf(id) >= 0;
+
+/* Oprava databáze poškozené do v59: potravina uložená pod zástupným id přebíjela
+   všechny záznamy stejného původu — při úpravě jednoho se z něj stal ten druhý.
+   Potravina se zachová, jen dostane vlastní id. Záznamy se pak řídí svými
+   uloženými hodnotami, což je správně. Běží při startu, obvykle nenajde nic. */
+async function opravZastupnaId() {
+  const spatne = products.filter(p => ZASTUPNE_ID.indexOf(p.id) >= 0);
+  if (!spatne.length) return;
+  for (const p of spatne) {
+    await dbDel('products', p.id);
+    const novy = Object.assign({}, p);
+    // uid starého řádku patří k jeho náhrobku — kdyby se přeneslo, sloučení by
+    // novou potravinu zase smazalo. Nová řádka dostane vlastní uid v dbPut.
+    delete novy.uid; delete novy.upd;
+    novy.id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    await dbPut('products', novy);
+  }
+  products = await dbAll('products');
+  toast('Opraveno v databázi: ' + spatne.length + ' ' +
+    plur(spatne.length, 'potravina', 'potraviny', 'potravin'));
+}
+
 async function editLog(id) {
   const r = await dbGet('log', id);
   if (!r) return;
   if (r.alc && r.productId === 'alk') { editDrink(r); return; }   // potravina s alkoholem se edituje jako potravina
-  const p = products.find(x => x.id === r.productId);
+  // U zástupného productId se v databázi zásadně nehledá — hodnoty má záznam vlastní.
+  const p = neniPotravina(r.productId) ? null : products.find(x => x.id === r.productId);
   editLogId = id;
   curProduct = p || {
     id: r.productId, name: r.name, unit: r.unit || 'g', serving: null,
@@ -2741,7 +2772,24 @@ async function copyMeal(mealKey) {
   toast('Zkopírováno: ' + src.length + ' ' + plur(src.length, 'položka', 'položky', 'položek'));
   renderDay();
 }
-function editCurrent() { if (curProduct) { closeMod('modPortion'); openEdit(curProduct.id); } }
+function editCurrent() {
+  if (!curProduct) return;
+  closeMod('modPortion');
+  if (!neniPotravina(curProduct.id)) { openEdit(curProduct.id); return; }
+  /* Záznam bez potraviny v databázi (rychlý zápis, položka z popisu, nápoj):
+     zakládá se NOVÁ potravina předvyplněná jeho hodnotami. Kdyby se uložila pod
+     zástupným id, začala by přebíjet všechny ostatní záznamy téhož původu. */
+  openEdit(null);
+  $('edName').value = curProduct.name || '';
+  $('edUnit').value = curProduct.unit || 'g';
+  $('edUnitTxt').textContent = curProduct.unit || 'g';
+  $('edKcal').value = r1(curProduct.kcal || 0);
+  $('edP').value = r1(curProduct.p || 0);
+  $('edC').value = r1(curProduct.c || 0);
+  $('edF').value = r1(curProduct.f || 0);
+  $('edFib').value = curProduct.fib ? r1(curProduct.fib) : '';
+  $('edSalt').value = curProduct.salt ? r1(curProduct.salt) : '';
+}
 
 /* ---------------- edit sheet ---------------- */
 function openEdit(id, presetCode) {
@@ -2775,7 +2823,9 @@ async function saveProduct() {
   const name = $('edName').value.trim();
   if (!name) { toast('Vyplň název'); return; }
   const code = $('edCode').value.replace(/\D/g, '');
-  const id = editingId || code || ('m' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  // pod zástupným id se potravina uložit nesmí — přebíjela by cizí záznamy
+  const id = (editingId && !neniPotravina(editingId)) ? editingId
+    : (code || ('m' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)));
   const old = products.find(x => x.id === editingId) || {};
   const pos = v => Math.max(0, n(v));                  // záporné hodnoty nedávají smysl
   const anyNeg = ['edKcal', 'edP', 'edC', 'edF', 'edFib', 'edSalt', 'edServ']

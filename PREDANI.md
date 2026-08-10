@@ -17,7 +17,44 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.10-59** (`APP_VERSION` v `index.html`, cache `kaltrack-v59` v `sw.js`).
+Aktuální verze: **2026.08.10-60** (`APP_VERSION` v `index.html`, cache `kaltrack-v60` v `sw.js`).
+
+### Novinky ve v60 — oprava: úprava záznamu měnila jídlo za jiné
+
+Uživatel u položky z popsaného oběda změnil chod z odpolední svačiny na oběd
+a **z kuřecího plátku se stala minerální voda**.
+
+**Příčina.** Záznamy, které nevznikly z potraviny v databázi, nesou ZÁSTUPNÉ
+`productId` — a všechny stejné: `'quick'` (rychlý zápis), `'popis'` (položky
+z popisu bez shody), `'foto'` (jídlo z fotky), `'recept'`, `'alk'` (nápoj).
+Není to identifikátor potraviny, jen značka původu. `editLog` ale podle něj
+hledal v `products`. Dokud potravina s takovým id neexistovala, fungovalo to;
+jenže vyrobit ji šlo snadno — v okně porce **Upravit potravinu** volalo
+`openEdit(curProduct.id)`, tedy `openEdit('popis')`, a `saveProduct` pak uložilo
+potravinu s `id: 'popis'`. Od té chvíle se pod ni schoval **každý** záznam
+z popisu a při úpravě se jím přepsal (název i hodnoty).
+
+Proto se to nedařilo zopakovat na testovací databázi — je skoro prázdná
+a taková potravina v ní nikdy nevznikla. Reprodukce vyžaduje **dvě položky
+ze stejného popisu** a uložení jedné z nich přes „Upravit potravinu".
+
+**Oprava má tři části** (`ZASTUPNE_ID`, `neniPotravina()`):
+
+1. `editLog` u zástupného `productId` v databázi **nehledá** — hodnoty si nese
+   záznam sám (`p = neniPotravina(r.productId) ? null : products.find(…)`).
+2. `editCurrent` u takového záznamu zakládá **novou** potravinu předvyplněnou
+   jeho hodnotami; `saveProduct` navíc pod zástupným id uložit odmítne
+   a vygeneruje vlastní.
+3. `opravZastupnaId()` při startu přeznačí už uloženou potravinu se zástupným id
+   na vlastní — nezmizí, jen přestane přebíjet cizí záznamy. **Nesmí si nést
+   `uid`/`upd` smazaného řádku**, jinak by ji sloučení podle náhrobku zase
+   smazalo (u `products` slouží jako klíč pro sync `id`, viz `uidOf`).
+
+- testy `test60.js` — ověřují přesně ten případ i nápravu poškozené databáze;
+  na verzi před opravou padají 4 tvrzení.
+
+**Pozor:** záznamy, které se přepsaly dřív, oprava neuzdraví — mají už uložený
+cizí název i hodnoty. Zpětná náprava by šla jen odhadem, proto se nedělá.
 
 ### Novinky ve v59 — zjednodušené zadávání jídla
 Kolo vzniklo z průchodu aplikací na mobilním rozměru. Naměřené výchozí stavy:
@@ -430,7 +467,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 60 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 61 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |
