@@ -39,7 +39,7 @@ const SAL = {hits:[
   console.log('7. výchozí podzáložka =', await vis(), '| segmentů =', await p.locator('#addSeg button').count());
   await p.click('#addSeg button[data-s="photo"]'); await p.waitForTimeout(250);
   console.log('8. po přepnutí na Foto =', await vis(), '| tlačítko Vyfotit =', await p.isVisible('text=📷 Vyfotit'));
-  await p.click('#addSeg button[data-s="man"]'); await p.waitForTimeout(250);
+  await p.evaluate(() => setAdd('man')); await p.waitForTimeout(250);
   console.log('9. Ručně =', await vis(), '| tlačítko =', await p.isVisible('text=+ Zadat potravinu ručně'));
 
   // 1) našeptávání

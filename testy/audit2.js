@@ -39,7 +39,7 @@ const num=v=>parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(',','.'));
 
   sec('B · Nesmyslné hodnoty');
   await p.click('nav button[data-p="set"]'); await p.evaluate(() => setSetMode('data')); await p.click('text=Smazat všechna data'); await p.waitForTimeout(1200);
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="man"]');
+  await p.click('nav button[data-p="scan"]'); await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně');
   await p.fill('#edName','Záporné'); await p.fill('#edKcal','-500'); await p.fill('#edP','-10');
   await p.click('#modEdit >> text=Uložit'); await p.waitForTimeout(500);
@@ -59,7 +59,7 @@ const num=v=>parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(',','.'));
   sec('C · Dlouhý název a zvláštní znaky');
   const LONG='Extrémně dlouhý název potraviny který se nevejde na jeden řádek a měl by se zalomit '+
              '<script>alert(1)</script> & "uvozovky" \'apostrof\' 🥐';
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="man"]');
+  await p.click('nav button[data-p="scan"]'); await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně');
   await p.fill('#edName', LONG); await p.fill('#edKcal','200'); await p.fill('#edP','5');
   await p.fill('#edC','20'); await p.fill('#edF','8');

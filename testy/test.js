@@ -24,7 +24,7 @@ const PROSTREDI = require('./prostredi');
 
   // --- lookup a barcode (miss locally -> OFF mock)
   await page.click('nav button[data-p="scan"]');
-  await page.click('#addSeg button[data-s="code"]');
+  await page.evaluate(() => setAdd('code'));
   await page.fill('#manualCode', '8594001020304');
   await page.click('#codeBtn');
   await page.waitForTimeout(600);
@@ -43,7 +43,7 @@ const PROSTREDI = require('./prostredi');
 
   // --- manual product
   await page.click('nav button[data-p="scan"]');
-  await page.click('#addSeg button[data-s="man"]');
+  await page.evaluate(() => setAdd('man'));
   await page.click('text=+ Zadat potravinu ručně');
   await page.fill('#edName', 'Tvaroh Albert');
   await page.fill('#edKcal', '75'); await page.fill('#edP', '13');
@@ -70,7 +70,7 @@ const PROSTREDI = require('./prostredi');
   await page.unroute(/openfoodfacts\.org/);
   await page.route(/openfoodfacts\.org/, r => r.abort());
   await page.click('nav button[data-p="scan"]');
-  await page.click('#addSeg button[data-s="code"]');
+  await page.evaluate(() => setAdd('code'));
   await page.fill('#manualCode', '8590000111222');
   await page.click('#codeBtn');
   // čekáme na otevřené okno, ne na pevný čas — jinak test občas klikne dřív, než se objeví

@@ -15,7 +15,7 @@ async function run(engine){
   await p.waitForTimeout(500);
   await p.click('nav button[data-p="scan"]');
   const t0=Date.now();
-  await p.click('#addSeg button[data-s="code"]');   // v43: výchozí je Hledat
+  await p.evaluate(() => setAdd('code'));   // v43: výchozí je Hledat
   await p.click('#camBtn');
   let code='', ms=0;
   for(let i=0;i<60;i++){

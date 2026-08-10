@@ -12,7 +12,7 @@ const PROSTREDI = require('./prostredi');
   await p.click('nav button[data-p="scan"]');
   console.log('1. podzáložek =', await p.locator('#addSeg button').count(),
               '|', (await p.locator('#addSeg button').allTextContents()).join(' · '));
-  await p.click('#addSeg button[data-s="rec"]'); await p.waitForTimeout(300);
+  await p.evaluate(() => { go('db'); setDbMode('rec'); }); await p.waitForTimeout(300);
 
   await p.fill('#recName','Guláš s knedlíkem');
   // hovězí zadní 300 g (131 kcal/100) + cibule 100 (40) + olej 20 (884) + knedlík 200 (214)
@@ -50,7 +50,7 @@ const PROSTREDI = require('./prostredi');
   console.log('10. uložený recept:', JSON.stringify(rec));
 
   // ochrany
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="rec"]');
+  await p.evaluate(() => { go('db'); setDbMode('rec'); });
   await p.click('text=Jen uložit do databáze'); await p.waitForTimeout(300);
   console.log('11. prázdný recept:', (await p.textContent('#toast')).trim());
   await p.fill('#recQ','rajce'); await p.waitForTimeout(400);

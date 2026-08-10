@@ -72,7 +72,7 @@ const PROSTREDI = require('./prostredi');
 
   /* ---- 7. kurzor neuteče z rozepsaného pole ----------------------- */
   await p.click('nav button[data-p="scan"]'); await p.waitForTimeout(200);
-  await p.click('#addSeg button[data-s="man"]'); await p.waitForTimeout(200);
+  await p.evaluate(() => setAdd('man')); await p.waitForTimeout(200);
   await p.click('text=+ Zadat potravinu ručně');
   await p.fill('#edName', 'Zkouška fokusu');
   await p.fill('#edCode', '8590000111222');       // hned po otevření, dokud běží odložený fokus

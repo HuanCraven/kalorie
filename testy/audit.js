@@ -67,7 +67,7 @@ const dd=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().
   await p.click('nav button[data-p="day"]');
   await p.click('#logList div:nth-child(1) .mealhead .btn.pri'); await p.waitForTimeout(400);
   ck('"+" u snídaně přepne na Zadat', await p.isVisible('#p-scan'));
-  await p.click('#addSeg button[data-s="code"]');
+  await p.evaluate(() => setAdd('code'));
   await p.fill('#manualCode','8594001020304'); await p.click('#codeBtn'); await p.waitForTimeout(800);
   ck('produkt nalezen v Open Food Facts', (await p.textContent('#poName'))==='Jogurt bílý');
   ck('kJ→kcal (418/4.184=99.9)', near(await p.textContent('#poK'),150,2), await p.textContent('#poK'));
@@ -93,7 +93,7 @@ const dd=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().
 
   // ────────────────────────────────────────────
   sec('5 · Ruční zadání a foto etikety');
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="man"]');
+  await p.click('nav button[data-p="scan"]'); await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně'); await p.waitForTimeout(300);
   await p.fill('#labIn','Energie 1428 kJ / 341 kcal, Bílkoviny 9,5 g, Sacharidy 24 g, Tuky 22,5 g, Sůl 1,4 g');
   await p.click('#modEdit >> text=OK'); await p.waitForTimeout(400);
@@ -268,13 +268,13 @@ Celkem 508 kcal.`);
 
   // ────────────────────────────────────────────
   sec('15 · Okrajové případy');
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="code"]');
+  await p.click('nav button[data-p="scan"]'); await p.evaluate(() => setAdd('code'));
   await p.fill('#manualCode','123'); await p.click('#codeBtn'); await p.waitForTimeout(400);
   ck('krátký kód odmítnut', (await p.textContent('#toast')).includes('Neplatný'));
   await p.click('#addSeg button[data-s="find"]');
   await p.fill('#nameQ','a'); await p.click('#nameBtn'); await p.waitForTimeout(400);
   ck('jednopísmenný dotaz odmítnut', (await p.textContent('#toast')).includes('dvě písmena'));
-  await p.click('#addSeg button[data-s="man"]'); await p.click('text=+ Zadat potravinu ručně');
+  await p.evaluate(() => setAdd('man')); await p.click('text=+ Zadat potravinu ručně');
   await p.click('#modEdit >> text=Uložit'); await p.waitForTimeout(300);
   ck('produkt bez názvu neuloží', (await p.textContent('#toast')).includes('název'));
   await p.click('#modEdit >> text=Zrušit');

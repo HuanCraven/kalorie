@@ -61,7 +61,7 @@ const A = (n)=>Math.round(n*10)/10;
 
   // ---- ETIKETA ----
   await p.click('nav button[data-p="scan"]');
-  await p.click('#addSeg button[data-s="man"]');
+  await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně');
   await p.fill('#labIn', 'Tady je přepis:\n```json\n{"nazev":"Tvaroh polotučný","znacka":"Madeta","jed":"g","kcal":0,"b":12.5,"s":3.8,"t":4.5,"vlaknina":0,"sul":0.1,"porce":250}\n```\nkJ bylo 431, tedy 103 kcal.');
   await p.click('#modEdit >> text=OK');
@@ -77,7 +77,7 @@ const A = (n)=>Math.round(n*10)/10;
   await p.click('#modPortion >> text=Zrušit');
 
   // ml varianta
-  await p.click('#addSeg button[data-s="man"]');
+  await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně');
   await p.fill('#labIn','{"nazev":"Mléko 1,5%","jed":"ml","kcal":47,"b":3.4,"s":4.8,"t":1.5}');
   await p.click('#modEdit >> text=OK');

@@ -30,7 +30,7 @@ const ZX = fs.readFileSync(require.resolve('@zxing/library/umd/index.min.js'),'u
   console.log('   info panel:', (await p.textContent('#infoTxt')).split('\n')[0]);
 
   await p.click('nav button[data-p="scan"]');
-  await p.click('#addSeg button[data-s="code"]');   // v43: výchozí je Hledat
+  await p.evaluate(() => setAdd('code'));   // v43: výchozí je Hledat
   await p.click('#camBtn');
   // čekáme, až se kód rozpozná (hit() -> lookup -> nenalezeno -> otevře formulář s předvyplněným kódem)
   let found = '';

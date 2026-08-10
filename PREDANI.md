@@ -17,7 +17,50 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.10-58** (`APP_VERSION` v `index.html`, cache `kaltrack-v58` v `sw.js`).
+Aktuální verze: **2026.08.10-59** (`APP_VERSION` v `index.html`, cache `kaltrack-v59` v `sw.js`).
+
+### Novinky ve v59 — zjednodušené zadávání jídla
+Kolo vzniklo z průchodu aplikací na mobilním rozměru. Naměřené výchozí stavy:
+Hlavní měřila 1606 px při okně 812 px, karta **Časté** začínala na 1444 px (třetí
+obrazovka), panel **Hledat** se otevíral prázdný a na Hlavní bylo **21 tlačítek**
+menších než doporučených 44×44 px.
+
+- **Hledat nabízí i bez napsaného dotazu.** `renderRychle()` ukáže 6 nejčastějších
+  (podle `uses`) a 4 naposledy použité (`lastUsed`); zápis běžného jídla je pak dva
+  ťuky bez psaní. Volá se z `onNameInput()` při dotazu kratším než 2 znaky, ze
+  `setAdd('find')` a z `clearNameQ()` — tedy i po zápisu porce a po smazání křížkem.
+- **Zadat má místo pěti panelů dva: Hledat a Popsat.** Čtečka kódů je ikona v poli
+  hledání (`#nameScan` → `setAdd('code')`), ruční zápis tlačítko pod výsledky
+  (→ `setAdd('man')`). Oba panely (`s-code`, `s-man`) zůstaly i s ID, jen se k nim
+  chodí jinudy a mají tlačítko zpět. V přepínači zůstává zvýrazněné **Hledat**,
+  protože jde o odbočky, ne o samostatné volby.
+- **Recept se přestěhoval do Jídel** jako pátý segment (`setDbMode('rec')`, blok
+  `#dbRec`) — je to skládání potraviny ze surovin, tedy správa databáze, ne zápis
+  dne. Panel `s-rec` v Zadat zanikl; `saveRecipe` proto končí `setDbMode('rec')`.
+  V režimu Recept se schová i hledací karta `#dbHledatKarta`.
+- **Časté jsou hned pod kruhem** (`#favCard`) — z 1444 px na 338 px.
+- **Rychlé gramáže se řídí poslední porcí.** `rychleGramaze()` nabídne ½× · 1× · 2×
+  z `lastAmount` (jinak `serving`, jinak 100), zaokrouhleno na pětky do 100 a na
+  desítky nad 100: kuřecí prsa 90/180/360, olej 5/10/20. Pevné 30/50/100 sedělo
+  na sýr, ne na maso nebo rýži. Volá se z `openPortion` i z `editLog`.
+- **Dotykové cíle**: nová třída `.dotyk` (min 44×44 px) na knoflících v hlavičkách
+  jídel, šipkách data, chipech Časté a zavíracím křížku. Z 21 podměrečných zbylo 0.
+  Tlačítko kopie má nově text **⧉ včera** a `aria-label` — samotná ikona byla na
+  mobilu nesrozumitelná, protože `title` se tam nezobrazí. Hlavička jídla se pořád
+  vejde na 375 px bez přetékání.
+- testy `test59.js`; kvůli zrušeným segmentům přepsáno 14 sad na `setAdd(…)`
+  a `setDbMode('rec')` místo klikání na `#addSeg`.
+
+**Dvě zastaralá očekávání v testech**, která tím vyplavala:
+`test40` klikal na `text=Zapsat` — volný podřetězec, který nově trefil i skryté
+tlačítko „Nenašel jsem to — zapsat rovnou kalorie" v jiném panelu; selektor je teď
+omezený na `#s-man`. A tentýž test čekal, že křížek nechá výsledky prázdné, což už
+neplatí. **Poučení:** textové selektory omezuj na panel, jinak je rozbije každý nový
+text, který obsahuje totéž slovo.
+
+**Co se vědomě nedělalo:** schování pole s datem v okně porce (uživatel chce nechat)
+a kopie celého dne (nejí každý den totéž — kopie jednoho jídla stačí a funguje pro
+libovolný den: přepni se na den a ⧉ vezme jídlo z předchozího).
 
 ### Novinky ve v58 — dvě drobnosti, které otravovaly při zápisu
 Obojí vzešlo z běžného používání, ne z revize kódu.
@@ -387,7 +430,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 59 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 60 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |

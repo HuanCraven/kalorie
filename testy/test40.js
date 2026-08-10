@@ -22,11 +22,11 @@ const PROSTREDI = require('./prostredi');
 
   // --- rychlý zápis
   await p.click('nav button[data-p="scan"]');
-  await p.click('#addSeg button[data-s="man"]'); await p.waitForTimeout(200);
+  await p.evaluate(() => setAdd('man')); await p.waitForTimeout(200);
   ck('panel Ručně má rychlý zápis', await p.locator('#qaKcal').isVisible());
   ck('panel Ručně má i plný formulář', (await p.locator('text=+ Zadat potravinu ručně').count()) === 1);
   await p.fill('#qaKcal', '450'); await p.fill('#qaB', '20');
-  await p.click('text=Zapsat'); await p.waitForTimeout(500);
+  await p.click('#s-man >> text=Zapsat'); await p.waitForTimeout(500);
   ck('rychlý zápis přistál v deníku', (await p.textContent('#logList')).includes('Rychlý zápis'));
   ck('deník ukazuje 450 kcal', (await p.textContent('#logList')).includes('450'));
   ck('sub ukazuje 1 porce', (await p.textContent('#logList')).includes('1 porce'));
@@ -36,8 +36,8 @@ const PROSTREDI = require('./prostredi');
   await p.evaluate(() => closeMod('modPortion'));
 
   // --- rychlý zápis bez kcal se odmítne
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="man"]');
-  await p.click('text=Zapsat'); await p.waitForTimeout(300);
+  await p.click('nav button[data-p="scan"]'); await p.evaluate(() => setAdd('man'));
+  await p.click('#s-man >> text=Zapsat'); await p.waitForTimeout(300);
   ck('bez kcal nic nezapsal', (await p.evaluate(async () =>
     (await new Promise(r => { const q = db.transaction('log', 'readonly').objectStore('log').getAll(); q.onsuccess = () => r(q.result); })).length)) === 1);
 
@@ -48,8 +48,10 @@ const PROSTREDI = require('./prostredi');
   ck('✕ viditelné při dotazu', await p.locator('#nameClr').isVisible());
   ck('našeptávač našel eidam', (await p.textContent('#nameRes')).includes('Sýr eidam'));
   await p.click('#nameClr'); await p.waitForTimeout(200);
-  ck('✕ smazal dotaz i výsledky', (await p.inputValue('#nameQ')) === '' &&
-    (await p.textContent('#nameRes')).trim() === '');
+  // od v59 tu po smazání nezůstane prázdno, ale nabídka nejčastějších —
+  // podstatné je, že zmizel dotaz i jeho výsledky
+  ck('✕ smazal dotaz i jeho výsledky', (await p.inputValue('#nameQ')) === '' &&
+    !(await p.textContent('#nameRes')).includes('Sýr eidam'));
   ck('fokus zůstal v poli', await p.evaluate(() => document.activeElement.id === 'nameQ'));
 
   // --- poslední gramáž: zapiš 145 g, znovu otevři → předvyplněno 145
@@ -64,7 +66,7 @@ const PROSTREDI = require('./prostredi');
   await p.evaluate(() => closeMod('modPortion'));
 
   // --- naposledy použité na panelu Kód
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="code"]');
+  await p.click('nav button[data-p="scan"]'); await p.evaluate(() => setAdd('code'));
   await p.waitForTimeout(300);
   ck('karta Naposledy použité viditelná', await p.locator('#recentCard').isVisible());
   ck('obsahuje eidam s poslední gramáží', (await p.textContent('#recentList')).includes('naposledy 145 g'));

@@ -77,7 +77,7 @@ const API_LABEL = { content: [{ type: 'text', text:
 
   // --- etiketa přes API
   mode = 'label';
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="man"]');
+  await p.click('nav button[data-p="scan"]'); await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně'); await p.waitForTimeout(300);
   ck('tlačítko u etikety vidět', await p.locator('#apiLabBtn').isVisible());
   await p.evaluate(() => {

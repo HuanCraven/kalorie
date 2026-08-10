@@ -39,7 +39,7 @@ const PROSTREDI = require('./prostredi');
   console.log('6) po reloadu databáze:', await p.textContent('#dbCount'));
 
   // recepturník musí umět použít hotové jídlo jako surovinu
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="rec"]');
+  await p.evaluate(() => { go('db'); setDbMode('rec'); });
   await p.fill('#recQ','gulas'); await p.waitForTimeout(500);
   const rr=(await p.textContent('#recRes')).replace(/\s+/g,' ').trim();
   console.log('7) recepturník najde jídlo:', rr.slice(0,90), '| ✓', /guláš|Guláš/i.test(rr));

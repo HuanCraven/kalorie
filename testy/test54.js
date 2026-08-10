@@ -17,7 +17,7 @@ const PROSTREDI = require('./prostredi');
 
   /* ---- 1. potravina s obsahem alkoholu ---------------------------- */
   await p.click('nav button[data-p="scan"]'); await p.waitForTimeout(200);
-  await p.click('#addSeg button[data-s="man"]'); await p.waitForTimeout(200);
+  await p.evaluate(() => setAdd('man')); await p.waitForTimeout(200);
   await p.click('text=+ Zadat potravinu ručně'); await p.waitForTimeout(300);
   ck('formulář má pole pro obsah alkoholu', await p.isVisible('#edAbv'));
   await p.fill('#edName', 'Pivo 12° točené');

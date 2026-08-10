@@ -38,11 +38,15 @@ const PROSTREDI = require('./prostredi');
   await zapis('tvaroh', 'p-tvaroh', 'vecere');
   const poPrvnim = await p.evaluate(() => ({
     dotaz: document.getElementById('nameQ').value,
-    vysledky: document.getElementById('nameRes').innerHTML.trim().length,
+    text: document.getElementById('nameRes').textContent,
     krizek: document.getElementById('nameClr').style.display
   }));
   ck('po zápisu je pole hledání prázdné', poPrvnim.dotaz === '', `"${poPrvnim.dotaz}"`);
-  ck('a nezůstaly ani výsledky minulého hledání', poPrvnim.vysledky === 0, poPrvnim.vysledky + ' znaků');
+  // od v59 tu po vyprázdnění nezůstane prázdno, ale nabídka nejčastějších —
+  // podstatné je, že tam není výsledek minulého hledání
+  ck('a nezůstaly výsledky minulého hledání', poPrvnim.text.indexOf('Šunka') < 0, poPrvnim.text.slice(0, 60));
+  ck('místo nich je nabídka nejčastějších', poPrvnim.text.indexOf('Nejčastější') >= 0 ||
+     poPrvnim.text.indexOf('Naposledy') >= 0, poPrvnim.text.slice(0, 60));
   ck('křížek na smazání dotazu se schová', poPrvnim.krizek === 'none', poPrvnim.krizek);
 
   // ověř i to, že se panel Hledat opravdu ukáže prázdný, ne jen podkladová data

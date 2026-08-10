@@ -35,7 +35,7 @@ Sůl: 1,4 g`],
   console.log('4. varování o sdílení viditelné =', await p.isVisible('text=Důležité'));
 
   // parser etikety
-  await p.click('#addSeg button[data-s="man"]'); await p.click('text=+ Zadat potravinu ručně');
+  await p.evaluate(() => setAdd('man')); await p.click('text=+ Zadat potravinu ručně');
   for (const [nm, txt] of LABELS) {
     await p.fill('#edKcal',''); await p.fill('#edP',''); await p.fill('#edC',''); await p.fill('#edF','');
     await p.fill('#edSalt',''); await p.fill('#labIn', txt);

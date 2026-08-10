@@ -36,6 +36,9 @@ input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
 .btn.pri{background:var(--acc);border-color:var(--acc);color:#04121f}
 .btn.dan{background:transparent;border-color:#4a2b2b;color:var(--bad)}
 .btn.sm{padding:7px 10px;font-size:13px;font-weight:500}
+/* Dotykový cíl aspoň 44×44 px — pod tím se na telefonu trefuje špatně.
+   Týká se hlavně malých knoflíků v hlavičkách jídel a šipek u data. */
+.dotyk{min-width:44px;min-height:44px;padding-left:10px;padding-right:10px}
 .btn.full{width:100%}
 .muted{color:var(--dim)}
 .tiny{font-size:12.5px}
@@ -141,20 +144,20 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="card" id="bakWarn" style="display:none;border-color:#4a3a20;background:#241f14">
     <div class="row" style="justify-content:space-between;gap:10px">
       <span class="tiny" id="bakTxt"></span>
-      <button class="btn sm pri" onclick="exportData()">Zálohovat</button>
+      <button class="btn sm pri dotyk" onclick="exportData()">Zálohovat</button>
     </div>
   </div>
   <div class="card" id="persWarn" style="display:none;border-color:#4a3a20;background:#241f14">
     <div class="row" style="justify-content:space-between;gap:10px">
       <span class="tiny">Prohlížeč nepovolil trvalé úložiště — při nedostatku místa může data smazat.
         Zálohuj častěji.</span>
-      <button class="btn sm pri" onclick="exportData()">Zálohovat</button>
+      <button class="btn sm pri dotyk" onclick="exportData()">Zálohovat</button>
     </div>
   </div>
   <div class="card" id="obCard" style="display:none">
     <div class="row" style="justify-content:space-between;align-items:flex-start">
       <h3 style="margin-bottom:6px">Začni tady</h3>
-      <button class="btn sm" onclick="obDismiss()" aria-label="zavřít">✕</button>
+      <button class="btn sm dotyk" onclick="obDismiss()" aria-label="zavřít">✕</button>
     </div>
     <p class="tiny muted" style="margin:0 0 10px">Tři kroky a aplikace začne dávat smysl.
       Kartu kdykoli zavřeš křížkem.</p>
@@ -163,11 +166,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button class="btn full" onclick="go('scan')">3 · Nebo najít jídlo podle názvu</button>
   </div>
   <div class="row" style="margin-bottom:10px">
-    <button class="btn sm" id="dayPrev" onclick="shiftDay(-1)">‹</button>
+    <button class="btn sm dotyk" id="dayPrev" onclick="shiftDay(-1)" aria-label="Předchozí den">‹</button>
     <div class="grow" style="text-align:center"><b id="dayLabel"></b></div>
-    <button class="btn sm" id="daySync" onclick="syncNow(true)" style="display:none"
+    <button class="btn sm dotyk" id="daySync" onclick="syncNow(true)" style="display:none"
       title="Sladit s druhým zařízením" aria-label="Synchronizovat">⟳</button>
-    <button class="btn sm" id="dayNext" onclick="shiftDay(1)">›</button>
+    <button class="btn sm dotyk" id="dayNext" onclick="shiftDay(1)" aria-label="Další den">›</button>
   </div>
 
   <div class="card hero">
@@ -194,6 +197,13 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <span class="tiny muted">Vláknina <b class="mono" id="fibTxt">0</b></span>
       <span class="tiny muted">Sůl <b class="mono" id="saltTxt">0</b></span>
     </div>
+  </div>
+
+  <!-- Časté jsou hned pod kruhem: opakovaný zápis je nejčastější úkon dne.
+       Dřív byly úplně dole, přes dvě obrazovky scrollování. -->
+  <div class="card" id="favCard">
+    <h3>Časté</h3>
+    <div id="favList" class="row wrap2"></div>
   </div>
 
   <div class="card">
@@ -228,10 +238,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     </div>
   </div>
 
-  <div class="card">
-    <h3>Časté</h3>
-    <div id="favList" class="row wrap2"></div>
-  </div>
 </section>
 
 <!-- ============ ZADAT ============ -->
@@ -245,15 +251,16 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <p class="tiny" id="addDateWarn" style="margin:8px 0 0;color:var(--warn);display:none"></p>
   </div>
 
+  <!-- Jen dvě cesty, jak jídlo zapsat. Čtečka kódů je ikona v poli hledání,
+       ruční zápis až pod výsledky (sahá se po něm, když hledání selže)
+       a recept se přesunul do Jídel — je to správa databáze, ne zápis dne. -->
   <div class="seg" id="addSeg">
     <button data-s="find" class="on" onclick="setAdd('find')">Hledat</button>
-    <button data-s="code" onclick="setAdd('code')">Kód</button>
     <button data-s="photo" onclick="setAdd('photo')">Popsat</button>
-    <button data-s="man" onclick="setAdd('man')">Ručně</button>
-    <button data-s="rec" onclick="setAdd('rec')">Recept</button>
   </div>
 
   <div class="pane" id="s-code">
+  <button class="btn" style="margin-bottom:10px" onclick="setAdd('find')">‹ Zpět na hledání</button>
   <div class="card">
     <div id="scanBox">
       <video id="video" playsinline muted></video>
@@ -291,6 +298,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
         onkeydown="if(event.key==='Enter'){clearTimeout(sugT);searchByName();}">
       <button class="btn" id="nameClr" onclick="clearNameQ()" aria-label="smazat dotaz"
         style="display:none">✕</button>
+      <button class="btn" id="nameScan" onclick="setAdd('code')" title="Načíst čárový kód"
+        aria-label="Načíst čárový kód"><svg width="19" height="17" viewBox="0 0 19 17" aria-hidden="true"
+        ><g fill="currentColor"><rect x="0" y="0" width="2" height="17"/><rect x="3.5" y="0" width="1" height="17"/
+        ><rect x="6" y="0" width="2" height="17"/><rect x="9.5" y="0" width="1" height="17"/
+        ><rect x="12" y="0" width="1" height="17"/><rect x="14.5" y="0" width="2" height="17"/
+        ><rect x="18" y="0" width="1" height="17"/></g></svg></button>
       <button class="btn pri" id="nameBtn" onclick="searchByName()">Hledat</button>
     </div>
     <label class="row" style="margin:10px 0 0;gap:8px;align-items:center">
@@ -299,8 +312,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <div id="nameRes" style="margin-top:8px"></div>
   </div>
 
-  <p class="tiny muted" style="margin:4px 2px 12px">Hotová jídla a základní potraviny procházej
-    v záložce <b>Jídla</b> dole — tady je najdeš i hledáním nahoře.</p>
+  <div class="card compact">
+    <button class="btn full" onclick="setAdd('man')">Nenašel jsem to — zapsat rovnou kalorie</button>
+    <p class="tiny muted" style="margin:8px 0 0">Odhad bez zakládání potraviny, nebo celý
+      formulář podle etikety. Hotová jídla a základní potraviny procházej v záložce
+      <b>Jídla</b> dole.</p>
+  </div>
 
   </div>
 
@@ -395,43 +412,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
   </div>
 
-  <div class="pane" id="s-rec">
-    <div class="card">
-      <h3>Vlastní recept</h3>
-      <p class="tiny muted" style="margin:0 0 10px">Slož jídlo ze surovin a aplikace dopočte hodnoty
-        na 100 g. Uloží se jako běžná potravina — příště ho přidáš jedním klepnutím.</p>
-      <div class="fld"><label>Název jídla</label>
-        <input id="recName" placeholder="např. Guláš s knedlíkem"></div>
-      <div class="row">
-        <input class="grow" id="recQ" placeholder="přidat surovinu…" autocomplete="off"
-          oninput="recSearch()" onkeydown="if(event.key==='Enter')recSearch()">
-      </div>
-      <div id="recRes" style="margin-top:6px"></div>
-    </div>
-
-    <div class="card">
-      <h3>Suroviny</h3>
-      <div id="recList"></div>
-      <div class="hr"></div>
-      <div class="fld"><label>Hmotnost hotového jídla (g) — po uvaření</label>
-        <input id="recW" type="number" inputmode="decimal" placeholder="nech prázdné = součet surovin"
-          oninput="recTotals()"></div>
-      <p class="tiny muted" style="margin:-4px 0 10px">Vařením se hmotnost mění — maso se srazí,
-        těstoviny nabobtnají. Když hotové jídlo zvážíš, hodnoty na 100 g budou sedět.</p>
-      <div class="card" style="background:var(--card2);margin-bottom:12px">
-        <div class="row" style="justify-content:space-between"><span class="muted tiny">Celkem</span>
-          <b class="mono" id="recTotK">0 kcal</b></div>
-        <div class="row" style="justify-content:space-between"><span class="muted tiny">B / S / T</span>
-          <span class="mono" id="recTotM">0 / 0 / 0 g</span></div>
-        <div class="row" style="justify-content:space-between"><span class="muted tiny">Na 100 g</span>
-          <b class="mono" id="rec100">—</b></div>
-      </div>
-      <button class="btn pri full" style="margin-bottom:8px" onclick="saveRecipe(true)">Uložit a přidat do dneška</button>
-      <button class="btn full" onclick="saveRecipe(false)">Jen uložit do databáze</button>
-    </div>
-  </div>
-
   <div class="pane" id="s-man">
+  <button class="btn" style="margin-bottom:10px" onclick="setAdd('find')">‹ Zpět na hledání</button>
   <div class="card">
     <h3>Rychlý zápis</h3>
     <p class="tiny muted" style="margin:0 0 10px">Odhad bez zakládání potraviny — třeba jídlo
@@ -728,8 +710,46 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button data-d="jidla" onclick="setDbMode('jidla')">Hotová</button>
     <button data-d="zaklad" onclick="setDbMode('zaklad')">Základní</button>
     <button data-d="ext" onclick="setDbMode('ext')">ČR</button>
+    <button data-d="rec" onclick="setDbMode('rec')">Recept</button>
   </div>
-  <div class="card">
+
+  <div id="dbRec" style="display:none">
+    <div class="card">
+      <h3>Vlastní recept</h3>
+      <p class="tiny muted" style="margin:0 0 10px">Slož jídlo ze surovin a aplikace dopočte hodnoty
+        na 100 g. Uloží se jako běžná potravina — příště ho přidáš jedním klepnutím.</p>
+      <div class="fld"><label>Název jídla</label>
+        <input id="recName" placeholder="např. Guláš s knedlíkem"></div>
+      <div class="row">
+        <input class="grow" id="recQ" placeholder="přidat surovinu…" autocomplete="off"
+          oninput="recSearch()" onkeydown="if(event.key==='Enter')recSearch()">
+      </div>
+      <div id="recRes" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <h3>Suroviny</h3>
+      <div id="recList"></div>
+      <div class="hr"></div>
+      <div class="fld"><label>Hmotnost hotového jídla (g) — po uvaření</label>
+        <input id="recW" type="number" inputmode="decimal" placeholder="nech prázdné = součet surovin"
+          oninput="recTotals()"></div>
+      <p class="tiny muted" style="margin:-4px 0 10px">Vařením se hmotnost mění — maso se srazí,
+        těstoviny nabobtnají. Když hotové jídlo zvážíš, hodnoty na 100 g budou sedět.</p>
+      <div class="card" style="background:var(--card2);margin-bottom:12px">
+        <div class="row" style="justify-content:space-between"><span class="muted tiny">Celkem</span>
+          <b class="mono" id="recTotK">0 kcal</b></div>
+        <div class="row" style="justify-content:space-between"><span class="muted tiny">B / S / T</span>
+          <span class="mono" id="recTotM">0 / 0 / 0 g</span></div>
+        <div class="row" style="justify-content:space-between"><span class="muted tiny">Na 100 g</span>
+          <b class="mono" id="rec100">—</b></div>
+      </div>
+      <button class="btn pri full" style="margin-bottom:8px" onclick="saveRecipe(true)">Uložit a přidat do dneška</button>
+      <button class="btn full" onclick="saveRecipe(false)">Jen uložit do databáze</button>
+    </div>
+  </div>
+
+  <div class="card" id="dbHledatKarta">
     <input id="dbSearch" placeholder="Hledat v mé databázi…" oninput="renderDbMode()">
     <p class="tiny muted" style="margin:8px 0 0" id="dbCount"></p>
   </div>
@@ -981,9 +1001,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <div class="fld"><label>Datum</label><input type="date" id="poDate" onchange="setAddDate(this.value)"></div>
     </div>
     <div class="grid4" style="margin-bottom:12px">
-      <button class="btn sm" onclick="setAmt(30)">30</button>
-      <button class="btn sm" onclick="setAmt(50)">50</button>
-      <button class="btn sm" onclick="setAmt(100)">100</button>
+      <button class="btn sm" id="poQ1" onclick="setAmt(n(this.dataset.g))">30</button>
+      <button class="btn sm" id="poQ2" onclick="setAmt(n(this.dataset.g))">50</button>
+      <button class="btn sm" id="poQ3" onclick="setAmt(n(this.dataset.g))">100</button>
       <button class="btn sm" id="poServ" onclick="setAmt(servingAmt)">porce</button>
     </div>
     <div class="card" style="margin-bottom:12px;background:var(--card2)">
@@ -1089,7 +1109,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.10-58';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.10-59';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1550,10 +1570,13 @@ function closeMod(id) { $(id).classList.remove('on'); }
 /* podzáložky na stránce Zadat */
 function setAdd(k) {
   document.querySelectorAll('#p-scan .pane').forEach(e => e.classList.toggle('on', e.id === 's-' + k));
-  document.querySelectorAll('#addSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === k));
+  // Kód i Ručně jsou odbočky z Hledat, ne samostatné volby — v přepínači proto
+  // zůstane zvýrazněné Hledat, aby bylo poznat, odkud se tam člověk dostal.
+  const zvyraz = (k === 'code' || k === 'man') ? 'find' : k;
+  document.querySelectorAll('#addSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === zvyraz));
   if (k !== 'code') stopCam();
   if (k === 'code') renderRecent();
-  if (k === 'find') setTimeout(() => $('nameQ').focus(), 100);
+  if (k === 'find') { onNameInput(); setTimeout(() => $('nameQ').focus(), 100); }
 }
 
 /* naposledy použité produkty — rychlé opakování bez kamery */
@@ -1700,9 +1723,10 @@ async function renderDay() {
           <span class="row" style="gap:6px;align-items:center">
             <span class="tiny muted mono">${g.rows.length ? r0(kc) + ' kcal' : '—'}</span>
             ${g.m.k === 'nezar' ? '' : `
-              <button class="btn sm" style="padding:8px 12px" onclick="copyMeal('${g.m.k}')"
-                title="zkopírovat ze včerejška">⧉</button>
-              <button class="btn sm pri" style="padding:8px 13px" onclick="addToMeal('${g.m.k}')">+</button>`}
+              <button class="btn sm dotyk" onclick="copyMeal('${g.m.k}')"
+                aria-label="Zkopírovat ${g.m.n} ze včerejška">⧉ včera</button>
+              <button class="btn sm pri dotyk" onclick="addToMeal('${g.m.k}')"
+                aria-label="Přidat do ${g.m.n}">+</button>`}
           </span>
         </div>
         ${g.rows.map(row).join('')}
@@ -1729,7 +1753,7 @@ async function renderDay() {
 
   const favs = products.slice().sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).filter(p => p.uses);
   $('favList').innerHTML = favs.length ? favs.map(p =>
-    `<button class="btn sm" onclick="openPortion('${sid(p.id)}')">${esc(p.name)}</button>`).join('')
+    `<button class="btn sm dotyk" onclick="openPortion('${sid(p.id)}')">${esc(p.name)}</button>`).join('')
     : '<span class="tiny muted">Nejpoužívanější položky se objeví tady.</span>';
 }
 /* smazání s možností vrátit — záznam se podrží v paměti po dobu toastu */
@@ -1810,6 +1834,11 @@ function setDbMode(m) {
   $('dbJid').style.display = m === 'jidla' ? '' : 'none';
   $('dbZak').style.display = m === 'zaklad' ? '' : 'none';
   $('dbExt').style.display = m === 'ext' ? '' : 'none';
+  // Recept je skládání nové potraviny ze surovin, ne procházení databáze —
+  // proto se mu schová i hledací pole nad seznamem.
+  $('dbRec').style.display = m === 'rec' ? '' : 'none';
+  $('dbHledatKarta').style.display = m === 'rec' ? 'none' : '';
+  if (m === 'rec') { renderRec(); return; }
   $('dbSearch').placeholder = {
     moje: 'Hledat v mé databázi…', jidla: 'Hledat v hotových jídlech…',
     zaklad: 'Hledat v základních potravinách…', ext: 'Hledat v externí databázi…'
@@ -1962,15 +1991,35 @@ function onNameInput() {
   const q = ($('nameQ').value || '').trim();
   clearTimeout(sugT);
   $('nameClr').style.display = q ? '' : 'none';
-  if (q.length < 2) { $('nameRes').innerHTML = ''; return; }
+  if (q.length < 2) { renderRychle(); return; }
   renderLocalMatches(q);
+}
+
+/* Prázdné pole hledání bylo promarněná obrazovka: kdo si zapisuje pořád totéž,
+   musel to pokaždé vypsat. Místo prázdna nabídneme, co se používá nejčastěji
+   a co bylo naposledy — zápis běžného jídla je pak dva ťuky bez psaní. */
+function renderRychle() {
+  const box = $('nameRes');
+  const casto = products.filter(p => p.uses).sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 6);
+  const videno = new Set(casto.map(p => p.id));
+  const nedavno = products.filter(p => p.lastUsed && !videno.has(p.id))
+    .sort((a, b) => b.lastUsed - a.lastUsed).slice(0, 4);
+  if (!casto.length && !nedavno.length) {
+    box.innerHTML = '<p class="tiny muted" style="margin:8px 0 0">Napiš aspoň dvě písmena. ' +
+      'Až budeš mít něco zapsaného, nabídnu tady, co jíš nejčastěji.</p>';
+    return;
+  }
+  const skupina = (nadpis, pole) => pole.length
+    ? `<p class="tiny muted" style="margin:10px 0 4px">${nadpis}</p>` + pole.map(p => resCard(p, true)).join('')
+    : '';
+  box.innerHTML = skupina('Nejčastější', casto) + skupina('Naposledy', nedavno);
 }
 /* fokus jen když maže uživatel tlačítkem ✕; po zápisu porce se pole čistí
    potichu, aby se pod prstem nevyskočila klávesnice a stránka neposkočila */
 function clearNameQ(fokus) {
   $('nameQ').value = '';
-  $('nameRes').innerHTML = '';
   $('nameClr').style.display = 'none';
+  renderRychle();               // ne prázdno — rovnou zase nabídni nejčastější
   if (fokus !== false) $('nameQ').focus();
 }
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -2257,7 +2306,7 @@ async function saveRecipe(alsoAdd) {
   recIngs = []; $('recName').value = ''; $('recW').value = '';
   renderRec(); renderDb(); info();
   toast('Recept uložen (' + r0(w) + ' g, ' + r0(p.kcal) + ' kcal/100 g)');
-  if (alsoAdd) openPortion(p.id); else setAdd('rec');
+  if (alsoAdd) openPortion(p.id); else setDbMode('rec');   // recept žije v Jídlech, ne v Zadat
 }
 
 async function useZaklad(id) {
@@ -2575,6 +2624,7 @@ async function editLog(id) {
   $('poUnit').textContent = curProduct.unit;
   $('poServ').style.display = 'none';
   $('poAmt').value = r1(r.amount);
+  rychleGramaze({ lastAmount: r.amount });
   fillMealSelect();
   $('poMeal').value = r.meal || defaultMeal();
   $('poDate').value = r.date || curDate;
@@ -2601,8 +2651,24 @@ function openPortion(id) {
   $('poServ').textContent = p.serving ? 'porce ' + r0(p.serving) : 'porce';
   $('poServ').style.display = p.serving ? '' : 'none';
   $('poAmt').value = p.lastAmount || p.serving || 100;   // naposledy zadaná gramáž má přednost
+  rychleGramaze(p);
   calcPortion();
   $('modPortion').classList.add('on');
+}
+
+/* Pevné 30/50/100 g sedí na sýr, ne na kuřecí prsa nebo rýži. Nabídneme proto
+   násobky toho, co se u téhle potraviny zapisuje — polovinu, celou a dvojnásobek.
+   Zaokrouhluje se na pětky, ať to nevypadá jako výsledek dělení. */
+function rychleGramaze(p) {
+  const zaklad = p.lastAmount || p.serving || 100;
+  const pekne = v => v >= 100 ? Math.round(v / 10) * 10 : Math.round(v / 5) * 5;
+  const hodnoty = [pekne(zaklad / 2), pekne(zaklad), pekne(zaklad * 2)]
+    .map(v => Math.max(5, v));
+  ['poQ1', 'poQ2', 'poQ3'].forEach((id, i) => {
+    const b = $(id);
+    b.dataset.g = hodnoty[i];
+    b.textContent = hodnoty[i];
+  });
 }
 function setAmt(v) { $('poAmt').value = v; calcPortion(); }
 function calcPortion() {
