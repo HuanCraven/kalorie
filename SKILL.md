@@ -45,7 +45,8 @@ Starší zipy jsou archiv — **nové se už nevytvářejí**.
 | `build/extra.js` | suroviny chybějící v zaklad.js | ano |
 | `build/build-jidla.js` | generátor jidla.js (Atwater, výtěžnost) | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
-| `testy/` | 62 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `build/off-cz.js` | stáhne z Open Food Facts české produkty s čárovými kódy do CSV | zřídka |
+| `testy/` | 64 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -59,7 +60,7 @@ Starší zipy jsou archiv — **nové se už nevytvářejí**.
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   62 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   64 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts,
    takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -71,7 +72,9 @@ Starší zipy jsou archiv — **nové se už nevytvářejí**.
 4. **Open Food Facts: limit 10 dotazů/min/IP.** Aplikace má vlastní hlídač (6/min)
    a 24h cache odpovědí. Nikdy nezaváděj našeptávání (search-as-you-type) proti OFF —
    vede k zablokování IP. Online dotaz jen po stisku Hledat.
-5. **Data z NutriDatabáze** se importují jen do telefonu uživatele, do repozitáře nepatří.
+5. **Cizí databáze potravin** (NutriDatabáze, Open Food Facts) se importují jen
+   do telefonu — do repozitáře nepatří, nesynchronizují se a nejsou v záloze.
+   Jde jich načíst víc naráz; import nahradí jen databázi se stejným klíčem `zd`.
 6. Žádný `eval` ani `document.write`; texty z OFF a z odpovědí Claude escapovat (`esc()`),
    ID sanitizovat (`sid()`) — obrana proti podvržené záloze.
 

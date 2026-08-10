@@ -17,7 +17,52 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.10-61** (`APP_VERSION` v `index.html`, cache `kaltrack-v61` v `sw.js`).
+Aktuální verze: **2026.08.10-63** (`APP_VERSION` v `index.html`, cache `kaltrack-v63` v `sw.js`).
+
+### Novinky ve v62–63 — databáze s čárovými kódy
+
+Vestavěné databáze čárové kódy nemají (`zaklad.js` 294 surovin, `jidla.js` 95 jídel).
+Skenování dosud stálo jen na tom, co si uživatel uložil, plus živý dotaz do Open Food
+Facts. Navíc **import externí databáze sloupec s kódem vůbec nečetl**.
+
+**`build/off-cz.js`** stáhne z Open Food Facts české produkty a udělá z nich CSV.
+Naměřeno: 20 043 produktů, z toho 86 % s vyplněnými kaloriemi → asi 17 200 položek,
+soubor kolem 1,3 MB.
+
+- **Bere se po stránkách, ne z hromadného exportu.** Export má 1,3 GB, tohle přenese
+  ~30 MB. Cenou je čas: server pouští asi deset dotazů za minutu → ~45 minut.
+- **Stránky po 100 server odmítá (503), po 50 projdou.** Stejně tak odmítá `sort_by`.
+  Proto se nedělá přírůstková aktualizace a proto **v aplikaci není tlačítko, které
+  by databázi stahovalo z internetu** — na telefonu by to běželo tři čtvrtě hodiny
+  a padalo v půlce.
+- Skript se dá přerušit a **naváže**, kde skončil; po 503 počká a zkusí to znovu.
+- Data jsou pod ODbL: volně použitelná při uvedení zdroje. **Výsledné CSV nepatří
+  do repozitáře** — zůstává na disku a v telefonu, stejně jako NutriDatabáze.
+
+**V aplikaci:**
+
+- import čte sloupce `kod` a `znacka`; u položek s kódem se z něj tvoří i `id`
+- `lookup()` se **nejdřív podívá do databáze v telefonu** a teprve pak na internet;
+  nalezená položka se uloží mezi vlastní potraviny (kvůli gramáži a četnosti)
+- **víc databází naráz**: každý řádek nese `zd` (klíč databáze), import nahradí jen
+  řádky se stejným klíčem. Typicky NutriDatabáze na suroviny + Open Food Facts na kódy.
+  Při hledání i skenování se chovají jako jedna, duplicity se v nabídce neopakují.
+  Název databáze je v meta `extNazvy`, čas načtení v `extKdy` — odvozovat je zpětně
+  z klíče by znamenalo hádat, jak se co zkrátilo.
+- v Nastavení → Data je u každé databáze počet, datum načtení a tlačítko **Aktualizovat**
+
+**`ext` se nesynchronizuje ani nezálohuje** (`SYNC_STORES` bez něj, `exportData` bez něj).
+Nejsou to data uživatele, dají se znovu načíst ze souboru, a se 17 tisíci řádky by
+každý commit i každá záloha narostly o megabajty (sladění posílá vždy celý stav).
+Na každém zařízení se importuje zvlášť.
+
+**Pozor na `ZRUSENE_STORY`:** `mergeState` schválně přenáší neznámé klíče beze změny
+(kvůli slučitelnosti se staršími verzemi), takže samotné vyřazení ze `SYNC_STORES`
+by `ext` ve sdíleném souboru nechalo ležet navždycky. Proto je seznam zrušených klíčů
+a v `syncRun` vynucený zápis, když se ve staženém stavu ještě objeví.
+
+- testy `test62.js` (databáze s kódy, dvě naráz, duplicity) a `test63.js`
+  (nesynchronizuje se, není v záloze, úklid zbytku po starší verzi)
 
 ### Novinky ve v61 — nová potravina z fotky obalu
 
@@ -495,7 +540,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 62 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 64 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |

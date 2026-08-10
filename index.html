@@ -1127,7 +1127,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.10-61';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.10-63';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1240,7 +1240,15 @@ function vidTajne(id, btn) {
    Každý synchronizovaný záznam má `upd` (čas poslední změny) a stabilní `uid`,
    který platí napříč zařízeními. Mazání zanechá náhrobek ve store `tomb`,
    jinak by se smazaný záznam při dalším sloučení vrátil z druhého zařízení. */
-const SYNC_STORES = ['log', 'workout', 'products', 'daily', 'ext'];
+/* `ext` (načtená cizí databáze potravin) se vědomě NESYNCHRONIZUJE ani nezálohuje:
+   nejsou to data uživatele a dají se kdykoli znovu načíst ze souboru. S Open Food
+   Facts jde o desítky tisíc řádků a sladění posílá vždycky celý stav, takže by
+   každý commit narostl o megabajty. Na každém zařízení se importuje zvlášť. */
+const SYNC_STORES = ['log', 'workout', 'products', 'daily'];
+/* Klíče, které se dřív synchronizovaly a mají ze sdíleného souboru zmizet.
+   Bez tohohle seznamu by je sloučení považovalo za „neznámé z novější verze"
+   a přenášelo dokola beze změny (viz mergeState). */
+const ZRUSENE_STORY = ['ext'];
 const SYNC_META = ['goals', 'drinks'];        // klíč `api` se vědomě nesynchronizuje
 const GEN_UID = ['log', 'workout'];           // stores, kde uid musíme vyrobit
 const TOMB_KEEP = 180 * 86400000;             // náhrobky starší než půl roku zahodíme
@@ -1313,7 +1321,7 @@ function mergeState(a, b, now) {
   const out = { v: 5, ts: now, meta: {}, tomb: [] };
   /* Data, kterým tahle verze nerozumí (nový store z novější verze aplikace),
      přeneseme beze změny. Bez toho by starší zařízení novinku ze souboru smazalo. */
-  const zname = SYNC_STORES.concat(['v', 'ts', 'meta', 'tomb']);
+  const zname = SYNC_STORES.concat(ZRUSENE_STORY, ['v', 'ts', 'meta', 'tomb']);
   for (const st of [a, b]) {
     for (const k in st) if (zname.indexOf(k) < 0) out[k] = st[k];
   }
@@ -1404,6 +1412,8 @@ let persisted = null;         // chrání IndexedDB před automatickým smazán�
 let curProduct = null;        // product open in portion sheet
 let servingAmt = 100;
 let editingId = null;
+let extNazvy = {};        // klíč databáze → její název, viz nazevZdroje()
+let extKdy = {};          // klíč databáze → kdy byla načtena
 let ringLeft = false;         // kruh: false = snědeno, true = zbývá
 try { ringLeft = localStorage.getItem('ringLeft') === '1'; } catch (e) {}
 function toggleRing() {
@@ -1474,6 +1484,8 @@ function offCachePut(k, v) {
   products = await dbAll('products');
   await opravZastupnaId();
   try { extFoods = await dbAll('ext'); } catch (e) { extFoods = []; }
+  try { const en = await dbGet('meta', 'extNazvy'); extNazvy = (en && en.v) || {}; } catch (e) { extNazvy = {}; }
+  try { const ek = await dbGet('meta', 'extKdy'); extKdy = (ek && ek.v) || {}; } catch (e) { extKdy = {}; }
   fillGoals();
   renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
   // po prvním úspěšném zpracování fotky se návody sbalí — tlačítka zůstávají
@@ -1944,6 +1956,18 @@ async function lookup(code) {
   if (code.length < 6) { toast('Neplatný kód'); return; }
   const local = products.find(p => p.barcode === code);
   if (local) { openPortion(local.id); return; }
+  /* Externí databáze s čárovými kódy (viz build/off-cz.js) odpoví okamžitě
+     a offline — proto se do ní kouká dřív než na internet. Nalezená položka
+     se uloží mezi moje potraviny, aby si pamatovala gramáž a četnost. */
+  const zvenku = extFoods.find(x => x.k === code);
+  if (zvenku) {
+    const p = extProduct(zvenku);
+    await dbPut('products', p);
+    products.push(p);
+    toast('Z databáze v telefonu: ' + p.name);
+    openPortion(p.id);
+    return;
+  }
   toast('Hledám v Open Food Facts…');
   let p = null;
   try { p = await fetchOFF(code); } catch (e) { /* offline */ }
@@ -2140,15 +2164,22 @@ let extFoods = [];
 
 function extProduct(x) {
   return {
-    id: x.id, barcode: null, name: x.n, brand: x.z || 'externí databáze', unit: 'g',
+    id: x.id, barcode: x.k || null, name: x.n, brand: x.z || 'externí databáze', unit: 'g',
     kcal: x.e, p: x.p, c: x.c, f: x.f, fib: x.v || 0, salt: x.s || 0,
     serving: null, source: 'ext', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
   };
 }
 function extMatches(q) {
   if (!extFoods.length) return [];
-  const out = [];
-  for (const x of extFoods) { if (matchWords(x.n, q)) { out.push(extProduct(x)); if (out.length >= 10) break; } }
+  const out = [], videno = new Set();
+  for (const x of extFoods) {
+    if (!matchWords(x.n, q)) continue;
+    // tatáž potravina může být ve dvou databázích — ukážeme ji jednou
+    const klic = norm(x.n) + '|' + Math.round(x.e);
+    if (videno.has(klic)) continue;
+    videno.add(klic);
+    out.push(extProduct(x)); if (out.length >= 10) break;
+  }
   return out;
 }
 async function useExt(id) {
@@ -2161,13 +2192,42 @@ async function useExt(id) {
   }
   openPortion(pr.id);
 }
+/* Databází může být načteno víc; při hledání se chovají jako jedna, tady se
+   vypíšou zvlášť, aby bylo vidět, co v telefonu je a co se dá znovu načíst. */
+function extZdroje() {
+  const m = new Map();
+  for (const x of extFoods) {
+    const k = x.zd || 'csv';
+    if (!m.has(k)) m.set(k, { klic: k, nazev: nazevZdroje(k), pocet: 0, kody: 0, kdy: extKdy[k] || 0 });
+    const z = m.get(k); z.pocet++; if (x.k) z.kody++;
+  }
+  return [...m.values()].sort((a, b) => b.pocet - a.pocet);
+}
+/* Název databáze se ukládá zvlášť (meta `extNazvy`), ne do každého řádku —
+   odvozovat ho zpětně z klíče by znamenalo hádat, jak se co zkrátilo. */
+const nazevZdroje = k => extNazvy[k] || (k === 'csv' ? 'CSV' : k);
+
 function extInfoTxt() {
   if (!$('extInfo')) return;
-  $('extInfo').textContent = extFoods.length
-    ? 'Načteno ' + extFoods.length + ' potravin' + (extFoods[0].z ? ' — ' + extFoods[0].z : '') +
-      '. Zůstávají jen v tomhle telefonu.'
-    : 'Nic načteného. Podporuje export z NutriDatabaze.cz (registrace zdarma) i obecné CSV ' +
-      'se sloupci název / kcal / bílkoviny / sacharidy / tuky.';
+  const zd = extZdroje();
+  if (!zd.length) {
+    $('extInfo').innerHTML = '<span class="tiny muted">Nic načteného. Podporuje export ' +
+      'z NutriDatabaze.cz (registrace zdarma), databázi s čárovými kódy z <code>build/off-cz.js</code> ' +
+      'i obecné CSV se sloupci název / kcal / bílkoviny / sacharidy / tuky. ' +
+      'Načíst jich jde víc naráz — při hledání i skenování se chovají jako jedna.</span>';
+    return;
+  }
+  /* U každé databáze zvlášť, protože aktualizace nahrazuje vždycky jen jednu.
+     Datum je tu proto, aby bylo poznat, že je databáze stará — sama se neobnoví. */
+  $('extInfo').innerHTML = zd.map(z => `
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span class="tiny"><b>${esc(z.nazev)}</b> · ${z.pocet}${z.kody ? ' s kódy' : ''}
+        <span class="muted">${z.kdy ? '· načteno ' + czd(dstr(new Date(z.kdy))) : ''}</span></span>
+      <button class="btn sm dotyk" onclick="document.getElementById('extFile').click()">Aktualizovat</button>
+    </div>`).join('') +
+    '<p class="tiny muted" style="margin:2px 0 0">Při hledání i skenování se chovají jako jedna. ' +
+    'Nový soubor nahradí jen svoji databázi, ostatní nechá být. Zůstávají v tomhle telefonu — ' +
+    'nesynchronizují se ani nejsou v záloze.</p>';
 }
 function readExt(inp) {
   const f = inp.files && inp.files[0]; if (!f) return;
@@ -2195,13 +2255,23 @@ async function parseExt(txt) {
         iC = find(/^chog$/, /^cho$/, /sacharid|carb/),
         iF = find(/^fatg$/, /^fat$/, /tuk/),
         iV = find(/^fibtg?$/, /vlaknin|vláknin|fiber/),
-        iS = find(/^naclg?$/, /^sul$/, /sůl|salt/);
+        iS = find(/^naclg?$/, /^sul$/, /sůl|salt/),
+        // čárový kód je nepovinný — s ním umí databáze odpovídat i na skenování
+        iB = find(/^kod$/, /^code$/, /ean|barcode|čárov|carov/),
+        iZ = find(/^znacka$/, /^značka$/, /^brand/);
   if (iN < 0 || iK < 0) {
     box.innerHTML = '<span style="color:var(--warn)">Nepoznal jsem sloupce.</span><br>Záhlaví: <code>' +
       esc(head.join(' | ').slice(0, 160)) + '</code><br>Pošli soubor Claudeovi, doladí to.';
     return;
   }
-  const zdroj = /origfdnm/.test(H.join(' ')) ? 'NutriDatabaze.cz' : 'CSV';
+  /* Databází může být načteno víc naráz (typicky NutriDatabáze pro suroviny
+     a Open Food Facts pro čárové kódy). Každý řádek proto nese `zd` = krátký
+     klíč své databáze; nový import přepíše jen řádky se stejným klíčem, ostatní
+     nechá být. `z` zůstává na značku výrobce, ta se ukazuje uživateli. */
+  const iZD = find(/^zdroj$/, /^source$/);
+  const zdroj = (iZD >= 0 && lines[1] && (lines[1].split(sep)[iZD] || '').trim())
+    || (/origfdnm/.test(H.join(' ')) ? 'NutriDatabáze' : (iB >= 0 ? 'Databáze s kódy' : 'CSV'));
+  const zdKlic = norm(zdroj).replace(/[^a-z0-9]+/g, '').slice(0, 10) || 'csv';
   // '-' znamená v odborných databázích „neuvedeno", ne nulu
   const MISS = v => { const t = String(v == null ? '' : v).trim(); return t === '' || t === '-' || t === '\u2014' || /^n\.?a\.?$/i.test(t); };
   const num = v => { if (MISS(v)) return null; const x = parseFloat(String(v).replace(',', '.').replace(/[^0-9.\-]/g, '')); return isFinite(x) ? x : null; };
@@ -2213,7 +2283,10 @@ async function parseExt(txt) {
     if (!nm || String(c[iK]).trim() === '') continue;   // sůl a voda mají 0 kcal, přesto patří dovnitř
     const e = num(c[iK]);
     if (!(e >= 0)) continue;
-    let id = 'x-' + norm(nm).replace(/[^a-z0-9]+/g, '-').slice(0, 48);
+    const kod = iB >= 0 ? String(c[iB] || '').replace(/\D/g, '') : '';
+    // kód je jednoznačnější než název — u databází s kódy z něj vzniká i id
+    let id = kod.length >= 8 ? 'x-' + kod
+      : 'x-' + norm(nm).replace(/[^a-z0-9]+/g, '-').slice(0, 48);
     while (seen.has(id)) id += '2';
     seen.add(id);
     const P = iP >= 0 ? num(c[iP]) : null, F = iF >= 0 ? num(c[iF]) : null;
@@ -2224,14 +2297,28 @@ async function parseExt(txt) {
       C = Math.max(0, r1((e - 4 * P - 9 * F - 2 * (V || 0)) / 4));
       dopo = true;
     }
-    rows.push({ id, n: nm + (dopo ? ' *' : ''), z: zdroj, e,
-      p: P || 0, c: C || 0, f: F || 0, v: V || 0, s: S || 0, x: dopo ? 1 : 0 });
+    rows.push({ id, n: nm + (dopo ? ' *' : ''), z: (iZ >= 0 && c[iZ] ? c[iZ].trim() : '') || zdroj,
+      zd: zdKlic, e,
+      p: P || 0, c: C || 0, f: F || 0, v: V || 0, s: S || 0, x: dopo ? 1 : 0,
+      k: kod.length >= 8 ? kod : undefined });
     if (dopo) dopoctu++;
   }
   if (!rows.length) { box.textContent = 'Sloupce jsem našel, ale žádný použitelný řádek.'; return; }
-  await new Promise(res => { const t = db.transaction('ext', 'readwrite'); t.objectStore('ext').clear(); t.oncomplete = res; });
+  // smaže se jen tahle databáze, ostatní zůstanou (řádky bez `zd` jsou z doby,
+  // kdy šla načíst jen jedna — patří pod 'csv')
+  const stare = await dbAll('ext');
+  const nahradit = stare.filter(x => (x.zd || 'csv') === zdKlic).map(x => x.id);
+  await new Promise(res => {
+    const t = db.transaction('ext', 'readwrite'), st = t.objectStore('ext');
+    for (const id of nahradit) st.delete(id);
+    t.oncomplete = res;
+  });
   for (const r of rows) await dbPut('ext', r);
-  extFoods = rows; extInfoTxt(); info();
+  extNazvy[zdKlic] = zdroj;
+  extKdy[zdKlic] = Date.now();
+  await dbPut('meta', { k: 'extNazvy', v: extNazvy });
+  await dbPut('meta', { k: 'extKdy', v: extKdy });
+  extFoods = await dbAll('ext'); extInfoTxt(); info();
   box.innerHTML = '<b style="color:var(--ok)">Načteno ' + rows.length + ' potravin</b> ze zdroje ' +
     esc(zdroj) + '.<br>Sloupce: název=' + esc(head[iN]) + ', kcal=' + esc(head[iK]) +
     (iP >= 0 ? ', B=' + esc(head[iP]) : '') + (iC >= 0 ? ', S=' + esc(head[iC]) : '') +
@@ -2941,10 +3028,13 @@ async function checkBackup() {
 }
 
 async function exportData() {
+  /* Bez `ext`: načtená cizí databáze potravin (NutriDatabáze, Open Food Facts)
+     nejsou data uživatele a s desítkami tisíc řádků by ze zálohy udělala megabajty.
+     Načte se znovu ze souboru. Starší zálohy `ext` obsahují a import je pořád přijme. */
   const data = {
     v: 5, exported: new Date().toISOString(), goals, drinks,
     products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily'),
-    ext: await dbAll('ext'), workout: await dbAll('workout'), tomb: await dbAll('tomb')
+    workout: await dbAll('workout'), tomb: await dbAll('tomb')
   };
   dl('kalorie-zaloha-' + dstr(new Date()) + '.json', JSON.stringify(data, null, 1));
   await dbPut('meta', { k: 'lastBackup', v: Date.now() });
@@ -4582,8 +4672,12 @@ async function syncRun(manual) {
       const merged = mergeState(local, rem ? rem.state : { tomb: [] });
       await applyState(merged);
       await reloadAfterSync();
+      /* Zbytek po zrušené synchronizaci externí databáze: dokud ve sdíleném souboru
+         leží, musí se soubor přepsat i když je jinak shodný — jinak by tam ta data
+         zůstala napořád a zbytečně nafukovala každé stažení. */
+      const uklid = !!(rem && rem.state && ZRUSENE_STORY.some(k => rem.state[k]));
       // shodný obsah nestačí — po zapnutí či vypnutí šifrování se musí přepsat i obálka
-      if (rem && syPrint(rem.state) === syPrint(merged) && !!rem.enc === !!syKey) { ok = true; break; }
+      if (rem && !uklid && syPrint(rem.state) === syPrint(merged) && !!rem.enc === !!syKey) { ok = true; break; }
       const res = await syPush(merged, rem ? rem.sha : '');
       if (res.conflict) continue;                 // druhé zařízení psalo dřív — celé kolo znovu
       ok = true; break;
