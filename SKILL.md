@@ -63,7 +63,9 @@ Starší zipy jsou archiv — **nové se už nevytvářejí**.
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts,
    takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
-   `npm install playwright @zxing/library@0.21.3` a `python testy/make-fixtures.py`.
+   `npm install` a `python testy/make-fixtures.py`.
+   Regrese běží i v GitHub Actions při každém pushi na `main`
+   (`.github/workflows/regrese.yml`); výpisy sad se ukládají jako artefakt.
    Prohlížeč si `prostredi.js` najde sám (Chrome/Edge/Chromium), stahovat se nemusí.
    Podrobnosti a pasti při psaní testů v `testy/README.md`.
 4. **Open Food Facts: limit 10 dotazů/min/IP.** Aplikace má vlastní hlídač (6/min)

@@ -28,3 +28,6 @@ echo "════════════════════════"
 echo "PROŠLO: $PASS   SELHALO: $FAIL"
 [ -n "$FAILED" ] && echo "selhalo:$FAILED"
 echo "úplné výstupy: $LOGY"
+# Návratový kód, aby se dalo spolehnout na výsledek i bez čtení výpisu (CI).
+[ "$FAIL" -eq 0 ] || exit 1
+exit 0

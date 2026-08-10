@@ -1,0 +1,84 @@
+name: Regrese
+
+# Push na main je zároveň nasazení (GitHub Pages servíruje kořen větve), takže
+# regrese je tu spíš pojistka „co se vlastně vypustilo" než brána před nasazením.
+# Změny jen v dokumentaci ji nespouštějí — trvá kolem dvaceti minut.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+# Když přijde další push, rozdělaný běh nemá cenu dopočítávat
+concurrency:
+  group: regrese-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      KAL_CHROME: playwright        # vlastní Chromium Playwrightu, ne to na runneru
+      KAL_DIR: ${{ github.workspace }}/.testy-data
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Závislosti
+        run: npm install --no-audit --no-fund
+
+      - name: Chromium pro Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Fixtures
+        run: python testy/make-fixtures.py
+
+      - name: Server na 8811
+        run: |
+          python -m http.server 8811 --bind 127.0.0.1 &
+          # počkat, až server odpoví — jinak by první testy padly na spojení
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8811/index.html && break
+            sleep 1
+          done
+          curl -sf -o /dev/null http://127.0.0.1:8811/index.html
+
+      - name: Verze musí být zvýšená spolu s cache
+        run: |
+          # Klasické zapomenutí: změní se index.html, ale sw.js drží starou cache,
+          # takže telefony novou verzi nedostanou. Tady se to pozná hned.
+          # head -1: vzor „APP_VERSION = '…'" je v index.html dvakrát — podruhé
+          # uvnitř regulárního výrazu, kterým si aplikace sama hlídá novou verzi
+          APP=$(grep -oP "APP_VERSION = '\K[0-9.]+-[0-9]+" index.html | head -1)
+          SW=$(grep -oP "kaltrack-v\K[0-9]+" sw.js | head -1)
+          echo "APP_VERSION=$APP   cache=kaltrack-v$SW"
+          [ "${APP##*-}" = "$SW" ] || {
+            echo "::error::APP_VERSION končí na ${APP##*-}, ale cache v sw.js je v$SW — musí souhlasit"
+            exit 1
+          }
+
+      - name: Regrese
+        working-directory: testy
+        run: bash runall.sh
+
+      - name: Výpisy z testů
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vypisy-testu
+          path: ${{ env.KAL_DIR }}/logy
+          retention-days: 14
+          if-no-files-found: warn

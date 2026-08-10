@@ -1,0 +1,15 @@
+{
+  "name": "kalorie",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Aplikace samotná žádné závislosti nemá — běží z index.html. Tohle je jen pro regresi.",
+  "scripts": {
+    "test": "cd testy && bash runall.sh",
+    "fixtures": "python testy/make-fixtures.py",
+    "server": "python -m http.server 8811 --bind 127.0.0.1"
+  },
+  "devDependencies": {
+    "@zxing/library": "0.21.3",
+    "playwright": "1.55.0"
+  }
+}

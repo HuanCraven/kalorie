@@ -8,6 +8,9 @@ const os = require('os');
 const path = require('path');
 
 function najdiProhlizec() {
+  // KAL_CHROME=playwright = ať si Playwright vezme vlastní stažené Chromium.
+  // V CI je to jistota: runner sice svůj Chrome mívá, ale která verze, to se mění.
+  if (process.env.KAL_CHROME === 'playwright') return undefined;
   if (process.env.KAL_CHROME) return process.env.KAL_CHROME;
   const kandidati = [
     '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',

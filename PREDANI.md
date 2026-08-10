@@ -339,11 +339,31 @@ takže **push na `main` je nasazení**. Složky `build/` a `testy/` Pages ignoru
 ```bash
 git clone https://github.com/HuanCraven/kalorie.git
 cd kalorie
-npm install playwright @zxing/library@0.21.3   # jednou
+npm install                                    # jednou (playwright + zxing, viz package.json)
 python testy/make-fixtures.py                  # jednou
 python -m http.server 8811 --bind 127.0.0.1    # aplikace pro testy
 cd testy && bash runall.sh                     # regrese, ~20 minut
 ```
+
+`package.json` v repozitáři popisuje **jen závislosti regrese** — aplikace sama žádné
+nemá, běží z `index.html`. Prohlížeč se stahovat nemusí, `testy/prostredi.js` si najde
+Chrome nebo Edge v systému; kdo chce Chromium od Playwrightu, nastaví
+`KAL_CHROME=playwright` a doinstaluje ho přes `npx playwright install chromium`.
+
+### Regrese v GitHub Actions
+
+`.github/workflows/regrese.yml` pustí celou sadu při každém pushi na `main` a u pull
+requestů; změny jen v `*.md` ji nespouštějí. Výpisy všech sad se ukládají jako artefakt
+(`vypisy-testu`, 14 dní), takže po pádu je vidět které tvrzení a proč — i u běhu,
+který spustil někdo jiný. V CI se schválně používá Chromium od Playwrightu
+(`KAL_CHROME=playwright`), aby výsledek nezávisel na tom, jaký prohlížeč má runner.
+
+Před samotnou regresí běží **kontrola verzí**: `APP_VERSION` musí končit stejným číslem,
+jaké má cache v `sw.js`. Je to nejčastější opomenutí (pravidlo 1 níže) a takhle se pozná
+během vteřin místo až na telefonu, který drží starou verzi.
+
+`runall.sh` nově **končí nenulovým kódem**, když něco spadne — bez toho by CI hlásilo
+úspěch vždycky.
 
 Testy si prohlížeč i složku pro fixtures najdou samy (`testy/prostredi.js`),
 takže běží na Windows, Linuxu i v cloudu. Dřív byly cesty zadrátované

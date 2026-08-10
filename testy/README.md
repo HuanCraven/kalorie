@@ -6,7 +6,7 @@ takže **neposílají žádný dotaz ven** — limit 10 dotazů/min/IP se jimi n
 ## Jednorázová příprava
 
 ```bash
-npm install playwright @zxing/library@0.21.3
+npm install                    # z kořene repa; verze jsou v package.json
 python testy/make-fixtures.py
 ```
 

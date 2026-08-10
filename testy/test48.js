@@ -47,7 +47,11 @@ const PROSTREDI = require('./prostredi');
     await p.goto('http://127.0.0.1:8811/index.html');
     await p.waitForFunction(() => typeof db !== 'undefined' && db, null, { timeout: 15000 });
     await p.evaluate(async () => {
-      await dbPut('meta', { k: 'sync', v: { repo: 'ja/data', token: 'github_pat_x', path: 'kalorie-sync.json', last: 0, on: true } });
+      /* `last` schválně NENÍ 0: aplikace slaďuje i sama od sebe — při získání fokusu
+         okna (>30 s od posledního kola) a při návratu viditelnosti (>60 s), a to hned,
+         ne přes časovač. Zakládání dalšího okna v testu takovou událost vyvolá a kolo
+         navíc pak rozhází počty i obsah. Zařízení proto zakládáme jako čerstvě sladěné. */
+      await dbPut('meta', { k: 'sync', v: { repo: 'ja/data', token: 'github_pat_x', path: 'kalorie-sync.json', last: Date.now(), on: true } });
       await loadSync();
     });
     return p;
@@ -89,7 +93,7 @@ const PROSTREDI = require('./prostredi');
     syCfg.last = Date.now(); const hned = syCekani();
     syCfg.last = Date.now() - 55000; const skoro = syCekani();
     syCfg.last = Date.now() - 120000; const davno = syCekani();
-    syCfg.last = 0;
+    syCfg.last = Date.now();   // ne zpátky na 0, to by zase pustilo samovolná kola
     return { prvni, hned, skoro, davno };
   });
   ck('po dlouhé pauze se čeká jen na doklepání změn', odstup.prvni === 6000 && odstup.davno === 6000,
