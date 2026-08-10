@@ -41,6 +41,22 @@ Aplikace pak jede na celou obrazovku a **funguje i offline** (kromě dotazů na 
 
 Na iPhonu: Safari → Sdílet → **Přidat na plochu**.
 
+### Zkratky pod ikonou
+
+Podržením ikony na ploše se rozbalí **Jídlo · Nápoj · Cvičení** — každá otevře
+aplikaci rovnou tam, kam se zapisuje.
+
+Chrome při instalaci vyrobí skutečný balíček aplikace (WebAPK) a zkratky do něj
+zapeče, takže **změna manifestu se neprojeví hned**. Chrome si ho po čase přečte
+znovu a balíček přegeneruje — typicky během dne dvou, když se aplikace otevírá.
+Kdo nechce čekat, aplikaci odinstaluje a nainstaluje znovu; **před tím ale ať si
+udělá zálohu** (Nastavení → Data → Export zálohy) a při odinstalaci odmítne
+smazání dat. Data leží v úložišti Chromu pro tu adresu, ne v balíčku, takže
+odinstalace je normálně nemaže — záloha je jen pojistka.
+
+Že funguje samotné přesměrování, se dá ověřit bez instalace: otevřít
+`…/kalorie/?jdi=alc` a zkontrolovat, že aplikace naskočí na Alkoholu.
+
 ## 5. První spuštění
 
 1. **Nastavení → Já** → nastav denní cíle a klidový výdej (ukládá se samo, žádné tlačítko)
