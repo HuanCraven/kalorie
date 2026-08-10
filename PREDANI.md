@@ -17,7 +17,35 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.10-60** (`APP_VERSION` v `index.html`, cache `kaltrack-v60` v `sw.js`).
+Aktuální verze: **2026.08.10-61** (`APP_VERSION` v `index.html`, cache `kaltrack-v61` v `sw.js`).
+
+### Novinky ve v61 — nová potravina z fotky obalu
+
+Třetí panel v Zadat: **Vyfotit** (`s-lab`). Pro potravinu, která není v databázi
+a nemá čitelný čárový kód. Jedna fotka pokryje obojí:
+
+- je-li vidět **tabulka výživových údajů**, Claude ji jen opíše (`zdroj: "etiketa"`),
+- není-li, určí podle obalu výrobek a hodnoty **odhadne** (`zdroj: "odhad"`) —
+  formulář to pak označí varováním `#edOdhad`, ať je jasné, co je potřeba ověřit.
+
+**Nestavělo se to znovu.** Čtení etikety existovalo od v44, jen bylo zakopané uvnitř
+formuláře nové potraviny — muselo se tam nejdřív doklikat. Nový panel je **rozcestník**:
+`gotObal()` otevře `openEdit(null)`, předá fotku do `labelFile`, ukáže náhled a s API
+klíčem rovnou zavolá `apiLabel()`. Bez klíče zůstane ve formuláři ruční cesta (poslat
+Claudeovi, vložit odpověď), takže funkce na klíči nezávisí. Žádné UI se nezdvojilo.
+
+- `LABEL_PROMPT` rozšířen o rozhodnutí etiketa/odhad a o pole `abv` a `zdroj`;
+  `processLabel` je plní (`edAbv`, varování). Vyfocené pivo se tak započítá i do alkoholu.
+- Po uložení potraviny se rovnou nabídne zápis porce (`saveProduct` končí `openPortion`),
+  takže jedním průchodem se potravina založí i sní.
+- **`PROJEKT-INSTRUKCE.md` upraveny na týž formát** — jinak by se ruční cesta přes
+  uživatelův Claude projekt rozešla s tím, co čeká parser (pravidlo ze skillu).
+- testy `test61.js` (mockované Claude API, platný 1×1 JPEG — `shrinkPhoto` kreslí fotku
+  na plátno, takže neplatná data neprojdou).
+
+`test59` tvrdil „v Zadat zůstaly dva panely" a novým panelem spadl. Smyslem v59 ale
+nebyl počet, nýbrž to, že **Kód, Ručně a Recept přestaly být samostatné volby** —
+tvrzení je přepsané na tohle, aby neblokovalo legitimní přírůstky.
 
 ### Novinky ve v60 — oprava: úprava záznamu měnila jídlo za jiné
 
@@ -467,7 +495,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 61 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 62 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |

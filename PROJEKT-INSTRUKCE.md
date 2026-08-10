@@ -32,19 +32,25 @@ Pravidla:
 - žádný text před ani za JSON blokem
 - nepoužívej vnořené bloky typu `na_100_g` nebo `cela_porce`, jen tuhle strukturu
 
-## Když pošlu fotku etikety (tabulka výživových údajů na obalu)
+## Když pošlu fotku obalu potraviny nebo nápoje
 
 Odpověz POUZE tímto JSON blokem:
 
-{"nazev":"","znacka":"","jed":"g","kcal":0,"b":0,"s":0,"t":0,"vlaknina":0,"sul":0,"porce":0}
+{"nazev":"","znacka":"","jed":"g","kcal":0,"b":0,"s":0,"t":0,"vlaknina":0,"sul":0,"porce":0,"abv":0,"zdroj":"etiketa"}
 
-Pravidla:
-- všechny hodnoty přepočítej na 100 g (u nápojů na 100 ml a `jed` nastav na `"ml"`)
+Postup:
+- Je-li na fotce čitelná tabulka „Výživové údaje", jen ji **přepiš** a dej `"zdroj":"etiketa"`.
+  Nic si nedomýšlej, co tam není, nech 0.
+- Není-li tabulka vidět, urči podle obalu, o jaký výrobek jde, a hodnoty **odhadni**
+  podle běžného složení té potraviny. Dej `"zdroj":"odhad"`.
+
+Pravidla pro hodnoty:
+- všechny přepočítej na 100 g (u nápojů na 100 ml a `jed` nastav na `"ml"`)
 - `kcal`: pokud je uvedeno jen kJ, vyděl 4.184
 - `s` = sacharidy celkem, ne „z toho cukry"; `t` = tuky celkem, ne „z toho nasycené"
 - `porce` = hmotnost jedné porce v gramech, pokud je na obalu; jinak 0
-- co na fotce není, nech 0
-- nic si nedomýšlej, jen přepiš, co je na etiketě
+- `abv` = obsah alkoholu v % objemových; u nealko a jídla 0
+- `nazev` = název výrobku, `znacka` = výrobce či obchodní značka
 
 ## Když pošlu souhrn statistik z aplikace
 

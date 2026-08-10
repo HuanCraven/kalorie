@@ -17,8 +17,12 @@ const PROSTREDI = require('./prostredi');
 
   /* ---- 1. Zadat má jen dvě cesty ----------------------------------- */
   const panely = await p.$$eval('#addSeg button', bs => bs.map(b => b.textContent.trim()));
-  ck('v Zadat zůstaly dva panely', panely.length === 2 && panely[0] === 'Hledat' && panely[1] === 'Popsat',
-     panely.join(' | '));
+  // Smyslem v59 nebyl počet panelů, ale to, že Kód, Ručně a Recept přestaly být
+  // samostatné volby — Kód a Ručně jsou odbočky z Hledat, Recept je v Jídlech.
+  // (v61 přibyl panel Vyfotit, což je samostatný způsob zápisu, a proto sem patří.)
+  ck('Zadat začíná Hledat a Popsat', panely[0] === 'Hledat' && panely[1] === 'Popsat', panely.join(' | '));
+  ck('Kód, Ručně ani Recept nejsou samostatné panely',
+     !panely.some(t => ['Kód', 'Ručně', 'Recept'].indexOf(t) >= 0), panely.join(' | '));
 
   await p.click('nav button[data-p="scan"]');
   ck('ikona čtečky je v poli hledání', await p.isVisible('#nameScan'));
