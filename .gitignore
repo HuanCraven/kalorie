@@ -1,3 +1,6 @@
 node_modules/
 testy/fixtures/
 *.zip
+# stažené cizí databáze — patří jen na disk a do telefonu (licence ODbL, viz build/off-cz.js)
+off-cz.csv
+*.rozdelane.json

@@ -36,6 +36,22 @@ soubor kolem 1,3 MB.
   by databázi stahovalo z internetu** — na telefonu by to běželo tři čtvrtě hodiny
   a padalo v půlce.
 - Skript se dá přerušit a **naváže**, kde skončil; po 503 počká a zkusí to znovu.
+  `--dokonci` udělá CSV z toho, co je zatím stažené, a rozdělaný stav nechá být.
+
+> **Ověřeno v provozu: celé stažení přes API se nepovedlo.** Skript došel na stránku 11
+> ze 401 a pak dostal `401 Unauthorized` a série 503 přes 25 minut — deset pokusů
+> s čekáním až pět minut nestačilo. Open Food Facts tenhle způsob zjevně odmítá a ve
+> své dokumentaci na hromadné výběry odkazuje na exporty. Vzorek tří stránek fungoval,
+> ale o čtyřech stovkách to nevypovídalo.
+>
+> **Kdo bude chtít celou databázi, musí sáhnout po exportu (1,3 GB)** a odfiltrovat
+> české produkty lokálně; stahování jde streamovat, takže se na disk neusadí 9 GB.
+> Skript zůstává použitelný pro malou databázi a pro jiné země s menším počtem produktů.
+>
+> Bez offline databáze aplikace funguje dál: dotaz na **jednotlivý kód** Open Food Facts
+> normálně vrací (ověřeno) a co se jednou naskenuje, uloží se natrvalo mezi vlastní
+> potraviny. Databáze se tedy plní sama používáním, jen postupně. Zaskřípe to v obchodě
+> se slabým signálem u výrobku kupovaného poprvé.
 - Data jsou pod ODbL: volně použitelná při uvedení zdroje. **Výsledné CSV nepatří
   do repozitáře** — zůstává na disku a v telefonu, stejně jako NutriDatabáze.
 

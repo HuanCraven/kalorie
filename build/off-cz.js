@@ -32,8 +32,14 @@ const VEN = path.resolve(arg('ven', path.join(__dirname, '..', 'off-cz.csv')));
 const ROZDELANE = VEN + '.rozdelane.json';   // aby šlo navázat po přerušení
 const NA_STRANKU = 50;        // 100 server odmítá (503), 50 projde
 const ODSTUP = 6500;          // ms mezi dotazy — pod deset za minutu
-const POKUSU = 5;
+/* Open Food Facts se čas od času na několik minut odmlčí (503) — při 400 stránkách
+   se to stane skoro jistě. Pět pokusů s čekáním do minuty bylo málo: vyčerpaly se
+   za dvě minuty a stahování zbytečně skončilo. Deset pokusů s čekáním až pět minut
+   dá dohromady přes půl hodiny trpělivosti na jednu stránku. */
+const POKUSU = 10;
 const STRANEK_MAX = parseInt(arg('stranek', '0'), 10) || 0;   // 0 = všechny
+// udělá CSV z toho, co je zatím stažené, a dál nestahuje
+const DOKONCI = process.argv.indexOf('--dokonci') > 0;
 
 const spi = ms => new Promise(r => setTimeout(r, ms));
 const UA = 'KalorieApp/1.0 (osobni offline databaze; https://huancraven.github.io/kalorie)';
@@ -54,7 +60,7 @@ async function stranka(n) {
       if (pokus === POKUSU) throw new Error('stránka ' + n + ' se nepovedla: ' + e.message);
       process.stdout.write('   ⟳ ' + e.message + ', zkusím znovu za ' + Math.round(cekej / 1000) + ' s\n');
       await spi(cekej);
-      cekej = Math.min(cekej * 2, 60000);
+      cekej = Math.min(cekej * 2, 300000);
     }
   }
 }
@@ -79,6 +85,25 @@ function vytez(p) {
 
 const bezStredniku = s => String(s).replace(/[;\r\n]/g, ' ').trim();
 
+/* Zápis výsledku. Rozdělaný stav se maže jen po úplném stažení — po --dokonci
+   zůstane, aby šlo později navázat a databázi doplnit. */
+function zapisCsv(polozky, uklidit) {
+  const videno = new Set(), radky = [];
+  for (const z of polozky) {                 // stejný kód bývá v datech víckrát
+    if (videno.has(z.kod)) continue;
+    videno.add(z.kod);
+    radky.push([z.kod, bezStredniku(z.nazev), bezStredniku(z.znacka),
+                z.kcal, z.b, z.s, z.t, z.v, z.sul, 'Open Food Facts'].join(';'));
+  }
+  // sloupec zdroj říká aplikaci, kterou databázi nahradit — vedle něj může být
+  // načtená ještě NutriDatabáze a import se jí nedotkne
+  const hlavicka = 'kod;nazev;znacka;kcal;bilkoviny;sacharidy;tuky;vlaknina;sul;zdroj';
+  fs.writeFileSync(VEN, '﻿' + hlavicka + '\n' + radky.join('\n') + '\n', 'utf8');
+  if (uklidit && fs.existsSync(ROZDELANE)) fs.unlinkSync(ROZDELANE);
+  const mb = (fs.statSync(VEN).size / 1e6).toFixed(2);
+  console.log('Hotovo: ' + radky.length + ' potravin s čárovým kódem, ' + mb + ' MB');
+}
+
 (async () => {
   let hotovo = { stranka: 0, polozky: [] };
   if (fs.existsSync(ROZDELANE)) {
@@ -87,6 +112,18 @@ const bezStredniku = s => String(s).replace(/[;\r\n]/g, ' ').trim();
       console.log('Navazuji na přerušené stahování: ' + hotovo.polozky.length +
                   ' položek, naposledy stránka ' + hotovo.stranka + '.');
     } catch (e) { console.log('Rozdělaný soubor je poškozený, začínám znovu.'); }
+  }
+
+  if (DOKONCI) {
+    if (!hotovo.polozky.length) {
+      console.error('Není z čeho — nic rozdělaného se nenašlo. Spusť skript bez --dokonci.');
+      process.exit(1);
+    }
+    console.log('Dělám CSV z toho, co je stažené (stránek ' + hotovo.stranka + ').');
+    zapisCsv(hotovo.polozky, false);
+    console.log('Soubor: ' + VEN);
+    console.log('\nRozdělaný stav zůstává — dalším spuštěním bez --dokonci se doplní zbytek.');
+    return;
   }
 
   const prvni = await stranka(hotovo.stranka + 1);
@@ -115,22 +152,7 @@ const bezStredniku = s => String(s).replace(/[;\r\n]/g, ' ').trim();
   }
   console.log('\n');
 
-  // stejný kód se v databázi objevuje víckrát — necháme ten první
-  const videno = new Set(), radky = [];
-  for (const z of hotovo.polozky) {
-    if (videno.has(z.kod)) continue;
-    videno.add(z.kod);
-    radky.push([z.kod, bezStredniku(z.nazev), bezStredniku(z.znacka),
-                z.kcal, z.b, z.s, z.t, z.v, z.sul, 'Open Food Facts'].join(';'));
-  }
-  // sloupec zdroj říká aplikaci, kterou databázi nahradit — vedle něj může být
-  // načtená ještě NutriDatabáze a import se jí nedotkne
-  const hlavicka = 'kod;nazev;znacka;kcal;bilkoviny;sacharidy;tuky;vlaknina;sul;zdroj';
-  fs.writeFileSync(VEN, '﻿' + hlavicka + '\n' + radky.join('\n') + '\n', 'utf8');
-  fs.unlinkSync(ROZDELANE);
-
-  const mb = (fs.statSync(VEN).size / 1e6).toFixed(2);
-  console.log('Hotovo: ' + radky.length + ' potravin s čárovým kódem, ' + mb + ' MB');
+  zapisCsv(hotovo.polozky, true);
   console.log('Soubor: ' + VEN);
   console.log('\nNaimportuj ho v aplikaci: Nastavení → Data → Externí databáze potravin.');
   console.log('Zdroj dat: Open Food Facts, licence ODbL (https://openfoodfacts.org).');
