@@ -1127,7 +1127,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.10-64';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.10-65';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -4767,23 +4767,42 @@ async function apiTest() {
   }
 }
 /* zmenší fotku na max 1024 px a vrátí base64 JPEG — šetří data i cenu dotazu */
-function shrinkPhoto(file, maxPx) {
-  return new Promise((res, rej) => {
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, (maxPx || 1024) / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(img.src);
-      res(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
-    };
-    img.onerror = () => rej(new Error('fotku nejde načíst'));
-    img.src = URL.createObjectURL(file);
-  });
+/* Zmenšení fotky před odesláním. U etikety jde o drobný tisk, takže se posílá
+   větší (1568 px je hranice, nad kterou stejně následuje zmenšení na druhé straně)
+   a v lepší kvalitě — z 1024 px byla tabulka často nečitelná a model pak hádal.
+   Telefony fotku často ukládají otočenou přes EXIF; `imageOrientation` to srovná,
+   jinak by tabulka dorazila na boku. */
+function shrinkPhoto(file, maxPx, kvalita) {
+  const max = maxPx || 1024, q = kvalita || 0.85;
+  const nakresli = zdroj => {
+    const w = zdroj.width, h = zdroj.height;
+    const k = Math.min(1, max / Math.max(w, h));
+    const c = document.createElement('canvas');
+    c.width = Math.round(w * k); c.height = Math.round(h * k);
+    c.getContext('2d').drawImage(zdroj, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', q).split(',')[1];
+  };
+  if (typeof createImageBitmap === 'function') {
+    return createImageBitmap(file, { imageOrientation: 'from-image' })
+      .then(bm => { const d = nakresli(bm); bm.close(); return d; })
+      .catch(() => starePlatno());
+  }
+  return starePlatno();
+
+  function starePlatno() {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => { const d = nakresli(img); URL.revokeObjectURL(img.src); res(d); };
+      img.onerror = () => rej(new Error('fotku nejde načíst'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
 }
-async function apiAsk(file, prompt) {
-  const data = await shrinkPhoto(file, 1024);
+/* `detail` = jde o drobný tisk (etiketa). Talíř s jídlem si vystačí s 1024 px,
+   tabulka výživových údajů ne — a nečitelná tabulka vedla k tomu, že model
+   hádal, o jaký výrobek jde. */
+async function apiAsk(file, prompt, detail) {
+  const data = detail ? await shrinkPhoto(file, 1568, 0.92) : await shrinkPhoto(file, 1024);
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), 60000);
   try {
@@ -4844,7 +4863,7 @@ async function apiLabel() {
   const btn = $('apiLabBtn');
   btn.disabled = true; btn.textContent = 'Čtu etiketu…';
   try {
-    const txt = await apiAsk(labelFile, apiPrompt('label'));
+    const txt = await apiAsk(labelFile, apiPrompt('label'), true);   // drobný tisk
     $('labIn').value = txt;
     processLabel();
   } catch (e) {
@@ -4869,8 +4888,13 @@ Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
 Postupuj takto:
 - Je-li na fotce čitelná tabulka "Výživové údaje", jen ji PŘEPIŠ a dej "zdroj":"etiketa".
   Nic si nedomýšlej, co tam není, nech 0.
-- Není-li tabulka vidět, urči podle obalu, o jaký výrobek jde, a hodnoty ODHADNI
-  podle běžného složení té potraviny. Dej "zdroj":"odhad".
+- Je-li tabulka nečitelná nebo není vidět, ale na obalu bezpečně PŘEČTEŠ název výrobku,
+  odhadni hodnoty podle běžného složení té potraviny a dej "zdroj":"odhad".
+- Nedokážeš-li název na obalu přečíst, dej "zdroj":"necitelne", "nazev" nech prázdný
+  a všechna čísla nech 0.
+
+NIKDY si nedomýšlej, o jaký výrobek jde. Raději vrať "necitelne" než špatný název —
+uživatel podle toho zapisuje, co snědl, a špatná potravina je horší než žádná.
 
 Pravidla pro hodnoty:
 - všechno přepočítej na 100 g (u nápojů na 100 ml a "jed" nastav na "ml")
@@ -4950,6 +4974,16 @@ function processLabel() {
     toast('Nešlo přečíst — zkus to znovu');
     $('labIn').value = '';
     $('labIn').placeholder = 'Nerozpoznáno. Napiš Claudeovi „vrať jen ten JSON" a vlož znovu.';
+    return;
+  }
+  /* Nečitelná fotka: nevyplňuje se NIC. Dřív se v takovém případě hádalo, o jaký
+     výrobek jde — uživatel vyfotil šunku a dostal čokoládu. Špatná potravina je
+     horší než žádná, protože se podle ní zapisuje, co snědl. */
+  if (String(o.zdroj || '').toLowerCase().indexOf('necit') >= 0 ||
+      (!String(o.nazev || '').trim() && !n(o.kcal))) {
+    $('edOdhad').style.display = 'none';
+    $('labIn').value = '';
+    toast('Z fotky se to přečíst nedá — vyfoť tabulku zblízka a ostře');
     return;
   }
   const setIf = (id, v) => { if (v !== undefined && v !== null && v !== '' && n(v) !== 0) $(id).value = n(v); };

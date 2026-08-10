@@ -17,7 +17,32 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.10-64** (`APP_VERSION` v `index.html`, cache `kaltrack-v64` v `sw.js`).
+Aktuální verze: **2026.08.10-65** (`APP_VERSION` v `index.html`, cache `kaltrack-v65` v `sw.js`).
+
+### Novinky ve v65 — oprava: z vyfocené šunky vyšla čokoláda
+
+**Zavlečeno v v61.** Do `LABEL_PROMPT` tehdy přibyla větev „není-li tabulka vidět, urči
+výrobek podle obalu a hodnoty odhadni". Model ji ale použil i tehdy, když byla tabulka
+jen **nečitelná** — a výrobek si prostě vymyslel. Uživatel vyfotil tabulku na šunce
+a dostal čokoládu. Do v61 znělo zadání „jen přepiš, nic si nedomýšlej", takže špatná
+fotka skončila nulami, ne cizí potravinou.
+
+1. **Třetí možnost `zdroj: "necitelne"`.** Když Claude název na obalu bezpečně nepřečte,
+   vrátí prázdno a `processLabel` **nevyplní nic** — jen řekne „Z fotky se to přečíst
+   nedá". V zadání je to i výslovně: raději přiznat nečitelnost než vrátit špatný název,
+   protože podle něj uživatel zapisuje, co snědl.
+2. **Etiketa se posílá ve 1568 px a kvalitě 0,92** (`apiAsk(file, prompt, detail)`).
+   Z 1024 px byl drobný tisk často nečitelný, takže se model do „hádací" větve dostával
+   běžně. Fotka talíře zůstává na 1024 px, tam detail netřeba.
+3. **Srovnání otočení fotky.** `shrinkPhoto` používá `createImageBitmap` s
+   `imageOrientation: 'from-image'`; canvas dřív EXIF ignoroval a tabulka mohla dorazit
+   na boku. Starší prohlížeče spadnou zpátky na původní cestu přes `Image`.
+
+`PROJEKT-INSTRUKCE.md` srovnány se zadáním — ruční cesta přes uživatelův projekt
+by se jinak rozešla s parserem. **Uživatel je musí v projektu nahradit.**
+
+- testy `test61.js` rozšířeny: nečitelná fotka nevyplní název ani hodnoty, ukáže
+  hlášku, neoznačí se jako odhad, a zadání obsahuje zákaz domýšlet si výrobek
 
 ### Novinky ve v64 — název databáze načtené starší verzí
 

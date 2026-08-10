@@ -98,7 +98,38 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
      (await p.inputValue('#edKcal')) === '75');
   await p.evaluate(() => closeMod('modEdit'));
 
-  /* ---- 5. alkohol z obalu se dostane do pole abv -------------------- */
+  /* ---- 5. nečitelná fotka nesmí nic vymyslet ----------------------- */
+  // Uživatel vyfotil šunku a dostal čokoládu: zadání dřív dovolovalo hádat výrobek,
+  // když tabulka nebyla čitelná. Teď se v takovém případě nevyplňuje nic.
+  claude.odpoved = '{"nazev":"","znacka":"","jed":"g","kcal":0,"b":0,"s":0,"t":0,' +
+    '"vlaknina":0,"sul":0,"porce":0,"abv":0,"zdroj":"necitelne"}';
+  await p.evaluate(() => { go('scan'); setAdd('lab'); });
+  await vyfot();
+  const po = await p.evaluate(() => ({
+    nazev: document.getElementById('edName').value,
+    kcal: document.getElementById('edKcal').value,
+    varovani: document.getElementById('edOdhad').style.display !== 'none',
+    toast: (document.getElementById('toast') || {}).textContent || ''
+  }));
+  ck('u nečitelné fotky se nevyplní název', po.nazev === '', po.nazev);
+  ck('ani hodnoty', po.kcal === '', po.kcal);
+  ck('a řekne se, že to nejde přečíst', po.toast.indexOf('přečíst') >= 0, po.toast);
+  ck('varování o odhadu se přitom neukáže', !po.varovani);
+  await p.evaluate(() => closeMod('modEdit'));
+
+  ck('zadání zakazuje domýšlet si výrobek',
+     claude.zadani.indexOf('necitelne') > 0 && claude.zadani.indexOf('NIKDY') > 0);
+
+  /* ---- 6. etiketa se posílá ve větším rozlišení --------------------- */
+  // z 1024 px byl drobný tisk často nečitelný a model pak hádal, o co jde
+  const poslano = JSON.parse(claude.zadani || '{}');
+  const obrazek = (((poslano.messages || [])[0] || {}).content || [])
+    .find(c => c.type === 'image');
+  ck('do API se posílá obrázek', !!obrazek && !!(obrazek.source || {}).data);
+  ck('a jde o JPEG v base64', obrazek && obrazek.source.media_type === 'image/jpeg',
+     obrazek && obrazek.source.media_type);
+
+  /* ---- 7. alkohol z obalu se dostane do pole abv -------------------- */
   claude.odpoved = '{"nazev":"Pivo 12","znacka":"Pilsner","jed":"ml","kcal":43,"b":0.5,' +
     '"s":3.8,"t":0,"vlaknina":0,"sul":0,"porce":500,"abv":5,"zdroj":"etiketa"}';
   await p.evaluate(() => { go('scan'); setAdd('lab'); });

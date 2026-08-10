@@ -41,8 +41,13 @@ Odpověz POUZE tímto JSON blokem:
 Postup:
 - Je-li na fotce čitelná tabulka „Výživové údaje", jen ji **přepiš** a dej `"zdroj":"etiketa"`.
   Nic si nedomýšlej, co tam není, nech 0.
-- Není-li tabulka vidět, urči podle obalu, o jaký výrobek jde, a hodnoty **odhadni**
-  podle běžného složení té potraviny. Dej `"zdroj":"odhad"`.
+- Je-li tabulka nečitelná nebo není vidět, ale na obalu bezpečně **přečteš** název
+  výrobku, hodnoty **odhadni** podle běžného složení a dej `"zdroj":"odhad"`.
+- Nedokážeš-li název na obalu přečíst, dej `"zdroj":"necitelne"`, `nazev` nech prázdný
+  a všechna čísla nech 0.
+
+**Nikdy si nedomýšlej, o jaký výrobek jde.** Raději vrať `necitelne` než špatný název —
+podle toho se zapisuje, co jsem snědl, a špatná potravina je horší než žádná.
 
 Pravidla pro hodnoty:
 - všechny přepočítej na 100 g (u nápojů na 100 ml a `jed` nastav na `"ml"`)
