@@ -1127,7 +1127,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.10-63';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.10-64';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -2198,8 +2198,20 @@ function extZdroje() {
   const m = new Map();
   for (const x of extFoods) {
     const k = x.zd || 'csv';
-    if (!m.has(k)) m.set(k, { klic: k, nazev: nazevZdroje(k), pocet: 0, kody: 0, kdy: extKdy[k] || 0 });
+    if (!m.has(k)) m.set(k, { klic: k, nazev: nazevZdroje(k), pocet: 0, kody: 0,
+                              kdy: extKdy[k] || 0, znacky: new Map() });
     const z = m.get(k); z.pocet++; if (x.k) z.kody++;
+    if (x.z) z.znacky.set(x.z, (z.znacky.get(x.z) || 0) + 1);
+  }
+  /* Databáze načtené před v63 nemají `zd` a hlásily by se obecně jako „CSV“.
+     Název se u nich odhadne z toho, co mají položky zapsané ve `z` — u NutriDatabáze
+     je to všude „NutriDatabaze.cz“. Bere se jen tehdy, když to má drtivá většina
+     řádků; u databáze s kódy je totiž `z` značka výrobce, a ta se liší položku od položky. */
+  for (const z of m.values()) {
+    if (extNazvy[z.klic] || !z.znacky.size) { delete z.znacky; continue; }
+    const [nej, kolik] = [...z.znacky.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (kolik / z.pocet > 0.9) z.nazev = nej;
+    delete z.znacky;
   }
   return [...m.values()].sort((a, b) => b.pocet - a.pocet);
 }

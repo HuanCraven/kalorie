@@ -108,6 +108,49 @@ const rozbal = b64 => {
   ck('a obě jsou vypsané jménem', info.text.indexOf('NutriDatabáze') >= 0 &&
      info.text.indexOf('Open Food Facts') >= 0, info.text.slice(0, 100));
 
+  /* ---- 6. import přes skutečný výběr souboru ----------------------- */
+  // volání parseExt() přímo nestačí: uživateli jednou neproběhl výběr souboru
+  // a chyba se kvůli tomu hledala v datech místo v ovládání
+  await p.evaluate(async () => {
+    await new Promise(res => { const t = db.transaction('ext', 'readwrite'); t.objectStore('ext').clear(); t.oncomplete = res; });
+    extFoods = [];
+  });
+  // soubor se skládá tady, ať test nezávisí na ničem staženém a nikdy tiše nepřeskočí
+  await p.setInputFiles('#extFile', { name: 'off-cz.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('﻿' + S_KODY, 'utf8') });
+  await p.waitForTimeout(2000);
+  const hlaska = await p.textContent('#extRes');
+  ck('výběr souboru databázi opravdu naimportuje', hlaska.indexOf('Načteno') >= 0, hlaska.slice(0, 80));
+  ck('a položky v ní jsou', (await p.evaluate(async () => (await dbAll('ext')).length)) === 1);
+
+  /* ---- 7. databáze načtená před v63 se pozná podle položek --------- */
+  // takové řádky nemají `zd` a hlásily by se obecně jako „CSV"
+  await p.evaluate(async () => {
+    await new Promise(res => { const t = db.transaction('ext', 'readwrite'); t.objectStore('ext').clear(); t.oncomplete = res; });
+    for (let i = 0; i < 20; i++)
+      await dbPut('ext', { id: 'x-stara' + i, n: 'Stará ' + i, z: 'NutriDatabaze.cz', e: 100, p: 1, c: 1, f: 1 });
+    extFoods = await dbAll('ext');
+    extInfoTxt();
+  });
+  await p.waitForTimeout(200);
+  const stara = await p.evaluate(() => document.getElementById('extInfo').textContent.replace(/\s+/g, ' '));
+  ck('stará databáze se pojmenuje podle svých položek, ne obecně CSV',
+     stara.indexOf('NutriDatabaze.cz') >= 0 && stara.indexOf('CSV ·') < 0, stara.slice(0, 70));
+
+  // u databáze s kódy je `z` značka výrobce a liší se — název se z ní brát nesmí
+  await p.evaluate(async () => {
+    await new Promise(res => { const t = db.transaction('ext', 'readwrite'); t.objectStore('ext').clear(); t.oncomplete = res; });
+    const znacky = ['Hollandia', 'Storck', 'Sedita', 'Nutrend', 'Lindt'];
+    for (let i = 0; i < 20; i++)
+      await dbPut('ext', { id: 'x-' + i, n: 'Výrobek ' + i, z: znacky[i % 5], e: 100, p: 1, c: 1, f: 1 });
+    extFoods = await dbAll('ext');
+    extInfoTxt();
+  });
+  await p.waitForTimeout(200);
+  const pestre = await p.evaluate(() => document.getElementById('extInfo').textContent.replace(/\s+/g, ' '));
+  ck('u pestrých značek se název nehádá', pestre.indexOf('CSV') >= 0 &&
+     pestre.indexOf('Hollandia') < 0, pestre.slice(0, 70));
+
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
   process.exit(0);

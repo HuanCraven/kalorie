@@ -17,7 +17,35 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.10-63** (`APP_VERSION` v `index.html`, cache `kaltrack-v63` v `sw.js`).
+Aktuální verze: **2026.08.10-64** (`APP_VERSION` v `index.html`, cache `kaltrack-v64` v `sw.js`).
+
+### Novinky ve v64 — název databáze načtené starší verzí
+
+Databáze naimportované před v63 nemají `zd` a hlásily se obecně jako **CSV**, takže
+uživatel viděl „CSV · 1136" místo NutriDatabáze a myslel si, že je něco rozbité.
+`extZdroje()` teď u takové skupiny odhadne název z pole `z` jednotlivých položek —
+u NutriDatabáze je tam všude `NutriDatabaze.cz`.
+
+**Bere se jen tehdy, když stejnou hodnotu má přes 90 % řádků.** U databáze s čárovými
+kódy je totiž `z` **značka výrobce** a liší se položku od položky; bez té podmínky by
+se celá databáze pojmenovala třeba „Hollandia". Obojí hlídá `test63.js`.
+
+### Rozhodnuto: offline databáze se plní používáním
+
+Plná databáze z Open Food Facts (~17 000 položek) se **dělat nebude**. Cesta přes API
+je zablokovaná (viz níže) a export má 1,3 GB. Zůstává tedy:
+
+- **online dotaz na jednotlivý kód** — funguje a je rychlý,
+- **co se jednou naskenuje, uloží se natrvalo** mezi vlastní potraviny,
+- **NutriDatabáze** pokrývá suroviny, u kterých se čárový kód stejně neskenuje.
+
+Databáze se tak plní tím, co uživatel opravdu kupuje. Zaskřípe to jen v obchodě se
+slabým signálem u výrobku kupovaného poprvé. Kdyby se to ukázalo jako časté, cesta
+přes export 1,3 GB s lokálním filtrem je pořád otevřená.
+
+**Pozor při ověřování importu:** testovat `parseExt(text)` voláním funkce nestačí —
+uživateli neproběhl výběr souboru a chyba se hledala jinde. Test má sahat na
+`setInputFiles('#extFile', …)`, tedy na tutéž cestu, kterou chodí uživatel.
 
 ### Novinky ve v62–63 — databáze s čárovými kódy
 
