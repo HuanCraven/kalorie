@@ -45,7 +45,8 @@ Starší zipy jsou archiv — **nové se už nevytvářejí**.
 | `build/extra.js` | suroviny chybějící v zaklad.js | ano |
 | `build/build-jidla.js` | generátor jidla.js (Atwater, výtěžnost) | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
-| `build/off-cz.js` | stáhne z Open Food Facts české produkty s čárovými kódy do CSV | zřídka |
+| `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty s kódy | zřídka |
+| `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
 | `testy/` | 64 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |

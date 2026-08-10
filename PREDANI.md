@@ -55,18 +55,20 @@ u NutriDatabáze je tam všude `NutriDatabaze.cz`.
 kódy je totiž `z` **značka výrobce** a liší se položku od položky; bez té podmínky by
 se celá databáze pojmenovala třeba „Hollandia". Obojí hlídá `test63.js`.
 
-### Rozhodnuto: offline databáze se plní používáním
+### Offline databáze: dvě cesty, obě funkční
 
-Plná databáze z Open Food Facts (~17 000 položek) se **dělat nebude**. Cesta přes API
-je zablokovaná (viz níže) a export má 1,3 GB. Zůstává tedy:
+**Plná databáze** — `build/off-export.js --stahni`. Stáhne hromadný export (1,3 GB,
+umí navázat po přerušení), proudem z něj vytáhne české produkty a export pak smaže.
+Uživatel to dělá doma na rychlé síti; cesta přes API (`off-cz.js`) na to nestačí.
+
+**Bez ní to funguje taky**, jen postupně:
 
 - **online dotaz na jednotlivý kód** — funguje a je rychlý,
 - **co se jednou naskenuje, uloží se natrvalo** mezi vlastní potraviny,
 - **NutriDatabáze** pokrývá suroviny, u kterých se čárový kód stejně neskenuje.
 
 Databáze se tak plní tím, co uživatel opravdu kupuje. Zaskřípe to jen v obchodě se
-slabým signálem u výrobku kupovaného poprvé. Kdyby se to ukázalo jako časté, cesta
-přes export 1,3 GB s lokálním filtrem je pořád otevřená.
+slabým signálem u výrobku kupovaného poprvé — a právě to je důvod pro plnou databázi.
 
 **Pozor při ověřování importu:** testovat `parseExt(text)` voláním funkce nestačí —
 uživateli neproběhl výběr souboru a chyba se hledala jinde. Test má sahat na
@@ -97,9 +99,12 @@ soubor kolem 1,3 MB.
 > své dokumentaci na hromadné výběry odkazuje na exporty. Vzorek tří stránek fungoval,
 > ale o čtyřech stovkách to nevypovídalo.
 >
-> **Kdo bude chtít celou databázi, musí sáhnout po exportu (1,3 GB)** a odfiltrovat
-> české produkty lokálně; stahování jde streamovat, takže se na disk neusadí 9 GB.
-> Skript zůstává použitelný pro malou databázi a pro jiné země s menším počtem produktů.
+> **Kdo bude chtít celou databázi, použije `build/off-export.js`** — ten čte hromadný
+> export (1,3 GB) proudem, takže se na disk nic nerozbaluje a v paměti drží jeden řádek.
+> `--stahni` export stáhne s navázáním po přerušení a po zpracování ho smaže.
+> Formát exportu je **tabulátory, 211 sloupců**; podstatné jsou `code`, `product_name`,
+> `brands`, `countries_tags` (hledá se `en:czech-republic`) a `*_100g`.
+> `build/off-cz.js` (přes API) zůstává použitelný jen pro malé výběry.
 >
 > Bez offline databáze aplikace funguje dál: dotaz na **jednotlivý kód** Open Food Facts
 > normálně vrací (ověřeno) a co se jednou naskenuje, uloží se natrvalo mezi vlastní
