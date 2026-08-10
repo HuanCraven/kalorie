@@ -1,6 +1,6 @@
 /* Test v50 — citlivá pole bez type="password" a rozbor období přes Claude API */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

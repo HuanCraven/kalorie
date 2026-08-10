@@ -1,7 +1,7 @@
 /* Test v45 — opravy po revizi synchronizace: dopředná kompatibilita, ověření
-const PROSTREDI = require('./prostredi');
    práva zápisu, odstup mezi commity, pravdivé mazání dat */
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });
@@ -132,18 +132,27 @@ const { chromium } = require('playwright');
 
   /* ---- 6. neúspěšné mazání všude nesmí nechat past ---------------- */
   const D = await novy();
+  /* Zařízení vzniká až po kroku 5, kde se mazalo „všude", takže v repozitáři leží
+     náhrobky a D si je při sladění správně stáhne. Kdy se to stane, ale neurčuje test:
+     aplikace slaďuje i sama od sebe (onfocus, visibilitychange), a když ten samovolný
+     kolo dorazilo až během měření, vypadalo to, jako by náhrobky nechalo po sobě
+     neúspěšné mazání. Proto D nejdřív jednou sladíme ručně, ať je stav ustálený. */
+  await D.evaluate(() => syncNow(true));
   await D.evaluate(async () => {
     await dbPut('log', { date: '2026-08-04', ts: 5, name: 'Nesmí zmizet', amount: 1, kcal: 30 });
   });
   gh.contentsStatus = 500;
   let dialogyD = 0;
   D.on('dialog', d => { dialogyD++; d.accept(); });
+  // hlídá se, že neúspěšné mazání nepřidá další náhrobky — ne že jich je nula
+  const tombPred = await D.evaluate(async () => (await dbAll('tomb')).length);
   await D.evaluate(() => wipe());
   await D.waitForTimeout(800);
   gh.contentsStatus = 0;
   const poD = await D.evaluate(async () => ({ log: (await dbAll('log')).length, tomb: (await dbAll('tomb')).length }));
   ck('při výpadku spojení se nemaže nic', poD.log === 1, JSON.stringify(poD));
-  ck('a nezůstanou po tom náhrobky', poD.tomb === 0, 'náhrobků: ' + poD.tomb);
+  ck('a nezůstane po tom žádný nový náhrobek', poD.tomb === tombPred,
+     'před: ' + tombPred + ', po: ' + poD.tomb);
   await D.evaluate(() => syncNow(true));
   ck('další sladění data nesmaže', (await D.evaluate(async () => (await dbAll('log')).length)) === 1);
 

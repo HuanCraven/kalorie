@@ -1,6 +1,6 @@
 /* Test v40 — dávka 2: rychlý zápis kcal, ✕ v hledání, poslední gramáž, naposledy použité */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

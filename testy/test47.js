@@ -1,7 +1,7 @@
 /* Test v46 — synchronizace přes GitHub: nastavení, první nahrání, sloučení
-const PROSTREDI = require('./prostredi');
    s druhým zařízením, konflikt zápisu, chybové stavy, odpojení */
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });
@@ -30,6 +30,11 @@ const { chromium } = require('playwright');
     if (m === 'PUT') {
       puts++;
       if (putStatus) return json(r, putStatus, { message: 'x' });
+      /* Ověření práva zápisu (syTestZapis) míří na JINOU cestu — „…​.zkouska" — a posílá
+         schválně neplatný sha. Skutečný GitHub na to odpoví 422 a nic nevytvoří.
+         Mock to musí dělat taky: dřív zkoušku přijal a uložil její obsah („x") jako
+         sync soubor, takže první opravdové sladění pak narazilo na cizí obsah. */
+      if (u.pathname.endsWith('.zkouska')) return json(r, 422, { message: 'invalid sha' });
       const b = JSON.parse(r.request().postData());
       if (konfliktJednou) { konfliktJednou = false; return json(r, 409, { message: 'conflict' }); }
       if (soubor !== null && b.sha !== 's' + sha) return json(r, 409, { message: 'sha mismatch' });

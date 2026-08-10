@@ -1,6 +1,6 @@
 /* Test v48 — sladění z hlavní stránky a pravidelné kolo u otevřeného okna */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

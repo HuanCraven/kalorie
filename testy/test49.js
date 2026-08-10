@@ -1,6 +1,6 @@
 /* Test v46 — šifrování zálohy heslem a párování přes QR */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

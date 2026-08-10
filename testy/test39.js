@@ -1,7 +1,7 @@
 /* Test v40 — dávka 1: swipe mazání + Vrátit, kruh zbývá/snědeno, onboarding karta,
-const PROSTREDI = require('./prostredi');
    smazání z editace záznamu a nápoje */
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

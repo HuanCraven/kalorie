@@ -1,6 +1,6 @@
 /* Test v55 — jedna cesta: věta, fotka nebo obojí; a hledání v deníku */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

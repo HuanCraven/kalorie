@@ -69,6 +69,11 @@ nastav ho pro obojí.
 - **Vratký test neopravuj prodloužením čekání.** Zjisti, co ho rozhazuje, a udělej ho
   deterministickým — zpomal mock, zastav samovolné dění, počkej na podmínku. A ověř, že
   na rozbité verzi opravdu padá; jinak nic nedokazuje.
-- `runall.sh` hlásí pád jen na `TimeoutError`, `PAGEERROR`, `MODULE_NOT_FOUND`,
-  `NEPROŠLO: [1-9]` nebo `Error:` na začátku řádku. Test, který jen tiše vypíše
-  nesmysl, projde — proto testy končí kontrolou a slovem `NEPROŠLO`.
+- `runall.sh` hlásí pád na nenulovém návratovém kódu nebo na `TimeoutError`,
+  `PAGEERROR`, `MODULE_NOT_FOUND`, `NEPROŠLO: [1-9]` či `Error:` na začátku řádku.
+  Test, který jen tiše vypíše nesmysl, pořád projde — proto každý test končí
+  kontrolou a slovem `NEPROŠLO`. Kontrola kódu tam přibyla poté, co se ukázalo,
+  že šest testů havarovalo hned při načtení a skript je počítal jako úspěšné.
+- **Neuvěř zelené regresi, dokud nevidíš test spadnout.** U každé nové sady ověř,
+  že na neopravené verzi opravdu padá. Právě tím se zjistilo, že se testy tváří
+  jako projité, i když se vůbec nespustí.

@@ -1,7 +1,7 @@
 /* Test v45 — synchronizační jádro: uid/upd, náhrobky, mergeState, applyState,
-const PROSTREDI = require('./prostredi');
    migrace DB v4→v5, export/import s náhrobky, simulace dvou zařízení */
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

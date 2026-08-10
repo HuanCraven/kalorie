@@ -1,7 +1,7 @@
 /* Test v41 — záložka Pohyb: MET odhad, ruční kcal, propsání do bilance a statistik,
-const PROSTREDI = require('./prostredi');
    swipe mazání, editace, záloha, dynamické cíle */
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

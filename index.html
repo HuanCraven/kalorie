@@ -1089,7 +1089,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.09-57';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.10-58';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1694,7 +1694,7 @@ async function renderDay() {
   $('logList').innerHTML = groups.map(g => {
     const kc = g.rows.reduce((a, r) => a + r.kcal, 0);
     return `
-      <div style="margin-bottom:10px">
+      <div style="margin-bottom:10px" id="jidlo-${g.m.k}">
         <div class="mealhead">
           <span class="n">${g.m.n}</span>
           <span class="row" style="gap:6px;align-items:center">
@@ -1965,11 +1965,13 @@ function onNameInput() {
   if (q.length < 2) { $('nameRes').innerHTML = ''; return; }
   renderLocalMatches(q);
 }
-function clearNameQ() {
+/* fokus jen když maže uživatel tlačítkem ✕; po zápisu porce se pole čistí
+   potichu, aby se pod prstem nevyskočila klávesnice a stránka neposkočila */
+function clearNameQ(fokus) {
   $('nameQ').value = '';
   $('nameRes').innerHTML = '';
   $('nameClr').style.display = 'none';
-  $('nameQ').focus();
+  if (fokus !== false) $('nameQ').focus();
 }
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 /* shoda po slovech a bez ohledu na pořadí: „slunecnicovy chleb" najde „Chléb slunečnicový" */
@@ -2632,7 +2634,8 @@ async function addPortion() {
     rec.id = editLogId; rec.ts = old.ts;
     await dbPut('log', rec);
     editLogId = null;
-    closeMod('modPortion'); toast('Upraveno'); renderDay(); return;
+    closeMod('modPortion'); toast('Upraveno');
+    await renderDay(); scrollToMeal(rec.meal); return;
   }
   await dbPut('log', rec);
   if (products.some(x => x.id === curProduct.id)) {
@@ -2643,11 +2646,20 @@ async function addPortion() {
   }
   pendingMeal = null;
   closeMod('modPortion');
+  clearNameQ(false);        // další hledání má začínat prázdné, ne s minulým dotazem
   const dd = new Date(rec.date + 'T12:00:00');
   toast('Přidáno do: ' + mealName(rec.meal) +
     (rec.date === dstr(new Date()) ? '' : ' · ' + dd.getDate() + '. ' + (dd.getMonth() + 1) + '.'));
   go('day');
-  renderDay();
+  await renderDay();
+  scrollToMeal(rec.meal);
+}
+
+/* Po zápisu zůstat u jídla, do kterého se psalo. go() sroluje na začátek stránky,
+   takže při psaní několika položek do večeře by se muselo pokaždé scrollovat dolů. */
+function scrollToMeal(k) {
+  const el = document.getElementById('jidlo-' + k);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* kopie jednoho jídla ze včerejška */

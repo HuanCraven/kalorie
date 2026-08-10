@@ -1,7 +1,7 @@
 /* Test v44 — Claude API (vlastní klíč): nastavení, tlačítka, odhad jídla, etiketa,
-const PROSTREDI = require('./prostredi');
    chybové stavy, klíč není v záloze */
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 const API_MEAL = { content: [{ type: 'text', text:
   '{"jidlo":"Kuřecí s rýží","polozky":[{"nazev":"kuřecí prsa","mn":180,"kcal":108,"b":23,"s":0,"t":1.8},' +

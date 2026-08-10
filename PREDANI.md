@@ -17,7 +17,58 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.09-57** (`APP_VERSION` v `index.html`, cache `kaltrack-v57` v `sw.js`).
+Aktuální verze: **2026.08.10-58** (`APP_VERSION` v `index.html`, cache `kaltrack-v58` v `sw.js`).
+
+### Novinky ve v58 — dvě drobnosti, které otravovaly při zápisu
+Obojí vzešlo z běžného používání, ne z revize kódu.
+
+- **Hledání se po zápisu porce vyprázdní.** Dřív tam zůstal minulý dotaz i výsledky,
+  takže další hledání začínalo cizím obsahem. `clearNameQ(fokus)` má nově parametr:
+  tlačítko ✕ maže s přesunem kurzoru do pole (jako dřív), po zápisu porce se maže
+  potichu — jinak by na telefonu vyskočila klávesnice a stránka poskočila.
+- **Po zápisu se pohled vrátí k tomu jídlu, kam se psalo.** `go('day')` roluje na
+  začátek stránky, takže při psaní několika položek do večeře se muselo pokaždé
+  scrollovat dolů. Každá skupina v deníku má teď kotvu `id="jidlo-<klíč>"`
+  (`snidane`, `obed`, `vecere`, …) a `addPortion` na ni po překreslení najede
+  přes nové `scrollToMeal()`. Platí i pro úpravu existujícího záznamu.
+- testy `test58.js` — ověřeno i to, že na verzi před opravou padá 8 tvrzení.
+
+#### `runall.sh` nekontroloval návratový kód — šest testů mlčky neběželo
+
+Test, který spadl výjimkou (a nestihl vypsat `NEPROŠLO`), se počítal jako **úspěšný**,
+protože se hledaly jen známé vzory v textu. Přišlo se na to, když `test58.js` na
+neopravené verzi havaroval na `getBoundingClientRect` neexistujícího prvku a skript
+to nahlásil jako ✓. Nenulový kód je teď pád.
+
+Hned to odhalilo, že **`test39`, `43`, `45`, `46`, `47` a `48` od přechodu na git vůbec
+neběžely**. Při hromadném portování se řádek `const PROSTREDI = require('./prostredi');`
+vkládal za první řádek souboru — a u testů s víceřádkovou hlavičkou tím skončil
+**uvnitř komentáře**, takže `PROSTREDI` nebylo definované. Zprávy „57/57" a „58/58“
+byly tedy o šest sad optimističtější, než měly být; v57 šla ven na neúplné regresi.
+Řádek se nově vkládá za `require('playwright')` — kotva mimo komentáře.
+
+Když ty testy konečně běžely, našly dvě věci:
+
+- **`test47` měl vadný falešný GitHub.** Ověření práva zápisu (`syTestZapis`) posílá
+  zkušební obsah `x` na jinou cestu (`….zkouska`) se záměrně neplatným `sha`. Skutečný
+  GitHub odpoví 422 a nic nevytvoří, ale mock zápis přijal a uložil `x` jako sync soubor
+  — první opravdové sladění pak narazilo na cizí obsah a test havaroval v `syDecode`.
+  `test48` má tentýž případ ošetřený správně, takže stačilo srovnat starší mock.
+- **`test48` čekal po nezdařeném „smazat všude" nula náhrobků.** Jenže zařízení vzniká
+  až po kroku, kde se mazalo všude, takže si náhrobky legitimně stáhne z repozitáře —
+  a **kdy** se to stane, test neurčoval (viz past s `last: 0` u `test50`). Samostatně
+  procházel, v sadě padal. Zařízení se nově před měřením jednou ručně sladí a hlídá se,
+  že neúspěšné mazání **nepřidá další** náhrobky. Úklid v aplikaci ověřen v izolaci —
+  chová se správně, vada byla v očekávání testu.
+
+**Nedořešeno:** uživatel hlásí, že po zápisu popisu „po položkách" a následné úpravě
+gramáže v deníku se uloží jiná potravina. Nepodařilo se zopakovat — zkoušeno se dvěma
+i pěti položkami, s napojením na databázi i bez, s klepnutím přes UI i programově,
+a s desetinnou čárkou v poli množství. Pokaždé se uložil správný záznam. Chybí
+konkrétní příklad z ostrých dat; podezření míří na položky napojené na **vlastní**
+potravinu uživatele (`pid` z `localMatches`), protože tam `editLog` vezme
+`curProduct` z `products` a přepíše záznam hodnotami té potraviny — v testovací
+databázi se to neprojeví, protože je skoro prázdná.
 
 ### Novinky ve v57 — zkratky ikony aplikace
 Po podržení ikony na ploše telefonu nabídne systém tři zkratky, které pustí rovnou
@@ -316,7 +367,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 58 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 59 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |

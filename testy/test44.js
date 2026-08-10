@@ -1,6 +1,6 @@
 /* Test v42 — kickbox v databázi, kalkulačka chůze s batohem (Pandolf) */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

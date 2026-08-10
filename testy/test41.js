@@ -1,6 +1,6 @@
 /* Test v40 — dávka 3: záložka Jídla se segmenty Moje · Hotová · Základní · ČR */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

@@ -1,6 +1,6 @@
 /* Test v49 — výdej z hodinek na záložce Pohyb a kontrola smysluplnosti vstupů */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

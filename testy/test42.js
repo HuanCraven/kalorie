@@ -1,6 +1,6 @@
 /* Test v40 — dávka 4: alkohol pročištěný, nastavení autosave, foto sbalený návod */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });

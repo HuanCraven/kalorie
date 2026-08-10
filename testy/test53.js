@@ -1,6 +1,6 @@
 /* Test v51 — Nastavení rozdělené do tří skupin */
-const PROSTREDI = require('./prostredi');
 const { chromium } = require('playwright');
+const PROSTREDI = require('./prostredi');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: PROSTREDI.EXE });
