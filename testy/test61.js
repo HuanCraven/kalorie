@@ -129,7 +129,47 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   ck('a jde o JPEG v base64', obrazek && obrazek.source.media_type === 'image/jpeg',
      obrazek && obrazek.source.media_type);
 
-  /* ---- 7. alkohol z obalu se dostane do pole abv -------------------- */
+  /* ---- 7. prohozené bílkoviny a tuky ------------------------------- */
+  /* Česká tabulka má pořadí energie–tuky–sacharidy–bílkoviny, takže model
+     opisující shora dolů prohazoval bílkoviny s tuky. Kontrola proti energii
+     (Atwater 4/4/9) to pozná a vrátí zpátky. */
+  const vyplnPres = async json => {
+    await p.evaluate(() => { openEdit(null); document.getElementById('labIn').value = ''; });
+    await p.evaluate(t => { document.getElementById('labIn').value = t; processLabel(); }, json);
+    await p.waitForTimeout(250);
+    return p.evaluate(() => ({
+      B: document.getElementById('edP').value, S: document.getElementById('edC').value,
+      T: document.getElementById('edF').value,
+      pozor: document.getElementById('edPozor').style.display !== 'none'
+        ? document.getElementById('edPozor').textContent : ''
+    }));
+  };
+
+  let v = await vyplnPres('{"nazev":"Šunka","kcal":100,"tuky":3,"sacharidy":1,"bilkoviny":18,"zdroj":"etiketa"}');
+  ck('správná čísla projdou beze změny', v.B === '18' && v.T === '3' && !v.pozor, JSON.stringify(v));
+
+  v = await vyplnPres('{"nazev":"Šunka","kcal":100,"tuky":18,"sacharidy":1,"bilkoviny":3,"zdroj":"etiketa"}');
+  ck('prohozené bílkoviny a tuky se vrátí zpátky', v.B === '18' && v.T === '3', JSON.stringify(v));
+  ck('a řekne se to', v.pozor.indexOf('prohozené') >= 0, v.pozor.slice(0, 60));
+
+  v = await vyplnPres('{"nazev":"Hořká čokoláda","kcal":550,"tuky":35,"sacharidy":50,"bilkoviny":7,"zdroj":"etiketa"}');
+  ck('vysoký tuk u čokolády se neopravuje', v.T === '35' && v.B === '7' && !v.pozor, JSON.stringify(v));
+
+  v = await vyplnPres('{"nazev":"Pivo","kcal":43,"tuky":0,"sacharidy":3.8,"bilkoviny":0.5,"abv":5,"zdroj":"etiketa"}');
+  ck('u alkoholu se energie nekontroluje (etanol není ve vzorci)', !v.pozor, v.pozor.slice(0, 60));
+
+  v = await vyplnPres('{"nazev":"Nesmysl","kcal":500,"tuky":1,"sacharidy":1,"bilkoviny":1,"zdroj":"etiketa"}');
+  ck('nesmyslná čísla se ohlásí, i když prohození nepomůže',
+     v.pozor.indexOf('nesedí') >= 0, v.pozor.slice(0, 60));
+
+  v = await vyplnPres('{"nazev":"Tvaroh","kcal":75,"b":12,"s":4,"t":0.5,"zdroj":"etiketa"}');
+  ck('starý tvar klíčů b/s/t se pořád přijme', v.B === '12' && v.S === '4', JSON.stringify(v));
+  await p.evaluate(() => closeMod('modEdit'));
+
+  ck('zadání pro Claude používá plné názvy živin',
+     claude.zadani.indexOf('bilkoviny') > 0 && claude.zadani.indexOf('tuky') > 0);
+
+  /* ---- 8. alkohol z obalu se dostane do pole abv -------------------- */
   claude.odpoved = '{"nazev":"Pivo 12","znacka":"Pilsner","jed":"ml","kcal":43,"b":0.5,' +
     '"s":3.8,"t":0,"vlaknina":0,"sul":0,"porce":500,"abv":5,"zdroj":"etiketa"}';
   await p.evaluate(() => { go('scan'); setAdd('lab'); });

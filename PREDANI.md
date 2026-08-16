@@ -17,7 +17,33 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.10-65** (`APP_VERSION` v `index.html`, cache `kaltrack-v65` v `sw.js`).
+Aktuální verze: **2026.08.11-66** (`APP_VERSION` v `index.html`, cache `kaltrack-v66` v `sw.js`).
+
+### Novinky ve v66 — oprava: z etikety chodily prohozené bílkoviny a tuky
+
+**Chyba byla v zadání, ne v aplikaci** — `processLabel` přiřazoval správně
+(`edP` ← bílkoviny, `edF` ← tuky). Jenže `LABEL_PROMPT` žádal JSON v pořadí
+`kcal, b, s, t`, tedy **bílkoviny před tuky**, kdežto česká a evropská tabulka má
+pořadí **energie, tuky, sacharidy, bílkoviny, sůl**. Model opisující tabulku shora
+dolů proto strčil tuky do `b` a bílkoviny do `t`. Jednopísmenné klíče tomu nijak
+nebránily. Projevilo se to výrazněji po v65, kde se zvětšilo rozlišení fotky —
+model začal tabulku číst doopravdy, a tedy v jejím pořadí.
+
+1. **Klíče mají plné názvy a pořadí podle etikety**: `kcal, tuky, sacharidy,
+   bilkoviny, vlaknina, sul`. Past mizí z obou stran. `processLabel` krátké klíče
+   `b`/`s`/`t` **dál přijímá** — starší Project instructions je ještě posílají.
+2. **`zkontrolujZiviny()` ověří čísla proti energii** (Atwater 4/4/9 + vláknina 2,
+   tolerance 15 %). Nesedí-li to, ale po prohození bílkovin a tuků ano (a výrazně
+   líp), hodnoty se **vrátí zpátky** a řekne se to v `#edPozor`. Když nepomůže ani
+   prohození, jen se upozorní.
+3. **Bez falešných poplachů:** u `abv > 0` se nekontroluje vůbec (etanol má
+   7 kcal/g a do vzorce nepatří) a čokoláda s vysokým tukem projde beze změny,
+   protože prohození by ji zhoršilo.
+
+`PROJEKT-INSTRUKCE.md` srovnány. **Uživatel je musí v projektu nahradit.**
+
+- testy `test61.js`: správná čísla beze změny, prohozená zpátky s hláškou, čokoláda
+  neopravená, alkohol bez kontroly, nesmysl ohlášený, starý tvar klíčů přijatý
 
 ### Novinky ve v65 — oprava: z vyfocené šunky vyšla čokoláda
 

@@ -36,7 +36,11 @@ Pravidla:
 
 Odpověz POUZE tímto JSON blokem:
 
-{"nazev":"","znacka":"","jed":"g","kcal":0,"b":0,"s":0,"t":0,"vlaknina":0,"sul":0,"porce":0,"abv":0,"zdroj":"etiketa"}
+{"nazev":"","znacka":"","jed":"g","kcal":0,"tuky":0,"sacharidy":0,"bilkoviny":0,"vlaknina":0,"sul":0,"porce":0,"abv":0,"zdroj":"etiketa"}
+
+Klíče jsou schválně ve stejném pořadí, v jakém stojí řádky v české tabulce
+výživových údajů: energie, tuky, sacharidy, bílkoviny, sůl. Opisuj řádek po řádku
+a drž se **názvů** klíčů, ne pořadí.
 
 Postup:
 - Je-li na fotce čitelná tabulka „Výživové údaje", jen ji **přepiš** a dej `"zdroj":"etiketa"`.
@@ -52,7 +56,10 @@ podle toho se zapisuje, co jsem snědl, a špatná potravina je horší než ž�
 Pravidla pro hodnoty:
 - všechny přepočítej na 100 g (u nápojů na 100 ml a `jed` nastav na `"ml"`)
 - `kcal`: pokud je uvedeno jen kJ, vyděl 4.184
-- `s` = sacharidy celkem, ne „z toho cukry"; `t` = tuky celkem, ne „z toho nasycené"
+- `sacharidy` = celkem, ne řádek „z toho cukry"; `tuky` = celkem, ne „z toho nasycené"
+- **Pozor na záměnu:** v tabulce stojí tuky výš než bílkoviny. Než odpovíš, zkontroluj
+  se výpočtem: kcal ≈ 4×bílkoviny + 4×sacharidy + 9×tuky. Nesedí-li to zhruba,
+  máš nejspíš prohozené bílkoviny s tuky.
 - `porce` = hmotnost jedné porce v gramech, pokud je na obalu; jinak 0
 - `abv` = obsah alkoholu v % objemových; u nealko a jídla 0
 - `nazev` = název výrobku, `znacka` = výrobce či obchodní značka

@@ -1064,6 +1064,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
         straně obalu — z ní se čísla opisují. Když ji nevyfotíš, odhadnou se podle výrobku na obalu.</p>
       <p class="tiny" id="edOdhad" style="margin:8px 0 0;color:var(--warn);display:none">⚠ Tohle je
         odhad podle obalu, ne opsaná tabulka. Projdi čísla, než potravinu uložíš.</p>
+      <p class="tiny" id="edPozor" style="margin:8px 0 0;color:var(--warn);display:none"></p>
     </div>
     <p class="tiny muted" style="margin:2px 0 10px">Hodnoty na 100 <span id="edUnitTxt">g</span> podle etikety:</p>
     <div class="grid2">
@@ -1127,7 +1128,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.10-65';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.11-66';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -4883,7 +4884,11 @@ const LABEL_PROMPT =
 `Na fotce je potravina nebo nápoj. Vyplň z ní výživové údaje.
 
 Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
-{"nazev":"","znacka":"","jed":"g","kcal":0,"b":0,"s":0,"t":0,"vlaknina":0,"sul":0,"porce":0,"abv":0,"zdroj":"etiketa"}
+{"nazev":"","znacka":"","jed":"g","kcal":0,"tuky":0,"sacharidy":0,"bilkoviny":0,"vlaknina":0,"sul":0,"porce":0,"abv":0,"zdroj":"etiketa"}
+
+Klíče jsou schválně ve stejném pořadí, v jakém stojí řádky v české tabulce
+výživových údajů: energie, tuky, sacharidy, bílkoviny, sůl. Opisuj řádek po řádku
+a drž se NÁZVŮ klíčů, ne pořadí — bílkoviny patří do "bilkoviny", tuky do "tuky".
 
 Postupuj takto:
 - Je-li na fotce čitelná tabulka "Výživové údaje", jen ji PŘEPIŠ a dej "zdroj":"etiketa".
@@ -4899,7 +4904,10 @@ uživatel podle toho zapisuje, co snědl, a špatná potravina je horší než �
 Pravidla pro hodnoty:
 - všechno přepočítej na 100 g (u nápojů na 100 ml a "jed" nastav na "ml")
 - kcal: pokud je uvedeno jen kJ, vyděl 4,184
-- b = bílkoviny, s = sacharidy (celkové, ne "z toho cukry"), t = tuky (celkové)
+- sacharidy = celkové, ne řádek "z toho cukry"; tuky = celkové, ne "z toho nasycené"
+- POZOR na záměnu: v tabulce stojí tuky výš než bílkoviny. Než odpovíš, zkontroluj
+  se výpočtem: kcal ≈ 4×bílkoviny + 4×sacharidy + 9×tuky. Nesedí-li to zhruba,
+  máš nejspíš prohozené bílkoviny s tuky.
 - porce = hmotnost jedné porce v gramech, pokud je na obalu; jinak 0
 - abv = obsah alkoholu v % objemových; u nealko a jídla 0
 - nazev = název výrobku, znacka = výrobce či obchodní značka`;
@@ -4959,6 +4967,29 @@ function labelFromText(src) {
   return (o.kcal || o.b || o.s || o.t) ? o : null;
 }
 
+/* Kontrola živin proti energii (Atwater 4/4/9 + vláknina 2) — týž princip, jakým
+   build-jidla.js hlídá receptury. Když čísla neodpovídají uvedeným kaloriím, ale po
+   prohození bílkovin s tuky sedí, je to ta známá záměna z etikety: v tabulce stojí
+   tuky výš než bílkoviny. Vrací hodnoty k vyplnění a případnou hlášku.
+   U nápojů s alkoholem se nekontroluje — etanol má 7 kcal/g a do vzorce nepatří. */
+function zkontrolujZiviny(d) {
+  const out = { b: d.b, s: d.s, t: d.t, hlaska: '' };
+  const atw = (b, s, t) => 4 * b + 4 * s + 9 * t + 2 * (d.v || 0);
+  if (!(d.kcal > 0) || d.abv > 0) return out;
+  const chyba = x => Math.abs(d.kcal - x) / d.kcal;
+  const tak = chyba(atw(d.b, d.s, d.t)), prohozene = chyba(atw(d.t, d.s, d.b));
+  if (tak <= 0.15) return out;                       // sedí, není co řešit
+  if (prohozene <= 0.15 && prohozene * 2 < tak) {    // po prohození sedí, a výrazně líp
+    out.b = d.t; out.t = d.b;
+    out.hlaska = '⚠ Bílkoviny a tuky vyšly prohozené (v tabulce stojí tuky výš), ' +
+      'podle energie jsem je vrátil zpátky. Zkontroluj to.';
+    return out;
+  }
+  out.hlaska = '⚠ Čísla nesedí s uvedenou energií (' + r0(d.kcal) + ' kcal, ze živin vychází '
+    + r0(atw(d.b, d.s, d.t)) + '). Projdi je, než potravinu uložíš.';
+  return out;
+}
+
 function processLabel() {
   let o;
   const src = String($('labIn').value || '').trim();
@@ -4990,7 +5021,23 @@ function processLabel() {
   if (o.nazev && !$('edName').value.trim()) $('edName').value = o.nazev;
   if (o.znacka && !$('edBrand').value.trim()) $('edBrand').value = o.znacka;
   if (o.jed === 'ml') { $('edUnit').value = 'ml'; $('edUnitTxt').textContent = 'ml'; }
-  setIf('edKcal', o.kcal); setIf('edP', o.b); setIf('edC', o.s); setIf('edF', o.t);
+
+  /* Klíče mají od v66 plné názvy, protože jednopísmenné `b`/`s`/`t` v pořadí
+     bílkoviny–sacharidy–tuky sváděly k záměně: česká tabulka má tuky VÝŠ než
+     bílkoviny, takže model opisující shora dolů je prohodil. Krátké klíče se
+     pořád přijímají — starší Project instructions je ještě posílají. */
+  const prvni = (a, b) => (a === undefined || a === null || a === '') ? b : a;
+  const zivin = zkontrolujZiviny({
+    kcal: n(o.kcal),
+    b: n(prvni(o.bilkoviny, o.b)),
+    s: n(prvni(o.sacharidy, o.s)),
+    t: n(prvni(o.tuky, o.t)),
+    v: n(prvni(o.vlaknina, o.v)),
+    abv: n(o.abv)
+  });
+  setIf('edKcal', o.kcal); setIf('edP', zivin.b); setIf('edC', zivin.s); setIf('edF', zivin.t);
+  $('edPozor').textContent = zivin.hlaska || '';
+  $('edPozor').style.display = zivin.hlaska ? '' : 'none';
   setIf('edFib', o.vlaknina); setIf('edSalt', o.sul); setIf('edServ', o.porce);
   setIf('edAbv', o.abv);              // pivo a spol. se pak počítají i do alkoholu
   $('labIn').value = ''; $('labPrev').style.display = 'none'; labelFile = null;
