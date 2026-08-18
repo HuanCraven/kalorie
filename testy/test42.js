@@ -53,19 +53,14 @@ const PROSTREDI = require('./prostredi');
   await p.click('nav button[data-p="set"]'); await p.waitForTimeout(300);
   ck('RMR z kalkulačky přežil restart', (await p.inputValue('#gRmr')) === '1830', await p.inputValue('#gRmr'));
 
-  // --- foto: návody otevřené před prvním úspěchem
+  /* Návody ke sdílení do chatu zanikly ve v67 i s celou ruční cestou.
+     Zůstává ověření, že rozbor popisu doputuje do deníku. */
   await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="photo"]');
   await p.waitForTimeout(200);
-  ck('varování ke sdílení otevřené', await p.evaluate(() => $('fotoHelp2').open));
-  // zpracuj odpověď a ulož → návody se sbalí
-  await p.fill('#aiIn', '{"jidlo":"Test","polozky":[{"nazev":"rýže","mn":200,"kcal":130,"b":2.7,"s":28,"t":0.3}],"pozn":""}');
-  await p.click('text=Zpracovat'); await p.waitForTimeout(400);
+  await p.evaluate(t => processAI(t), '{"jidlo":"Test","polozky":[{"nazev":"rýže","mn":200,"kcal":130,"b":2.7,"s":28,"t":0.3}],"pozn":""}'); await p.waitForTimeout(400);
   await p.click('text=Přidat jako jedno jídlo'); await p.waitForTimeout(500);
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="photo"]');
-  ck('po úspěchu je varování sbalené', !(await p.evaluate(() => $('fotoHelp2').open)));
-  await p.reload(); await p.waitForTimeout(600);
-  await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="photo"]');
-  ck('sbalení přežije restart', !(await p.evaluate(() => $('fotoHelp2').open)));
+  ck('rozebraný popis se zapíše do deníku',
+    (await p.textContent('#logList')).indexOf('Test') >= 0);
 
   console.log(errs.length ? 'PAGEERROR: ' + errs.join(' | ') : 'bez JS chyb');
   console.log('NEPROŠLO: ' + fail);

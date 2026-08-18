@@ -63,8 +63,7 @@ const A = (n)=>Math.round(n*10)/10;
   await p.click('nav button[data-p="scan"]');
   await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně');
-  await p.fill('#labIn', 'Tady je přepis:\n```json\n{"nazev":"Tvaroh polotučný","znacka":"Madeta","jed":"g","kcal":0,"b":12.5,"s":3.8,"t":4.5,"vlaknina":0,"sul":0.1,"porce":250}\n```\nkJ bylo 431, tedy 103 kcal.');
-  await p.click('#modEdit >> text=OK');
+  await p.evaluate(t => processLabel(t), 'Tady je přepis:\n```json\n{"nazev":"Tvaroh polotučný","znacka":"Madeta","jed":"g","kcal":0,"b":12.5,"s":3.8,"t":4.5,"vlaknina":0,"sul":0.1,"porce":250}\n```\nkJ bylo 431, tedy 103 kcal.');
   await p.waitForTimeout(400);
   console.log('10. etiketa ->', await p.inputValue('#edName'), '/', await p.inputValue('#edBrand'),
               '| B', await p.inputValue('#edP'), 'S', await p.inputValue('#edC'), 'T', await p.inputValue('#edF'),
@@ -79,8 +78,7 @@ const A = (n)=>Math.round(n*10)/10;
   // ml varianta
   await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně');
-  await p.fill('#labIn','{"nazev":"Mléko 1,5%","jed":"ml","kcal":47,"b":3.4,"s":4.8,"t":1.5}');
-  await p.click('#modEdit >> text=OK');
+  await p.evaluate(t => processLabel(t), '{"nazev":"Mléko 1,5%","jed":"ml","kcal":47,"b":3.4,"s":4.8,"t":1.5}');
   await p.waitForTimeout(300);
   console.log('12. ml varianta: jednotka =', await p.inputValue('#edUnit'), '| kcal =', await p.inputValue('#edKcal'));
   await p.click('#modEdit >> text=Zrušit');

@@ -31,8 +31,7 @@ Dohromady asi 596 kcal.`],
   await p.goto('http://127.0.0.1:8811/index.html'); await p.waitForTimeout(800);
   await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="photo"]');
   for (const [name, txt] of CASES) {
-    await p.fill('#aiIn', txt);
-    await p.click('#p-scan >> text=Zpracovat'); await p.waitForTimeout(350);
+    await p.evaluate(t => processAI(t), txt); await p.waitForTimeout(350);
     const rows = await p.locator('#aiList .item').count();
     const tot = await p.textContent('#aiTotK'), mac = await p.textContent('#aiTotM');
     const note = (await p.textContent('#aiNote')).trim();

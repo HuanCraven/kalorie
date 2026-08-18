@@ -21,7 +21,7 @@ Sůl: 1,4 g`],
 
   // reálný případ: rolka přes foto jídla
   await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="photo"]');
-  await p.fill('#aiIn', ROLL); await p.click('#p-scan >> text=Zpracovat'); await p.waitForTimeout(400);
+  await p.evaluate(t => processAI(t), ROLL); await p.waitForTimeout(400);
   console.log('1. rolka:', await p.locator('#aiList .item').count(), 'položky ·',
               await p.textContent('#aiTotK'), '·', await p.textContent('#aiTotM'));
   await p.fill('#aiName','Sýrová rolka T Market');
@@ -38,8 +38,8 @@ Sůl: 1,4 g`],
   await p.evaluate(() => setAdd('man')); await p.click('text=+ Zadat potravinu ručně');
   for (const [nm, txt] of LABELS) {
     await p.fill('#edKcal',''); await p.fill('#edP',''); await p.fill('#edC',''); await p.fill('#edF','');
-    await p.fill('#edSalt',''); await p.fill('#labIn', txt);
-    await p.click('#modEdit >> text=OK'); await p.waitForTimeout(350);
+    await p.fill('#edSalt',''); await p.evaluate(t => processLabel(t), txt);
+    await p.waitForTimeout(350);
     console.log(`${nm}: kcal=${await p.inputValue('#edKcal')} B=${await p.inputValue('#edP')} `+
       `S=${await p.inputValue('#edC')} T=${await p.inputValue('#edF')} sůl=${await p.inputValue('#edSalt')}`+
       ` | ${(await p.textContent('#toast')).trim()}`);

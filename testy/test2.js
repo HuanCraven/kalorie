@@ -29,8 +29,7 @@ const PROSTREDI = require('./prostredi');
 
 Dej vědět, jestli mám něco upřesnit.`;
 
-  await p.fill('#aiIn', reply);
-  await p.click('text=Zpracovat');
+  await p.evaluate(t => processAI(t), reply);
   await p.waitForTimeout(400);
   console.log('2. rows =', await p.locator('#aiList .item').count());
   console.log('3. name =', await p.inputValue('#aiName'));
@@ -72,8 +71,7 @@ Dej vědět, jestli mám něco upřesnit.`;
 
   // bad input handling
   await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="photo"]');
-  await p.fill('#aiIn','tohle není json vůbec');
-  await p.click('text=Zpracovat'); await p.waitForTimeout(300);
+  await p.evaluate(t => processAI(t), 'tohle není json vůbec'); await p.waitForTimeout(300);
   console.log('13. bad input toast =', await p.textContent('#toast'));
 
   await p.screenshot({path:PROSTREDI.DIR+'/shot-photo.png', fullPage:true});

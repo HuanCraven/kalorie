@@ -17,7 +17,36 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.11-66** (`APP_VERSION` v `index.html`, cache `kaltrack-v66` v `sw.js`).
+Aktuální verze: **2026.08.11-67** (`APP_VERSION` v `index.html`, cache `kaltrack-v67` v `sw.js`).
+
+### Novinky ve v67 — ruční posílání do chatu zrušeno
+
+Uživatel používá výhradně Claude API, ruční cestu přes projekt nikdy nepoužil.
+Pryč šel celý blok „Bez API klíče — poslat do chatu ručně" i s režimem projektu.
+
+Odstraněno: `#rucniCesta`, `#aiIn`, `#labIn`, `#gProj`, `projOn`/`projOff`,
+`fotoHelp1`/`fotoHelp2`, tlačítka na sdílení a kopírování zadání — a funkce
+`shareToClaude`, `shareLabel`, `copyPrompt`, `savePhoto`, `saveProj`, `projUi`,
+`pasteAI`, `pasteLabel`, `promptFor` plus nastavení `goals.proj` a meta `fotoOk`.
+
+**`processAI` a `processLabel` dostávají text parametrem**, ne ze skrytého políčka.
+Čistší i pro testy — volají parser přímo místo vyplňování formuláře.
+
+Bez klíče se v panelu Popsat (`#apiChybi`) i Vyfotit (`#obalNote`) ukáže, že rozbor
+potřebuje klíč a kde ho zadat. **Aplikace je tím u fotky a popisu závislá na API
+klíči**; hledání, čárový kód a ruční zápis fungují dál bez něj.
+
+- `test20.js` (režim projektu) **smazán** — testoval jen zrušenou funkci
+- `test19.js` přepsán z `promptFor` na `apiPrompt`; navíc hlídá, že po ruční cestě
+  nezbyla žádná funkce ani prvek, a že zadání pro etiketu má plné názvy živin
+  v pořadí podle české tabulky
+- `test42.js`: sbalování návodů ke sdílení nahrazeno ověřením, že rozebraný popis
+  doputuje do deníku
+- devět sad přepsáno na přímé volání `processAI(text)` / `processLabel(text)`
+
+**Pozor:** pět pádů v první regresi nesouviselo se změnou — z `%TEMP%\kalorie-testy`
+zmizely fixtures. Když testy s alkoholem, NutriDatabází nebo kamerou padají na
+`ENOENT`, stačí `python testy/make-fixtures.py`.
 
 ### Novinky ve v66 — oprava: z etikety chodily prohozené bílkoviny a tuky
 
@@ -640,7 +669,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 64 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 63 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |

@@ -43,8 +43,8 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   ck('panel Vyfotit se otevře', await p.isVisible('#s-lab'));
 
   /* ---- 2. bez klíče se řekne, jak dál ------------------------------ */
-  ck('bez klíče panel vysvětlí ruční cestu',
-     (await p.textContent('#obalNote')).indexOf('Bez klíče') >= 0, await p.textContent('#obalNote'));
+  ck('bez klíče panel řekne, co chybí',
+     (await p.textContent('#obalNote')).indexOf('klíč ke Claude API') >= 0, await p.textContent('#obalNote'));
 
   await p.evaluate(async () => {
     await dbPut('meta', { k: 'api', v: { key: 'sk-ant-test', model: 'claude-haiku-4-5-20251001' } });
@@ -134,8 +134,8 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
      opisující shora dolů prohazoval bílkoviny s tuky. Kontrola proti energii
      (Atwater 4/4/9) to pozná a vrátí zpátky. */
   const vyplnPres = async json => {
-    await p.evaluate(() => { openEdit(null); document.getElementById('labIn').value = ''; });
-    await p.evaluate(t => { document.getElementById('labIn').value = t; processLabel(); }, json);
+    await p.evaluate(() => openEdit(null));
+    await p.evaluate(t => processLabel(t), json);
     await p.waitForTimeout(250);
     return p.evaluate(() => ({
       B: document.getElementById('edP').value, S: document.getElementById('edC').value,

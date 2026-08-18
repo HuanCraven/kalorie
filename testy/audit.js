@@ -95,8 +95,8 @@ const dd=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().
   sec('5 · Ruční zadání a foto etikety');
   await p.click('nav button[data-p="scan"]'); await p.evaluate(() => setAdd('man'));
   await p.click('text=+ Zadat potravinu ručně'); await p.waitForTimeout(300);
-  await p.fill('#labIn','Energie 1428 kJ / 341 kcal, Bílkoviny 9,5 g, Sacharidy 24 g, Tuky 22,5 g, Sůl 1,4 g');
-  await p.click('#modEdit >> text=OK'); await p.waitForTimeout(400);
+  await p.evaluate(t => processLabel(t), 'Energie 1428 kJ / 341 kcal, Bílkoviny 9,5 g, Sacharidy 24 g, Tuky 22,5 g, Sůl 1,4 g');
+  await p.waitForTimeout(400);
   ck('etiketa z volného textu vyplní formulář',
      (await p.inputValue('#edKcal'))==='341' && (await p.inputValue('#edP'))==='9.5' && (await p.inputValue('#edF'))==='22.5');
   await p.fill('#edName','Sýrová rolka'); await p.fill('#edBrand','T Market'); await p.fill('#edServ','225');
@@ -108,14 +108,14 @@ const dd=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().
   // ────────────────────────────────────────────
   sec('6 · Foto jídla');
   await p.click('#addSeg button[data-s="photo"]');
-  ck('upozornění na sdílení je vidět', await p.isVisible('text=Důležité'));
-  await p.fill('#aiIn', `Odhad:
+  // od v67 se do chatu nic neposílá — rozbor jde přes API klíč
+  ck('panel Popsat má tlačítko pro rozbor', (await p.locator('#apiEstBtn').count()) === 1);
+  await p.evaluate(t => processAI(t), `Odhad:
 | Surovina | Množství | kcal | Bílkoviny | Sacharidy | Tuky |
 |---|---|---|---|---|---|
 | Kuřecí prsa | 150 g | 248 | 46 | 0 | 5,4 |
 | Rýže | 200 g | 260 | 5,4 | 56 | 0,6 |
-Celkem 508 kcal.`);
-  await p.click('#p-scan >> text=Zpracovat'); await p.waitForTimeout(400);
+Celkem 508 kcal.`); await p.waitForTimeout(400);
   ck('tabulka rozpoznána, 2 položky', await p.locator('#aiList .item').count()===2);
   ck('součet 508 kcal', near(await p.textContent('#aiTotK'),508,2), await p.textContent('#aiTotK'));
   ck('varuje, že to není JSON', (await p.textContent('#aiNote')).includes('zkontroluj'));

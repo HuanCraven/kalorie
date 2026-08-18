@@ -32,8 +32,7 @@ const CASES = [
   const num=v=>parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(',','.'));
   let ok=0, bad=[];
   for (const [name, txt, exp] of CASES) {
-    await p.fill('#aiIn', txt);
-    await p.click('#p-scan >> text=Zpracovat'); await p.waitForTimeout(350);
+    await p.evaluate(t => processAI(t), txt); await p.waitForTimeout(350);
     const rows = await p.locator('#aiList .item').count();
     if (!rows) { bad.push(name+' → nerozpoznáno'); console.log('✗ '+name+'\n    nerozpoznáno'); continue; }
     const tot = num(await p.textContent('#aiTotK'));
