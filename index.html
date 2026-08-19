@@ -510,6 +510,29 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <p class="tiny" id="fitDateWarn" style="margin:8px 0 0;color:var(--warn);display:none"></p>
   </div>
 
+  <!-- Nahrání snímku z hodinek či fitness aplikace. Stejná mašinerie jako u etikety:
+       apiAsk → parser → potvrzení. Bez potvrzení se neuloží nic. -->
+  <div class="card">
+    <h3>Ze snímku hodinek nebo aplikace</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Vyfoť nebo nahraj snímek obrazovky s tréninkem —
+      Claude z něj vytáhne aktivitu, délku a kalorie. Než se to zapíše, ukážu ti to k potvrzení.</p>
+    <button class="btn pri full dotyk" onclick="document.getElementById('fitFoto').click()">📷 Nahrát snímek</button>
+    <input type="file" id="fitFoto" accept="image/*" style="display:none" onchange="gotFitFoto(this)">
+    <img id="fitPrev" style="display:none;width:100%;border-radius:10px;margin-top:8px">
+    <p class="tiny muted" id="fitFotoNote" style="margin:10px 0 0"></p>
+    <p class="tiny" id="fitFotoMsg" style="margin:8px 0 0;display:none"></p>
+  </div>
+
+  <div class="card" id="fitNavrhCard" style="display:none">
+    <h3>Zkontroluj a potvrď</h3>
+    <div id="fitNavrhList"></div>
+    <p class="tiny" id="fitNavrhPozn" style="margin:8px 0 0;color:var(--warn);display:none"></p>
+    <div class="row" style="margin-top:10px">
+      <button class="btn grow" onclick="fitNavrhZahod()">Zahodit</button>
+      <button class="btn pri grow" onclick="fitNavrhSave()">Zapsat do deníku</button>
+    </div>
+  </div>
+
   <div class="card">
     <h3 id="fitFormHead">Zapsat aktivitu</h3>
     <div id="fitRecent" class="row wrap2" style="margin-bottom:8px"></div>
@@ -578,11 +601,16 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div class="card">
     <h3>Z hodinek</h3>
+    <div class="fld"><label>Celkový výdej za den (kcal)</label>
+      <input id="dTotal" type="number" inputmode="numeric" placeholder="—" onchange="saveDaily()"></div>
+    <p class="tiny muted" style="margin:-4px 0 10px">Číslo, které hodinky ukazují jako <b>celkové</b>
+      kalorie za den — už v sobě má klidový výdej i pohyb. Když ho vyplníš, <b>nahradí</b> celý výpočet:
+      klidový výdej, aktivní kalorie ani zapsaná cvičení se k němu nepřičítají. Dá se kdykoli přepsat.</p>
+    <p class="tiny" id="dTotalStav" style="margin:-4px 0 10px;color:var(--acc);display:none"></p>
     <div class="fld"><label>Aktivní kcal za celý den</label>
       <input id="dBurn" type="number" inputmode="numeric" placeholder="0" onchange="saveDaily()"></div>
-    <p class="tiny muted" style="margin:-4px 0 0">Číslo z hodinek nebo z fitness aplikace za den, který máš
-      nastavený nahoře. Přičítá se ke klidovému výdeji stejně jako aktivity zapsané níž — nezapisuj
-      tedy totéž dvakrát.</p>
+    <p class="tiny muted" style="margin:-4px 0 0">Jen aktivní pohyb, bez klidového výdeje. Používá se,
+      když celkový výdej výše nevyplníš — pak se sčítá s klidovým výdejem a se zapsanými cvičeními.</p>
   </div>
 
   <div class="card">
@@ -1079,7 +1107,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.11-67';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.11-69';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1618,15 +1646,27 @@ async function lastWeight(date) {
   return w ? w.weight : null;
 }
 function fixTargets() { return { kcal: goals.kcal, p: goals.p, c: goals.c, f: goals.f, dyn: false }; }
-async function dayTargets(date, burn) {
+/* Výdej dne na jednom místě. Je-li zadaný CELKOVÝ výdej (např. ze snímku Zepp),
+   je nadřazený: už v sobě má klidový výdej i všechen pohyb, takže se k němu nic
+   nepřičítá — jinak by se klid a cvičení počítaly dvakrát. Bez něj se skládá
+   po částech: klidový výdej + aktivní kcal z hodinek + zapsaná cvičení. */
+function vydejDne(dd, wk) {
+  dd = dd || {};
+  if (typeof dd.total === 'number' && dd.total > 0) return { out: dd.total, celkovy: true };
+  const rmr = goals.rmr || 0;
+  if (!rmr) return { out: null, celkovy: false };
+  return { out: rmr + (typeof dd.burn === 'number' ? dd.burn : 0) + (wk || 0), celkovy: false };
+}
+
+async function dayTargets(date, vydej) {
   if (!goals.dyn || !goals.rmr) return fixTargets();
   const w = await lastWeight(date) || n(($('cW') || {}).value) || 0;
-  if (!w) return fixTargets();
-  const out = goals.rmr + (burn || 0);
+  if (!w || !(vydej > 0)) return fixTargets();
+  const out = vydej;
   const kcal = Math.max(800, r0(out - (goals.def || 0)));
   const p = r0((goals.pKg || 2.0) * w), f = r0((goals.fKg || 0.9) * w);
   const c = Math.max(0, r0((kcal - 4 * p - 9 * f) / 4));
-  return { kcal, p, c, f, dyn: true, w, out, burn: burn || 0 };
+  return { kcal, p, c, f, dyn: true, w, out, burn: Math.max(0, out - (goals.rmr || 0)) };
 }
 
 /* ---------------- day view ---------------- */
@@ -1651,7 +1691,7 @@ async function renderDay() {
 
   const dd0 = await dbGet('daily', curDate) || {};
   const wkToday = await workoutSum(curDate);
-  const TG = await dayTargets(curDate, (typeof dd0.burn === 'number' ? dd0.burn : 0) + wkToday);
+  const TG = await dayTargets(curDate, vydejDne(dd0, wkToday).out);
   if (ringLeft) {                        // klepnutím na kruh: zbývá ↔ snědeno
     $('kcalNow').textContent = r0(TG.kcal - t.k);
     $('kcalGoal').textContent = 'zbývá';
@@ -3530,18 +3570,42 @@ let period = 7, statCache = null, alcCache = null;
 async function loadDaily() {
   const d = await dbGet('daily', curDate) || {};
   $('dBurn').value = (typeof d.burn === 'number') ? d.burn : '';
+  $('dTotal').value = (typeof d.total === 'number') ? d.total : '';
   $('dWeight').value = (typeof d.weight === 'number') ? d.weight : '';
+  dTotalUi(d, await workoutSum(curDate));
+}
+
+/* Když je zadaný celkový výdej, musí být na první pohled jasné, že ostatní čísla
+   se do bilance nepočítají — jinak by to vypadalo jako chyba. */
+function dTotalUi(d, wk) {
+  const p = $('dTotalStav'); if (!p) return;
+  const ma = typeof d.total === 'number' && d.total > 0;
+  p.style.display = ma ? '' : 'none';
+  if (!ma) return;
+  const slozky = [];
+  if (goals.rmr) slozky.push('klidový výdej ' + r0(goals.rmr));
+  if (typeof d.burn === 'number' && d.burn) slozky.push('aktivní ' + r0(d.burn));
+  if (wk) slozky.push('cvičení ' + r0(wk));
+  p.textContent = 'Bilance počítá s ' + r0(d.total) + ' kcal.' +
+    (slozky.length ? ' Nepřičítá se ' + slozky.join(', ') + ' — celkový výdej to už obsahuje.' : '');
 }
 /* Meze, za kterými hodnota skoro jistě není to, co do políčka patří. Chybný vstup
    se jinak projeví až o dvě obrazovky dál (váha 1800 kg → cíl 3600 g bílkovin). */
-const MEZE = { burn: [0, 10000, 'Aktivní kcal'], weight: [25, 350, 'Váha'], rmr: [600, 5000, 'Klidový výdej'] };
+const MEZE = { burn: [0, 10000, 'Aktivní kcal'], weight: [25, 350, 'Váha'], rmr: [600, 5000, 'Klidový výdej'],
+  total: [500, 12000, 'Celkový výdej'] };
 function mimoMeze(pole, v) {
   const m = MEZE[pole];
   return (v < m[0] || v > m[1]) ? m[2] + ' mimo rozsah ' + m[0] + '–' + m[1] + ' — ' + v + ' nevypadá správně' : null;
 }
 async function saveDaily() {
   const burn = $('dBurn').value.trim(), w = $('dWeight').value.trim();
+  const tot = $('dTotal').value.trim();
   const rec = { date: curDate };
+  if (tot !== '') {
+    const t = n(tot), chyba = mimoMeze('total', t);
+    if (chyba) { toast(chyba); await loadDaily(); return; }
+    rec.total = t;
+  }
   if (burn !== '') {
     const b = n(burn), chyba = mimoMeze('burn', b);
     if (chyba) { toast(chyba); await loadDaily(); return; }
@@ -3594,18 +3658,21 @@ async function renderBalance(intake, wk) {
   const burn = (typeof d.burn === 'number') ? d.burn : 0;
   if (wk === undefined) wk = await workoutSum(curDate);
   const rmr = goals.rmr || 0;
-  if (!rmr) {
+  if (!rmr && !(typeof d.total === 'number' && d.total > 0)) {
     $('balExp').textContent = 'Bilance';
     $('balVal').textContent = '—';
     $('balHint').textContent = 'Nastav klidový výdej v Nastavení, jinak nejde bilanci spočítat.';
     return;
   }
-  const out = rmr + burn + wk, bal = intake - out;
-  $('balExp').textContent = 'Výdej ' + r0(rmr) + ' + ' + r0(burn) +
-    (wk ? ' + cvičení ' + r0(wk) : '') + ' = ' + r0(out) + ' kcal';
+  const v = vydejDne(d, wk), out = v.out, bal = intake - out;
+  $('balExp').textContent = v.celkovy
+    ? 'Výdej celkem ' + r0(out) + ' kcal (z hodinek)'
+    : 'Výdej ' + r0(rmr) + ' + ' + r0(burn) + (wk ? ' + cvičení ' + r0(wk) : '') + ' = ' + r0(out) + ' kcal';
   $('balVal').textContent = (bal > 0 ? '+' : '') + r0(bal) + ' kcal';
   $('balVal').style.color = bal > 0 ? C_SUR : C_DEF;
-  $('balHint').textContent = (typeof d.burn === 'number') ? '' : 'Aktivní kalorie z hodinek zatím nezadané — počítá se s 0.';
+  $('balHint').textContent = v.celkovy
+    ? 'Celkový výdej z hodinek má v sobě klidový výdej i cvičení, proto se nic nepřičítá.'
+    : ((typeof d.burn === 'number') ? '' : 'Aktivní kalorie z hodinek zatím nezadané — počítá se s 0.');
 }
 
 /* --- sběr dat --- */
@@ -3629,6 +3696,7 @@ async function statsData(days) {
       date: key, k: b ? b.k : 0, p: b ? b.p : 0, c: b ? b.c : 0, f: b ? b.f : 0,
       alc: b ? b.alc : 0, items: b ? b.items : [], logged: !!b,
       burn: (typeof dd.burn === 'number') ? dd.burn + w : (w > 0 ? w : null),
+      total: (typeof dd.total === 'number' && dd.total > 0) ? dd.total : null,
       wk: w,
       weight: (typeof dd.weight === 'number') ? dd.weight : null
     });
@@ -3639,10 +3707,12 @@ function agg(list, w0) {
   const rmr = goals.rmr || 0;
   // cíle pro každý den zvlášť — v dynamickém režimu se liší podle zátěže a váhy
   let wRun = w0 || 0;
+  // celkový výdej ze snímku je nadřazený, jinak klid + pohyb (viz vydejDne)
+  const vyd = d => d.total !== null ? d.total : (rmr ? rmr + (d.burn || 0) : null);
   const tg = list.map(d => {
     if (d.weight !== null) wRun = d.weight;
-    if (!goals.dyn || !rmr || !wRun) return { kcal: goals.kcal, p: goals.p, c: goals.c, f: goals.f };
-    const kcal = Math.max(800, r0(rmr + (d.burn || 0) - (goals.def || 0)));
+    if (!goals.dyn || !wRun || !(vyd(d) > 0)) return { kcal: goals.kcal, p: goals.p, c: goals.c, f: goals.f };
+    const kcal = Math.max(800, r0(vyd(d) - (goals.def || 0)));
     const P = r0((goals.pKg || 2) * wRun), F = r0((goals.fKg || 0.9) * wRun);
     return { kcal, p: P, f: F, c: Math.max(0, r0((kcal - 4 * P - 9 * F) / 4)) };
   });
@@ -3650,8 +3720,9 @@ function agg(list, w0) {
   const avg = (arr, f) => arr.length ? arr.reduce((a, x) => a + f(x), 0) / arr.length : 0;
   const kcals = lg.map(d => d.k);
   const withBurn = list.filter(d => d.burn !== null);
-  const outDays = rmr ? list.map(d => rmr + (d.burn || 0)) : [];
-  const balDays = rmr ? list.map(d => d.logged ? d.k - (rmr + (d.burn || 0)) : null) : [];
+  const maVydej = list.some(d => vyd(d) > 0);
+  const outDays = maVydej ? list.map(d => vyd(d) || 0) : [];
+  const balDays = maVydej ? list.map(d => (d.logged && vyd(d) > 0) ? d.k - vyd(d) : null) : [];
   const w = list.filter(d => d.weight !== null);
   // klouzavý 7denní průměr váhy
   const ma = list.map((d, i) => {
@@ -3700,7 +3771,7 @@ function agg(list, w0) {
 function svgBars(list, a) {
   const W = 320, H = 110, pad = 4;
   const rmr = goals.rmr || 0;
-  const vydej = list.map(d => rmr ? rmr + (d.burn || 0) : null);
+  const vydej = list.map(d => (d.total !== null ? d.total : (rmr ? rmr + (d.burn || 0) : null)));
   const cil = a.tK || goals.kcal;
   const top = Math.max(cil || 0, a.maxK, ...vydej.filter(v => v !== null)) * 1.12 || 100;
   const bw = (W - pad * 2) / list.length;
@@ -4631,6 +4702,9 @@ function apiUi() {
       + 'Bez něj se dá potravina založit ručně přes Hledat.';
   // bez klíče se řekne, co chybí — ruční cesta přes chat od v67 není
   if ($('apiChybi')) $('apiChybi').style.display = on ? 'none' : '';
+  if ($('fitFotoNote') && !$('fitFotoNote').textContent.startsWith('⚠'))
+    $('fitFotoNote').textContent = on ? ''
+      : 'Potřebuje klíč ke Claude API — vlož ho v Nastavení → Propojení.';
 }
 async function apiTest() {
   const key = ($('apiKey').value || '').trim();
@@ -5418,6 +5492,183 @@ async function workoutByDay() {
   all.forEach(r => { by[r.date] = (by[r.date] || 0) + (r.kcal || 0); });
   return by;
 }
+/* ---------------- cvičení ze snímku hodinek ---------------- */
+let fitFotoFile = null, fitNavrh = [], fitDenNavrh = null;
+
+/* Pozor na dvojí započtení: aplikace počítá kcal jako (MET−1)×váha×hodiny, tedy
+   BEZ klidového výdeje. Hodinky ale často hlásí celkové kalorie včetně bazálu.
+   Proto se ptáme, o který údaj jde, a při "celkove" na to upozorníme. */
+const CVICENI_PROMPT =
+`Na snímku je obrazovka z hodinek nebo fitness aplikace. Rozliš, co na ní je.
+
+Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
+{"typ":"den","datum":"","kcal_celkem":0,"kroky":0,"zaznamy":[],"pozn":""}
+
+Dvě možnosti:
+
+A) DENNÍ SOUHRN (přehled dne: kroky, kalorie za den, spánek, tep…)
+   typ = "den"
+   kcal_celkem = číslo u popisku KALORIE / CALORIES — tedy kolik člověk za den spálil
+   kroky = počet kroků, když je vidět; jinak 0
+   zaznamy nech prázdné
+
+B) SEZNAM TRÉNINKŮ (jednotlivé aktivity s délkou)
+   typ = "treninky"
+   zaznamy = [{"nazev":"","minuty":0,"kcal":0,"kcal_typ":"aktivni"}]
+   nazev česky (běh, jízda na kole, posilování…), z času 1:05:00 udělej 65 minut
+   kcal_typ = "aktivni" u aktivních či čistých kalorií, "celkove" u celkových,
+   "nevim", když to nepoznáš
+   kcal_celkem nech 0
+
+Společné:
+- datum ve tvaru RRRR-MM-DD, jen když je na snímku vidět; jinak nech prázdné
+- pozn = co je nejisté nebo nečitelné
+
+Nedokážeš-li ze snímku přečíst nic použitelného, vrať {"typ":"nic","pozn":"nečitelné"}.
+Nic si nedomýšlej — raději prázdná odpověď než vymyšlené číslo.`;
+
+function gotFitFoto(inp) {
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  fitFotoFile = f;
+  const img = $('fitPrev'); img.src = URL.createObjectURL(f); img.style.display = '';
+  inp.value = '';
+  if (!apiCfg.key) { toast('Nejdřív vlož klíč ke Claude API v Nastavení → Propojení'); return; }
+  apiFitFoto();
+}
+
+async function apiFitFoto() {
+  const msg = $('fitFotoMsg');
+  msg.style.display = ''; msg.style.color = 'var(--dim)';
+  msg.textContent = 'Čtu snímek…';
+  try {
+    // snímek obrazovky má drobná čísla, proto stejné rozlišení jako u etikety
+    const txt = await apiAsk(fitFotoFile, CVICENI_PROMPT, true);
+    zpracujFitFoto(txt);
+    msg.style.display = 'none';
+  } catch (e) {
+    msg.style.color = 'var(--warn)';
+    msg.textContent = '✕ ' + (e.name === 'AbortError' ? 'vypršel čas — zkus to znovu' : e.message);
+  }
+}
+
+function zpracujFitFoto(text) {
+  let o = null;
+  try {
+    let t = String(text || '').replace(/```[a-z]*/gi, '')
+      .replace(/[\u201C\u201D\u201E]/g, '"').replace(/[\u2018\u2019]/g, "'");
+    const i = t.indexOf('{'), j = t.lastIndexOf('}');
+    if (i >= 0 && j > i) o = JSON.parse(t.slice(i, j + 1).replace(/,\s*([}\]])/g, '$1'));
+  } catch (e) { o = null; }
+  o = o || {};
+  const jeDatum = x => /^\d{4}-\d{2}-\d{2}$/.test(String(x || ''));
+  // datum může přijít nahoře i u jednotlivého tréninku — bereme oboje
+  const datum = jeDatum(o.datum) ? o.datum : curDate;
+  const typ = String(o.typ || '').toLowerCase();
+
+  fitNavrh = [];
+  fitDenNavrh = null;
+  if (typ === 'den' && n(o.kcal_celkem) > 0) {
+    // denní souhrn: nahradí celý výpočet výdeje pro ten den
+    fitDenNavrh = { datum: datum, kcal: r0(n(o.kcal_celkem)), kroky: r0(n(o.kroky)) };
+  } else {
+    const zaz = Array.isArray(o.zaznamy) ? o.zaznamy : [];
+    fitNavrh = zaz.map(z => ({
+      nazev: String(z.nazev || '').trim().slice(0, 40),
+      min: Math.max(0, r0(n(z.minuty))),
+      kcal: Math.max(0, r0(n(z.kcal))),
+      typ: String(z.kcal_typ || 'nevim').toLowerCase(),
+      datum: jeDatum(z.datum) ? z.datum : datum,
+      ber: true
+    })).filter(z => z.nazev && (z.min > 0 || z.kcal > 0));
+  }
+
+  if (!fitDenNavrh && !fitNavrh.length) {
+    $('fitNavrhCard').style.display = 'none';
+    toast('Ze snímku se nedá nic přečíst — zkus ho ostřejší nebo zapiš ručně');
+    return;
+  }
+  $('fitNavrhPozn').textContent = o.pozn ? '⚠ ' + o.pozn : '';
+  $('fitNavrhPozn').style.display = o.pozn ? '' : 'none';
+  renderFitNavrh();
+  $('fitNavrhCard').style.display = '';
+  $('fitNavrhCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderFitNavrh() {
+  if (fitDenNavrh) {
+    const d = fitDenNavrh;
+    $('fitNavrhList').innerHTML = `
+      <div class="item" style="align-items:flex-start">
+        <div class="grow">
+          <div class="nm">Celkový výdej za den</div>
+          <div class="sub">${d.datum === curDate ? 'dnes' : czd(d.datum)}${
+            d.kroky ? ' · ' + d.kroky + ' kroků' : ''}</div>
+        </div>
+        <input type="number" inputmode="numeric" value="${d.kcal}" style="width:78px;padding:7px 6px;text-align:right"
+          oninput="fitDenNavrh.kcal=n(this.value)"><span class="tiny muted" style="align-self:center">kcal</span>
+      </div>
+      <p class="tiny muted" style="margin:10px 0 0">Nahradí výpočet výdeje pro ten den — klidový výdej,
+        aktivní kalorie ani zapsaná cvičení se k němu už nepřičítají. Číslo můžeš přepsat.</p>`;
+    $('fitFotoNote').textContent = '';
+    return;
+  }
+  $('fitNavrhList').innerHTML = fitNavrh.map((z, i) => `
+    <div class="item" style="align-items:flex-start">
+      <input type="checkbox" ${z.ber ? 'checked' : ''} style="width:auto;margin-top:10px"
+        onchange="fitNavrh[${i}].ber=this.checked">
+      <div class="grow">
+        <div class="nm">${esc(z.nazev)}</div>
+        <div class="sub">${z.datum === curDate ? 'dnes' : czd(z.datum)}${
+          z.typ === 'celkove' ? ' · <span style="color:var(--warn)">celkové kcal</span>' : ''}</div>
+      </div>
+      <input type="number" inputmode="numeric" value="${z.min}" style="width:58px;padding:7px 6px;text-align:right"
+        oninput="fitNavrh[${i}].min=n(this.value)"><span class="tiny muted" style="align-self:center">min</span>
+      <input type="number" inputmode="numeric" value="${z.kcal}" style="width:66px;padding:7px 6px;text-align:right"
+        oninput="fitNavrh[${i}].kcal=n(this.value)"><span class="tiny muted" style="align-self:center">kcal</span>
+    </div>`).join('');
+  // upozornění na dvojí započtení má smysl jen u celkových kalorií u jednotlivých tréninků
+  const celkove = fitNavrh.some(z => z.ber && z.typ === 'celkove');
+  const p = $('fitFotoNote');
+  p.textContent = celkove
+    ? '⚠ Snímek uvádí u tréninku celkové kalorie včetně klidového výdeje. Aplikace klidový výdej '
+      + 'počítá zvlášť, takže by se část započetla dvakrát — zvaž, jestli číslo nesnížit.'
+    : '';
+  p.style.color = celkove ? 'var(--warn)' : 'var(--dim)';
+}
+
+function fitNavrhZahod() {
+  fitNavrh = []; fitDenNavrh = null; fitFotoFile = null;
+  $('fitNavrhCard').style.display = 'none';
+  $('fitPrev').style.display = 'none';
+  $('fitFotoNote').textContent = '';
+}
+
+async function fitNavrhSave() {
+  if (fitDenNavrh) {
+    if (!(fitDenNavrh.kcal > 0)) { toast('Není co zapsat'); return; }
+    const den = await dbGet('daily', fitDenNavrh.datum) || { date: fitDenNavrh.datum };
+    den.total = r0(fitDenNavrh.kcal);
+    await dbPut('daily', den);
+    const kdy = fitDenNavrh.datum;
+    fitNavrhZahod();
+    toast('Celkový výdej zapsán: ' + r0(den.total) + ' kcal');
+    await loadDaily(); renderDay(); renderFit();
+    if (kdy !== curDate) toast('Zapsáno na ' + czd(kdy));
+    return;
+  }
+  const ber = fitNavrh.filter(z => z.ber && (z.min > 0 || z.kcal > 0));
+  if (!ber.length) { toast('Není co zapsat'); return; }
+  for (const z of ber) {
+    await dbPut('workout', { date: z.datum, name: z.nazev, min: z.min, met: 0,
+      kcal: z.kcal, ts: Date.now() });
+  }
+  const kolik = ber.length;
+  fitNavrhZahod();
+  toast('Zapsáno: ' + kolik + ' ' + plur(kolik, 'aktivita', 'aktivity', 'aktivit'));
+  renderFit();
+}
+
 async function renderFit() {
   syncAddDate();
   await loadDaily();

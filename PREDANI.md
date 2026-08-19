@@ -17,7 +17,41 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.11-67** (`APP_VERSION` v `index.html`, cache `kaltrack-v67` v `sw.js`).
+Aktuální verze: **2026.08.11-69** (`APP_VERSION` v `index.html`, cache `kaltrack-v69` v `sw.js`).
+
+### Novinky ve v68–69 — pohyb ze snímku hodinek
+
+Na Pohybu je karta **Ze snímku hodinek nebo aplikace**: nahraje se screenshot,
+Claude z něj vytáhne data a aplikace je **ukáže k potvrzení** — bez potvrzení se
+nezapíše nic. `CVICENI_PROMPT` rozlišuje dvě situace:
+
+- **denní souhrn** (`typ: "den"`) — úvodní obrazovka Zeppu s kroky a kaloriemi
+  za den → nabídne se jako **celkový výdej** (`daily.total`)
+- **seznam tréninků** (`typ: "treninky"`) → jednotlivé aktivity do `workout`,
+  každou lze odškrtnout nebo přepsat minuty i kalorie
+
+Snímek se posílá ve větším rozlišení (`apiAsk(…, true)`) — drobná čísla.
+Datum se bere ze snímku, když je vidět; přijímá se nahoře i u jednotlivého tréninku.
+
+#### `daily.total` je nadřazený výdej
+
+Zepp ukazuje **celkové** kalorie za den včetně klidového výdeje. Sečíst je
+s `goals.rmr` a se cvičeními by znamenalo počítat totéž dvakrát. Proto nová funkce
+**`vydejDne(dd, wk)`**: je-li `dd.total > 0`, je to výdej dne a **nic se nepřičítá**;
+jinak `rmr + burn + cvičení` jako dřív. Používají ji `renderBalance`, `dayTargets`
+i `agg()` ve statistikách (`vyd(d)`), takže se to promítne do bilance, dynamických
+cílů, grafů i souhrnu pro Claude.
+
+`dayTargets(date, vydej)` už nebere aktivní kcal, ale **celý výdej** — volající si ho
+spočítá přes `vydejDne`.
+
+Na Pohybu je pole **Celkový výdej za den** (`#dTotal`, meze 500–12000) a pod ním
+`#dTotalStav`, které vypíše, co se do bilance **nepočítá** („Nepřičítá se klidový
+výdej 1800, aktivní 400, cvičení 350"). Vymazáním pole se aplikace vrátí k výpočtu
+po částech. Cvičení se dál zapisují kvůli přehledu, jen se nesčítají.
+
+- testy `test64.js` — obojí čtení snímku, přepis výdeje, dynamický cíl z něj,
+  nezdvojené cvičení, ruční úprava, vymazání, meze
 
 ### Novinky ve v67 — ruční posílání do chatu zrušeno
 
@@ -669,7 +703,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 63 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 64 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |
