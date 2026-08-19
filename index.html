@@ -480,7 +480,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <p class="tiny muted" id="alcAvgNote" style="margin:0 0 14px"></p>
 
   <div id="alcLimitBar"></div>
-  <h3 style="margin-top:16px">Vývoj 30denního průměru</h3>
+  <h3 style="margin-top:16px" id="alcTrendHead">Vývoj 30denního průměru</h3>
+  <div class="seg" id="alcTrendSeg" style="margin-bottom:10px">
+    <button data-t="7" onclick="setAlcOkno(7)">7 dní</button>
+    <button data-t="30" class="on" onclick="setAlcOkno(30)">30 dní</button>
+  </div>
   <div id="alcTrend" style="margin:8px 0 4px"></div>
 
   <details style="margin-top:14px">
@@ -1119,7 +1123,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.19-73';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.19-74';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3868,11 +3872,11 @@ function limitBlock(s) {
 }
 
 /* Vývoj klouzavého 30denního průměru — jediné číslo srovnatelné s limitem. */
-function svgAlcTrend(long, trend, lim) {
+function svgAlcTrend(long, trend, lim, okno) {
   const pts = [];
   for (let i = 0; i < long.length; i++) if (trend[i] !== null) pts.push({ d: long[i].d, v: trend[i] });
   if (pts.length < 2)
-    return '<p class="tiny muted">Na trend potřebuju aspoň 30 dní záznamů — graf naskočí sám, ' +
+    return '<p class="tiny muted">Na trend potřebuju aspoň ' + dnu(okno) + ' záznamů — graf naskočí sám, ' +
       'jakmile je budeš mít.</p>';
   const W = 320, H = 96, L = 26;
   const mx = (Math.max(lim * 1.35 || 0, ...pts.map(p => p.v)) || 10) * 1.1;
@@ -3902,7 +3906,7 @@ function svgAlcTrend(long, trend, lim) {
     <p class="tiny muted" style="margin:6px 0 0">Teď <b style="color:var(--fg)">${r1(last.v)} g/den</b>,
       za posledních 14 dní ${smer > 0.3 ? 'stoupl o ' + r1(smer) + ' g' :
         smer < -0.3 ? 'klesl o ' + r1(-smer) + ' g' : 'se drží'}.
-      Křivka klesá každý den, kdy nepiješ — dělí se vždycky třiceti.</p>`;
+      Křivka klesá každý den, kdy nepiješ — dělí se vždycky ${okno === 7 ? 'sedmi' : 'třiceti'}.</p>`;
 }
 
 /* Denní záznamy — otázka „kdy a kolik", ne „jsem v limitu". */
@@ -5449,20 +5453,29 @@ async function alcStats() {
     avg7: sum(7) / 7, avg30: sum(30) / 30,
     mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
     long,
-    trend: (() => {
-      const out = [];
-      for (let i = 0; i < long.length; i++) {
-        if (i < 29) { out.push(null); continue; }
-        const win = long.slice(i - 29, i + 1);
-        if (win[0].d < (dates[0] || curDate)) { out.push(null); continue; }
-        out.push(win.reduce((a, x) => a + x.g, 0) / 30);
-      }
-      return out;
-    })(),
     lim: goals.alcDay || 0,
     budget: goals.alcDay ? goals.alcDay * 30 - sum(30) : null,
     allSum, allDays, avgAll: allSum / allDays, first
   };
+}
+/* Klouzavý průměr alkoholu. Okno se dá přepnout: třicet dní ukáže dlouhodobý směr,
+   ale jeden večer s ním hne jen o gramy/30 — proto křivka umí klesnout i po dni, kdy
+   se pilo, když z okna zároveň vypadl silnější den. Sedm dní reaguje rychle, zato skáče. */
+function alcKlouzavy(long, okno, prvni) {
+  const out = [];
+  for (let i = 0; i < long.length; i++) {
+    if (i < okno - 1) { out.push(null); continue; }
+    const win = long.slice(i - okno + 1, i + 1);
+    if (win[0].d < prvni) { out.push(null); continue; }
+    out.push(win.reduce((a, x) => a + x.g, 0) / okno);
+  }
+  return out;
+}
+let alcOkno = 30;
+function setAlcOkno(dny) {
+  alcOkno = dny;
+  document.querySelectorAll('#alcTrendSeg button').forEach(b => b.classList.toggle('on', +b.dataset.t === dny));
+  renderAlc();
 }
 let alcPeriod = 30;
 function setAlcPeriod(dny) {
@@ -5487,7 +5500,8 @@ async function renderAlc() {
     ' (dny bez alkoholu se do průměru počítají)';
   $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : '<p class="tiny muted" style="margin:0">' +
     'Limit není nastavený (Víc → Alkohol).</p>';
-  $('alcTrend').innerHTML = svgAlcTrend(s.long, s.trend, s.lim);
+  $('alcTrendHead').textContent = 'Vývoj ' + alcOkno + 'denního průměru';
+  $('alcTrend').innerHTML = svgAlcTrend(s.long, alcKlouzavy(s.long, alcOkno, s.first), s.lim, alcOkno);
   $('alcChart').innerHTML = svgAlcBars(obd);
   syncAddDate();
   const allLog = await dbAll('log');

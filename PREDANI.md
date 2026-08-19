@@ -17,7 +17,29 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.19-73** (`APP_VERSION` v `index.html`, cache `kaltrack-v73` v `sw.js`).
+Aktuální verze: **2026.08.19-74** (`APP_VERSION` v `index.html`, cache `kaltrack-v74` v `sw.js`).
+
+### Novinky ve v74 — přepínatelné okno u křivky alkoholu
+
+Uživatel hlásil, že se mu alkohol z nekompletních dnů asi nepočítá: pil, a křivka
+přesto klesala. **Ověřeno, že se počítá** — příznak `neuplny` se `alcStats` ani
+`renderAlc` nedotýká a hodnoty jsou s ním i bez něj shodné do posledního čísla.
+
+Příčina byla jinde a je to vlastnost, ne chyba: křivka je **klouzavý průměr za
+30 dní**, takže jeden večer s ní hne jen o `gramy/30`. Když ze třicetidenního okna
+zároveň vypadne silnější den, křivka klesne i po dni, kdy se pilo — čistá změna je
+`(včera − den před 31 dny) / 30`. Sedm večerů po 30 g vyjde na třicetidenní křivce
+jako ~7 g/den, což vypadá jako málo, i když se pilo každý den.
+
+- Nad křivkou je **přepínač 7 / 30 dní** (`#alcTrendSeg`, `setAlcOkno`). Výchozí
+  zůstává 30 — dlouhodobý směr je to, kvůli čemu graf vznikl; sedmička je na
+  „co se děje teď".
+- Výpočet vytažen z `alcStats` do `alcKlouzavy(long, okno, prvni)`; `alcStats`
+  už `trend` nevrací, počítá se až při vykreslení podle zvoleného okna.
+- S oknem se mění i **nadpis** a věta pod grafem („dělí se vždycky třiceti/sedmi") —
+  jinak by text tvrdil něco jiného než graf.
+- testy: `test54.js` navíc ověřuje obě okna, jejich čísla (30denní ~7 g/den proti
+  sedmidennímu ~30 g/den z týchž dat) i to, že přepínač nesahá na období grafů.
 
 ### Novinky ve v73 — zrušená duplicitní karta hledání
 

@@ -23,7 +23,8 @@ const PROSTREDI = require('./prostredi');
   await p.evaluate(()=>setAddDate('2026-07-31')); await p.waitForTimeout(900);
   await p.click('nav button[data-p="alc"]'); await p.waitForTimeout(900);
 
-  const st = await p.evaluate(()=>alcStats());
+  const st = await p.evaluate(async ()=>{ const a = await alcStats();
+    a.trend = alcKlouzavy(a.long, 30, a.first); return a; });
   const pts = st.trend.filter(x=>x!==null);
   console.log('2. bodů trendu =', pts.length, '| první =', pts[0].toFixed(2),
               '| poslední =', pts[pts.length-1].toFixed(2), '| ø30 z karty =', st.avg30.toFixed(2));
@@ -42,7 +43,8 @@ const PROSTREDI = require('./prostredi');
 
   // simulace: měsíc abstinence musí trend stáhnout k nule
   await p.evaluate(()=>setAddDate('2026-08-31')); await p.waitForTimeout(900);
-  const st2 = await p.evaluate(()=>alcStats());
+  const st2 = await p.evaluate(async ()=>{ const a = await alcStats();
+    a.trend = alcKlouzavy(a.long, 30, a.first); return a; });
   const p2 = st2.trend.filter(x=>x!==null);
   console.log('\n7. po měsíci bez pití (k 31.8.): ø30 =', st2.avg30.toFixed(2),
               '| poslední bod trendu =', p2[p2.length-1].toFixed(2), '(má být 0)');
