@@ -17,7 +17,46 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.11-69** (`APP_VERSION` v `index.html`, cache `kaltrack-v69` v `sw.js`).
+Aktuální verze: **2026.08.11-70** (`APP_VERSION` v `index.html`, cache `kaltrack-v70` v `sw.js`).
+
+### Novinky ve v70 — zdravotní metriky ze snímku a karta Zdraví
+
+Ze **stejného snímku** (úvodní obrazovka Zeppu) se čte devět čísel místo dvou:
+celkový výdej, kroky, klidový tep, HRV, délka spánku, hluboký, REM, skóre spánku,
+stav tréninku. Ukládají se do `daily` — žádný nový store, takže se to samo
+synchronizuje i zálohuje.
+
+- **Časy se převádějí na minuty** (`cas2min`): `06:29` → 389. Jinak by nešly
+  průměrovat. Zpátky na displej přes `min2cas`.
+- **Chybějící hodnota nepřepíše dřívější.** Zapisuje se jen to, co snímek nesl —
+  když je jednou tep nečitelný, nepřijde se o něj.
+- V zadání je varování před záměnou čísel (kroky tisíce, kalorie stovky,
+  tep 40–90, HRV 15–120), protože jsou na snímku blízko sebe.
+
+**Karta Zdraví na Statistikách** (`#zdraviKarta`, `renderZdravi`) — průměry za
+zvolené období, křivky tepu, HRV a spánku (`svgCara`).
+
+#### Proč zrovna tahle čísla
+
+Uživatel nemá váhu s měřením tělesného složení, takže odpadla nejcennější metrika
+(procento tuku by upřesnilo bílkoviny na kilo i výpočet reálného výdeje ze změny
+váhy — ten dnes mlčky předpokládá, že ubývá tuk).
+
+**HybridCharge se vědomě nepoužívá.** V Zepp 10.4 nahradil Readiness i BioCharge,
+ale míchá biometrii se **subjektivními vstupy přes LifeLoad** — uživatel tam sám
+zapisuje mimo jiné výživu. Korelovat ho s naším jídlem by znamenalo porovnávat dva
+zápisy téhož. Navíc se složená skóre v Zeppu za rok třikrát přejmenovala a
+předefinovala; klidový tep a HRV znamenají pořád totéž.
+
+#### Vztah k alkoholu je důvod, proč karta existuje
+
+Bez něj by to byl jen horší opis Zeppu. Karta proto počítá průměry tepu, HRV
+a spánku **ve dnech s alkoholem proti dnům bez něj** — to hodinky nevědí, o alkoholu
+nemají tušení. Horší hodnota se obarví `--warn`, lepší `--ok`. Ukáže se, až jsou
+aspoň dva dny od každého.
+
+- testy `test64.js` — převod časů, uložení všech metrik, nepřepisování nulami,
+  karta se ukáže i schová, spočítaný rozdíl proti dnům s alkoholem
 
 ### Novinky ve v68–69 — pohyb ze snímku hodinek
 

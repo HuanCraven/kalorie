@@ -170,6 +170,74 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
      (await p.evaluate(async () => (await dbGet('daily', curDate)).total)) === undefined ||
      (await p.evaluate(async () => (await dbGet('daily', curDate)).total)) !== 99999);
 
+  /* ---- 11. zdravotní metriky ze stejného snímku --------------------- */
+  await p.evaluate(async () => {
+    await new Promise(res => { const t = db.transaction('daily', 'readwrite'); t.objectStore('daily').clear(); t.oncomplete = res; });
+    go('fit');
+  });
+  claude.odpoved = JSON.stringify({ typ: 'den', datum: '', kcal_celkem: 815, kroky: 1269,
+    tep: 53, hrv: 30, spanek: '06:29', spanek_hluboky: '01:03', spanek_rem: '01:41',
+    spanek_skore: 68, stav_treninku: 2, zaznamy: [], pozn: '' });
+  await nahraj();
+  ck('zadání říká Claudeovi, co má číst',
+     claude.zadani.indexOf('VARIABILITA') > 0 && claude.zadani.indexOf('KLIDOVÝ') > 0);
+  ck('návrh ukáže tep i spánek',
+     (await p.textContent('#fitNavrhList')).indexOf('Klidový tep') >= 0 &&
+     (await p.textContent('#fitNavrhList')).indexOf('Délka spánku') >= 0);
+
+  await p.click('text=Zapsat do deníku');
+  await p.waitForTimeout(900);
+  const zdr = await p.evaluate(async () => await dbGet('daily', curDate));
+  ck('časy se převedou na minuty (06:29 → 389)', zdr.spanek === 389, zdr.spanek);
+  ck('hluboký spánek 01:03 → 63', zdr.hluboky === 63, zdr.hluboky);
+  ck('REM 01:41 → 101', zdr.rem === 101, zdr.rem);
+  ck('tep, HRV a kroky sedí', zdr.tep === 53 && zdr.hrv === 30 && zdr.kroky === 1269,
+     JSON.stringify({ t: zdr.tep, h: zdr.hrv, k: zdr.kroky }));
+  ck('výdej se uloží zvlášť od zdravotních čísel', zdr.total === 815, zdr.total);
+
+  // co snímek nenese, se nesmí přepsat nulou
+  claude.odpoved = JSON.stringify({ typ: 'den', datum: '', kcal_celkem: 900, kroky: 0,
+    tep: 0, hrv: 0, spanek: '', zaznamy: [], pozn: '' });
+  await nahraj();
+  await p.click('text=Zapsat do deníku');
+  await p.waitForTimeout(900);
+  const po2 = await p.evaluate(async () => await dbGet('daily', curDate));
+  ck('chybějící hodnoty nepřepíšou ty dřívější',
+     po2.tep === 53 && po2.spanek === 389 && po2.total === 900,
+     JSON.stringify({ tep: po2.tep, spanek: po2.spanek, total: po2.total }));
+
+  /* ---- 12. karta Zdraví a vztah k alkoholu ------------------------- */
+  await p.evaluate(async () => {
+    const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
+    for (let i = 1; i <= 13; i++) {
+      const pil = [2, 5, 9].indexOf(i) >= 0;
+      await dbPut('daily', { date: den(i), total: 2500, tep: pil ? 60 : 52, hrv: pil ? 22 : 33,
+        spanek: pil ? 350 : 420, hluboky: pil ? 45 : 70, rem: 95, skore: pil ? 55 : 74, kroky: 8000 });
+      await dbPut('log', { date: den(i), productId: 'quick', name: 'Jídlo', unit: 'porce', amount: 1,
+        meal: 'obed', kcal: 2200, p: 100, c: 200, f: 70, ts: Date.now() });
+      if (pil) await dbPut('log', { date: den(i), productId: 'alk', name: 'Pivo', unit: 'ml', amount: 500,
+        meal: 'vecere', kcal: 210, p: 0, c: 17, f: 0, alc: 20, abv: 5, ts: Date.now() });
+    }
+    go('stats'); return renderStats();
+  });
+  await p.waitForTimeout(1200);
+  ck('karta Zdraví se ukáže', await p.isVisible('#zdraviKarta'));
+  const dl = await p.textContent('#zdraviDlazdice');
+  ck('dlaždice mají tep, HRV i spánek',
+     dl.indexOf('Klidový tep') >= 0 && dl.indexOf('HRV') >= 0 && dl.indexOf('Spánek') >= 0, dl.slice(0, 60));
+  const vz = (await p.textContent('#zdraviVztahy')).replace(/\s+/g, ' ');
+  ck('spočítá se rozdíl proti dnům s alkoholem', vz.indexOf('s alkoholem') >= 0, vz.slice(0, 60));
+  ck('a tep s alkoholem vychází vyšší', vz.indexOf('60') >= 0 && vz.indexOf('52') >= 0, vz.slice(0, 120));
+  ck('graf tepu se vykreslí', (await p.locator('#chTep svg').count()) >= 1);
+
+  /* ---- 13. bez dat se karta neukazuje ------------------------------ */
+  await p.evaluate(async () => {
+    await new Promise(res => { const t = db.transaction('daily', 'readwrite'); t.objectStore('daily').clear(); t.oncomplete = res; });
+    return renderStats();
+  });
+  await p.waitForTimeout(800);
+  ck('bez zdravotních dat je karta schovaná', !(await p.isVisible('#zdraviKarta')));
+
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
   process.exit(0);

@@ -659,6 +659,16 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <div id="stMacros"></div>
   </div>
 
+  <div class="card" id="zdraviKarta" style="display:none">
+    <h3>Zdraví</h3>
+    <div id="zdraviDlazdice" class="row wrap2" style="margin-bottom:10px"></div>
+    <div id="chTep"></div>
+    <div id="chSpanek" style="margin-top:12px"></div>
+    <div id="zdraviVztahy" style="margin-top:12px"></div>
+    <p class="tiny muted" style="margin:10px 0 0">Čísla z hodinek. Sama o sobě říkají málo —
+      smysl dává, jak se mění a jak souvisí s tím, co jíš a piješ.</p>
+  </div>
+
   <div class="card">
     <h3>Postřehy</h3>
     <div id="stInsights"></div>
@@ -1107,7 +1117,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.11-69';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.11-70';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3697,6 +3707,12 @@ async function statsData(days) {
       alc: b ? b.alc : 0, items: b ? b.items : [], logged: !!b,
       burn: (typeof dd.burn === 'number') ? dd.burn + w : (w > 0 ? w : null),
       total: (typeof dd.total === 'number' && dd.total > 0) ? dd.total : null,
+      tep: (typeof dd.tep === 'number' && dd.tep > 0) ? dd.tep : null,
+      hrv: (typeof dd.hrv === 'number' && dd.hrv > 0) ? dd.hrv : null,
+      spanek: (typeof dd.spanek === 'number' && dd.spanek > 0) ? dd.spanek : null,
+      hluboky: (typeof dd.hluboky === 'number' && dd.hluboky > 0) ? dd.hluboky : null,
+      rem: (typeof dd.rem === 'number' && dd.rem > 0) ? dd.rem : null,
+      kroky: (typeof dd.kroky === 'number' && dd.kroky > 0) ? dd.kroky : null,
       wk: w,
       weight: (typeof dd.weight === 'number') ? dd.weight : null
     });
@@ -3940,6 +3956,87 @@ function stTip(i) {
 
 /* --- render --- */
 function setPeriod(p) { period = p; renderStats(); }
+
+/* ---------------- karta Zdraví ----------------
+   Čísla z hodinek mají cenu jako trend a hlavně ve srovnání s tím, co aplikace
+   ví a hodinky ne: co se jedlo a pilo. Proto se kromě průměrů počítají dva
+   vztahy — tep a HRV ve dnech s alkoholem proti dnům bez něj, a spánek podle
+   toho, jak hluboký byl ten den deficit. */
+function svgCara(body, popis, barva, obracene) {
+  const W = 320, H = 88;
+  const pts = body.map((v, i) => ({ i, v })).filter(p => p.v !== null);
+  if (pts.length < 3) return '<p class="tiny muted" style="margin:6px 0 0">' + popis +
+    ': málo dnů na graf (potřeba aspoň tři).</p>';
+  const vs = pts.map(p => p.v);
+  const lo = Math.min(...vs), hi = Math.max(...vs), rng = Math.max(1, hi - lo) * 1.3;
+  const y0 = (hi + lo) / 2 - rng / 2;
+  const X = i => (i / Math.max(1, body.length - 1)) * (W - 34);
+  const Y = v => H - ((v - y0) / rng) * H;
+  const d = pts.map((p, k) => (k ? 'L' : 'M') + r1(X(p.i)) + ' ' + r1(Y(p.v))).join(' ');
+  const prum = vs.reduce((a, x) => a + x, 0) / vs.length;
+  return `<div class="tiny muted" style="margin-bottom:2px">${popis} · průměr <b class="mono"
+      style="color:var(--fg)">${r0(prum)}</b></div>
+    <svg viewBox="0 0 ${W} ${H + 12}" style="width:100%;height:auto">
+      <path d="${d}" fill="none" stroke="${barva}" stroke-width="2" stroke-linejoin="round"/>
+      ${pts.map(p => `<circle cx="${r1(X(p.i))}" cy="${r1(Y(p.v))}" r="2" fill="${barva}"/>`).join('')}
+      <text x="${W - 30}" y="10" fill="var(--dim)" font-size="9">${r0(hi)}</text>
+      <text x="${W - 30}" y="${H}" fill="var(--dim)" font-size="9">${r0(lo)}</text>
+    </svg>`;
+}
+
+function renderZdravi(list) {
+  const ma = k => list.filter(d => d[k] !== null);
+  const prum = (pole, k) => pole.length ? pole.reduce((a, d) => a + d[k], 0) / pole.length : null;
+  const tepy = ma('tep'), hrvs = ma('hrv'), spanky = ma('spanek');
+  if (!tepy.length && !hrvs.length && !spanky.length) {
+    $('zdraviKarta').style.display = 'none';
+    return;
+  }
+  $('zdraviKarta').style.display = '';
+
+  const dl = (popis, hodnota, jednotka) => hodnota === null ? '' : `
+    <div class="card compact" style="flex:1 1 44%;margin:0 0 8px">
+      <div class="lbl-s">${popis}</div>
+      <b class="mono" style="font-size:18px">${hodnota}</b>
+      <span class="tiny muted"> ${jednotka}</span>
+    </div>`;
+  const pSp = prum(spanky, 'spanek'), pHl = prum(ma('hluboky'), 'hluboky'), pRem = prum(ma('rem'), 'rem');
+  $('zdraviDlazdice').innerHTML =
+    dl('Klidový tep', tepy.length ? r0(prum(tepy, 'tep')) : null, 'tep/min') +
+    dl('Variabilita (HRV)', hrvs.length ? r0(prum(hrvs, 'hrv')) : null, 'ms') +
+    dl('Spánek', pSp === null ? null : min2cas(pSp), 'průměrně') +
+    dl('Hluboký + REM', (pHl === null && pRem === null) ? null
+      : r0(((pHl || 0) + (pRem || 0)) / (pSp || 1) * 100), '% spánku');
+
+  $('chTep').innerHTML = svgCara(list.map(d => d.tep), 'Klidový tep', '#e2564d') +
+    svgCara(list.map(d => d.hrv), 'Variabilita tepu (HRV)', '#6ea8ff');
+  $('chSpanek').innerHTML = svgCara(list.map(d => d.spanek), 'Délka spánku (min)', '#8b7cf0');
+
+  /* --- vztahy k jídlu a alkoholu --- */
+  const radky = [];
+  const srov = (pole, k, jm) => {
+    const s1 = pole.filter(d => d.alc > 0), s0 = pole.filter(d => !(d.alc > 0));
+    if (s1.length < 2 || s0.length < 2) return null;
+    const a1 = prum(s1, k), a0 = prum(s0, k), roz = a1 - a0;
+    return { jm, a1: r0(a1), a0: r0(a0), roz: r0(roz), dnu: s1.length, hor: k === 'tep' ? roz > 0 : roz < 0 };
+  };
+  for (const [k, jm] of [['tep', 'Klidový tep'], ['hrv', 'HRV'], ['spanek', 'Délka spánku']]) {
+    const v = srov(ma(k), k, jm);
+    if (!v) continue;
+    const jed = k === 'spanek' ? ' min' : (k === 'hrv' ? ' ms' : '');
+    radky.push(`<div class="row" style="justify-content:space-between;padding:5px 0">
+      <span class="tiny">${v.jm} — s alkoholem</span>
+      <span class="tiny mono" style="color:${v.hor ? 'var(--warn)' : 'var(--ok)'}">${v.a1}${jed}
+        vs ${v.a0}${jed} (${v.roz > 0 ? '+' : ''}${v.roz})</span></div>`);
+  }
+  const box = $('zdraviVztahy');
+  box.innerHTML = radky.length
+    ? '<div class="lbl-s">Co na to má vliv</div>' + radky.join('') +
+      '<p class="tiny muted" style="margin:6px 0 0">Porovnáno na dnech s alkoholem proti dnům bez něj. ' +
+      'Tohle ti hodinky neřeknou — o alkoholu nevědí.</p>'
+    : '<p class="tiny muted">Až budeš mít víc dnů s alkoholem i bez něj, ukážu tady, jak se liší.</p>';
+}
+
 async function renderStats() {
   alcCache = await alcStats();
   const list = await statsData(period);
@@ -3959,6 +4056,7 @@ async function renderStats() {
 
   $('chKcal').innerHTML = a.logged ? svgBars(list, a) : '<p class="tiny muted">Zatím žádná data.</p>';
   $('chWeight').innerHTML = svgWeight(list, a);
+  renderZdravi(list);
   $('stWeightTxt').innerHTML = a.wFirst !== null && a.wLast !== null
     ? 'Od ' + r1(a.wFirst) + ' na ' + r1(a.wLast) + ' kg (' + (a.dKg > 0 ? '+' : '') + r1(a.wLast - a.wFirst) + ' kg)'
       + (a.realTdee ? '<br><b style="color:#e8ecf3">Reálný výdej podle váhy: ' + r0(a.realTdee) + ' kcal/den</b>'
@@ -5492,7 +5590,20 @@ async function workoutByDay() {
   all.forEach(r => { by[r.date] = (by[r.date] || 0) + (r.kcal || 0); });
   return by;
 }
-/* ---------------- cvičení ze snímku hodinek ---------------- */
+/* ---------------- cvičení a zdraví ze snímku hodinek ---------------- */
+
+/* Časy chodí ze snímku jako "06:29"; ukládáme minuty, ať se dá průměrovat.
+   Přijme i "6h 29m" nebo samotné číslo (to bereme jako minuty). */
+function cas2min(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return 0;
+  let m = t.match(/^(\d{1,2})\s*[:h]\s*(\d{1,2})/);
+  if (m) return n(m[1]) * 60 + n(m[2]);
+  const x = n(t);
+  return x > 0 && x < 1440 ? r0(x) : 0;
+}
+const min2cas = m => Math.floor(m / 60) + ':' + String(r0(m % 60)).padStart(2, '0');
+
 let fitFotoFile = null, fitNavrh = [], fitDenNavrh = null;
 
 /* Pozor na dvojí započtení: aplikace počítá kcal jako (MET−1)×váha×hodiny, tedy
@@ -5502,15 +5613,24 @@ const CVICENI_PROMPT =
 `Na snímku je obrazovka z hodinek nebo fitness aplikace. Rozliš, co na ní je.
 
 Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
-{"typ":"den","datum":"","kcal_celkem":0,"kroky":0,"zaznamy":[],"pozn":""}
+{"typ":"den","datum":"","kcal_celkem":0,"kroky":0,"tep":0,"hrv":0,
+ "spanek":"","spanek_hluboky":"","spanek_rem":"","spanek_skore":0,
+ "stav_treninku":0,"zaznamy":[],"pozn":""}
 
 Dvě možnosti:
 
-A) DENNÍ SOUHRN (přehled dne: kroky, kalorie za den, spánek, tep…)
-   typ = "den"
-   kcal_celkem = číslo u popisku KALORIE / CALORIES — tedy kolik člověk za den spálil
-   kroky = počet kroků, když je vidět; jinak 0
-   zaznamy nech prázdné
+A) DENNÍ PŘEHLED (kroky, kalorie, spánek, tep…)
+   typ = "den", zaznamy nech prázdné a vyplň, co na snímku vidíš:
+   kcal_celkem = číslo u popisku KALORIE (kolik za den spálil)
+   kroky = počet kroků
+   tep = KLIDOVÝ SRDEČNÍ TEP, číslo tepů za minutu
+   hrv = VARIABILITA TEPOVÉ FREKVENCE, číslo v ms
+   spanek, spanek_hluboky, spanek_rem = časy PŘESNĚ jak jsou napsané, tvar "HH:MM"
+     (DÉLKA SPÁNKU 06:29 → "06:29"; HLUBOKÝ SPÁNEK 01:03 → "01:03")
+   spanek_skore = číslo u popisku SPÁNEK v horním kruhu
+   stav_treninku = číslo u STAV TRÉNINKU
+   Co na snímku není, nech 0 nebo prázdné. Slovní hodnocení (STŘEDNÍ, NORMÁLNÍ,
+   DOBRÁ) ignoruj, ber jen čísla.
 
 B) SEZNAM TRÉNINKŮ (jednotlivé aktivity s délkou)
    typ = "treninky"
@@ -5518,12 +5638,12 @@ B) SEZNAM TRÉNINKŮ (jednotlivé aktivity s délkou)
    nazev česky (běh, jízda na kole, posilování…), z času 1:05:00 udělej 65 minut
    kcal_typ = "aktivni" u aktivních či čistých kalorií, "celkove" u celkových,
    "nevim", když to nepoznáš
-   kcal_celkem nech 0
 
 Společné:
 - datum ve tvaru RRRR-MM-DD, jen když je na snímku vidět; jinak nech prázdné
 - pozn = co je nejisté nebo nečitelné
 
+POZOR na záměnu čísel: kroky bývají tisíce, kalorie stovky, tep 40-90, HRV 15-120.
 Nedokážeš-li ze snímku přečíst nic použitelného, vrať {"typ":"nic","pozn":"nečitelné"}.
 Nic si nedomýšlej — raději prázdná odpověď než vymyšlené číslo.`;
 
@@ -5568,9 +5688,14 @@ function zpracujFitFoto(text) {
 
   fitNavrh = [];
   fitDenNavrh = null;
-  if (typ === 'den' && n(o.kcal_celkem) > 0) {
-    // denní souhrn: nahradí celý výpočet výdeje pro ten den
-    fitDenNavrh = { datum: datum, kcal: r0(n(o.kcal_celkem)), kroky: r0(n(o.kroky)) };
+  if (typ === 'den' && (n(o.kcal_celkem) > 0 || cas2min(o.spanek) > 0 || n(o.tep) > 0)) {
+    // denní přehled: výdej nahradí výpočet, zdravotní čísla jdou k němu
+    fitDenNavrh = {
+      datum: datum, kcal: r0(n(o.kcal_celkem)), kroky: r0(n(o.kroky)),
+      tep: r0(n(o.tep)), hrv: r0(n(o.hrv)),
+      spanek: cas2min(o.spanek), hluboky: cas2min(o.spanek_hluboky), rem: cas2min(o.spanek_rem),
+      skore: r0(n(o.spanek_skore)), stav: r0(n(o.stav_treninku))
+    };
   } else {
     const zaz = Array.isArray(o.zaznamy) ? o.zaznamy : [];
     fitNavrh = zaz.map(z => ({
@@ -5598,18 +5723,25 @@ function zpracujFitFoto(text) {
 function renderFitNavrh() {
   if (fitDenNavrh) {
     const d = fitDenNavrh;
+    const radek = (popis, hodnota, klic, jednotka) => hodnota > 0 ? `
+      <div class="item" style="padding:8px 0">
+        <div class="grow"><div class="nm" style="font-size:13px">${popis}</div></div>
+        <input type="number" inputmode="numeric" value="${hodnota}" style="width:74px;padding:6px;text-align:right"
+          oninput="fitDenNavrh.${klic}=n(this.value)"><span class="tiny muted" style="align-self:center">${jednotka}</span>
+      </div>` : '';
     $('fitNavrhList').innerHTML = `
-      <div class="item" style="align-items:flex-start">
-        <div class="grow">
-          <div class="nm">Celkový výdej za den</div>
-          <div class="sub">${d.datum === curDate ? 'dnes' : czd(d.datum)}${
-            d.kroky ? ' · ' + d.kroky + ' kroků' : ''}</div>
-        </div>
-        <input type="number" inputmode="numeric" value="${d.kcal}" style="width:78px;padding:7px 6px;text-align:right"
-          oninput="fitDenNavrh.kcal=n(this.value)"><span class="tiny muted" style="align-self:center">kcal</span>
-      </div>
-      <p class="tiny muted" style="margin:10px 0 0">Nahradí výpočet výdeje pro ten den — klidový výdej,
-        aktivní kalorie ani zapsaná cvičení se k němu už nepřičítají. Číslo můžeš přepsat.</p>`;
+      <p class="tiny muted" style="margin:0 0 6px">${d.datum === curDate ? 'Dnes' : czd(d.datum)}${
+        d.kroky ? ' · ' + d.kroky + ' kroků' : ''}</p>
+      ${radek('Celkový výdej', d.kcal, 'kcal', 'kcal')}
+      ${radek('Klidový tep', d.tep, 'tep', 'tep/min')}
+      ${radek('Variabilita tepu (HRV)', d.hrv, 'hrv', 'ms')}
+      ${radek('Délka spánku', d.spanek, 'spanek', 'min')}
+      ${radek('Hluboký spánek', d.hluboky, 'hluboky', 'min')}
+      ${radek('REM spánek', d.rem, 'rem', 'min')}
+      ${radek('Skóre spánku', d.skore, 'skore', 'bodů')}
+      <p class="tiny muted" style="margin:10px 0 0">Výdej nahradí výpočet pro ten den — klidový výdej,
+        aktivní kalorie ani cvičení se k němu nepřičítají. Ostatní čísla jdou do karty Zdraví
+        na Statistikách. Cokoli můžeš přepsat.</p>`;
     $('fitFotoNote').textContent = '';
     return;
   }
@@ -5646,15 +5778,23 @@ function fitNavrhZahod() {
 
 async function fitNavrhSave() {
   if (fitDenNavrh) {
-    if (!(fitDenNavrh.kcal > 0)) { toast('Není co zapsat'); return; }
-    const den = await dbGet('daily', fitDenNavrh.datum) || { date: fitDenNavrh.datum };
-    den.total = r0(fitDenNavrh.kcal);
+    const d = fitDenNavrh;
+    if (!(d.kcal > 0) && !(d.spanek > 0) && !(d.tep > 0)) { toast('Není co zapsat'); return; }
+    const den = await dbGet('daily', d.datum) || { date: d.datum };
+    // zapisuje se jen to, co snímek opravdu nesl — zbytek se nepřepisuje nulami
+    if (d.kcal > 0) den.total = r0(d.kcal);
+    if (d.kroky > 0) den.kroky = r0(d.kroky);
+    if (d.tep > 0) den.tep = r0(d.tep);
+    if (d.hrv > 0) den.hrv = r0(d.hrv);
+    if (d.spanek > 0) den.spanek = r0(d.spanek);
+    if (d.hluboky > 0) den.hluboky = r0(d.hluboky);
+    if (d.rem > 0) den.rem = r0(d.rem);
+    if (d.skore > 0) den.skore = r0(d.skore);
     await dbPut('daily', den);
-    const kdy = fitDenNavrh.datum;
+    const kdy = d.datum;
     fitNavrhZahod();
-    toast('Celkový výdej zapsán: ' + r0(den.total) + ' kcal');
+    toast(kdy === curDate ? 'Zapsáno' : 'Zapsáno na ' + czd(kdy));
     await loadDaily(); renderDay(); renderFit();
-    if (kdy !== curDate) toast('Zapsáno na ' + czd(kdy));
     return;
   }
   const ber = fitNavrh.filter(z => z.ber && (z.min > 0 || z.kcal > 0));
