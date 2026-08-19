@@ -117,6 +117,22 @@ const PROSTREDI = require('./prostredi');
   await p.click('#denikOut >> xpath=../div[1]/button'); await p.waitForTimeout(400);
   ck('křížek pole vyprázdní', (await p.inputValue('#denikQ')) === '');
 
+  // v73: kartě se stejným nadpisem stavěly na Statistikách dvě, jedna šla pryč
+  ck('karta hledání je na Statistikách jen jednou',
+     (await p.evaluate(() => [...document.querySelectorAll('#p-stats h3')]
+       .filter(h => h.textContent.indexOf('Hledat v deníku') >= 0).length)) === 1);
+
+  // proklik na den po zrušené kartě zbyl — skáče na poslední výskyt (dnes − 3 dny)
+  await p.fill('#denikQ', 'svíčk'); await p.waitForTimeout(600);
+  await p.click('#denikOut .item'); await p.waitForTimeout(600);
+  const skok = await p.evaluate(() => {
+    const x = new Date(); x.setDate(x.getDate() - 3);
+    return { kde: curDate, cekano: dstr(x), naDni: $('p-day').classList.contains('on') };
+  });
+  ck('klik na výsledek skočí na poslední výskyt', skok.kde === skok.cekano, JSON.stringify(skok));
+  ck('a přepne na Hlavní', skok.naDni, JSON.stringify(skok));
+  await p.click('nav button[data-p="stats"]'); await p.waitForTimeout(600);
+
   /* ---- 7. dohledávání v databázi je opatrné ----------------------- */
   const shody = await p.evaluate(() => ({
     presne: (aiMatch('Rýže bílá vařená') || {}).name || null,

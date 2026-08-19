@@ -209,6 +209,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="card">
     <h3>Záznam dne</h3>
     <div id="logList"><p class="muted tiny">Zatím nic. Naskenuj kód nebo přidej z databáze.</p></div>
+    <div class="hr"></div>
+    <label class="row" style="gap:8px;align-items:flex-start">
+      <input type="checkbox" id="dNeuplny" style="width:auto;margin-top:2px" onchange="saveDaily()">
+      <span class="tiny muted">Tenhle den je <b>nekompletní</b> — nezvládl jsem zapsat všechno jídlo.
+        Nebude se počítat do průměrů ani do výpočtu reálného výdeje. <b>Alkohol se počítá dál.</b></span>
+    </label>
   </div>
 
   <div class="card">
@@ -648,6 +654,11 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <span style="color:#e0574d">▬</span> nad výdejem &nbsp; ┄ výdej toho dne</p>
   </div>
 
+  <div class="card" id="tydenKarta" style="display:none">
+    <h3>Všední dny proti víkendu</h3>
+    <div id="stTyden"></div>
+  </div>
+
   <div class="card">
     <h3>Váha</h3>
     <div id="chWeight"></div>
@@ -675,17 +686,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
-    <h3>Nejčastější zdroje kalorií</h3>
+    <h3>Největší zdroje kalorií</h3>
     <div id="stTop"></div>
-  </div>
-
-  <div class="card">
-    <h3>Hledat v deníku</h3>
-    <div class="row" style="gap:8px">
-      <input class="grow" id="hlQ" placeholder="název jídla nebo nápoje" oninput="hlLater()">
-      <button class="btn sm" onclick="document.getElementById('hlQ').value='';hledejDenik()">✕</button>
-    </div>
-    <div id="hlOut" style="margin-top:10px"></div>
   </div>
 
   <div class="card">
@@ -1117,7 +1119,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.11-70';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.19-73';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3581,6 +3583,7 @@ async function loadDaily() {
   const d = await dbGet('daily', curDate) || {};
   $('dBurn').value = (typeof d.burn === 'number') ? d.burn : '';
   $('dTotal').value = (typeof d.total === 'number') ? d.total : '';
+  $('dNeuplny').checked = !!d.neuplny;
   $('dWeight').value = (typeof d.weight === 'number') ? d.weight : '';
   dTotalUi(d, await workoutSum(curDate));
 }
@@ -3611,6 +3614,7 @@ async function saveDaily() {
   const burn = $('dBurn').value.trim(), w = $('dWeight').value.trim();
   const tot = $('dTotal').value.trim();
   const rec = { date: curDate };
+  if ($('dNeuplny').checked) rec.neuplny = true;
   if (tot !== '') {
     const t = n(tot), chyba = mimoMeze('total', t);
     if (chyba) { toast(chyba); await loadDaily(); return; }
@@ -3680,9 +3684,13 @@ async function renderBalance(intake, wk) {
     : 'Výdej ' + r0(rmr) + ' + ' + r0(burn) + (wk ? ' + cvičení ' + r0(wk) : '') + ' = ' + r0(out) + ' kcal';
   $('balVal').textContent = (bal > 0 ? '+' : '') + r0(bal) + ' kcal';
   $('balVal').style.color = bal > 0 ? C_SUR : C_DEF;
-  $('balHint').textContent = v.celkovy
+  const zaklad = v.celkovy
     ? 'Celkový výdej z hodinek má v sobě klidový výdej i cvičení, proto se nic nepřičítá.'
     : ((typeof d.burn === 'number') ? '' : 'Aktivní kalorie z hodinek zatím nezadané — počítá se s 0.');
+  // u nekompletního dne je bilance ze své podstaty nadsazená — příjem je zapsaný jen zčásti
+  $('balHint').textContent = d.neuplny
+    ? 'Den je označený jako nekompletní, takže tahle bilance je jen orientační a do průměrů nejde.'
+    : zaklad;
 }
 
 /* --- sběr dat --- */
@@ -3704,7 +3712,13 @@ async function statsData(days) {
     const w = wk[key] || 0;
     list.push({
       date: key, k: b ? b.k : 0, p: b ? b.p : 0, c: b ? b.c : 0, f: b ? b.f : 0,
-      alc: b ? b.alc : 0, items: b ? b.items : [], logged: !!b,
+      alc: b ? b.alc : 0, items: b ? b.items : [],
+      /* `logged` znamená „počítá se do průměrů". Nekompletní den zápis má, ale
+         do průměrů, reálného výdeje ani bilance nepatří — číslo by bylo nižší,
+         než co se doopravdy snědlo. Alkohol jde jinou cestou (alcStats), takže
+         se počítá dál. */
+      logged: !!b && !dd.neuplny,
+      neuplny: !!dd.neuplny && !!b,
       burn: (typeof dd.burn === 'number') ? dd.burn + w : (w > 0 ? w : null),
       total: (typeof dd.total === 'number' && dd.total > 0) ? dd.total : null,
       tep: (typeof dd.tep === 'number' && dd.tep > 0) ? dd.tep : null,
@@ -3763,7 +3777,7 @@ function agg(list, w0) {
   const sd = kcals.length > 1
     ? Math.sqrt(kcals.reduce((a, x) => a + (x - avg(lg, d => d.k)) ** 2, 0) / kcals.length) : 0;
   return {
-    days: list.length, logged: lg.length, rmr, tg,
+    days: list.length, logged: lg.length, neuplnych: list.filter(d => d.neuplny).length, rmr, tg,
     tK: avgT('kcal'), tP: avgT('p'), tC: avgT('c'), tF: avgT('f'), dyn: !!goals.dyn,
     avgK: avg(lg, d => d.k), minK: Math.min(...(kcals.length ? kcals : [0])),
     maxK: Math.max(...(kcals.length ? kcals : [0])), sdK: sd,
@@ -4050,13 +4064,18 @@ async function renderStats() {
   $('stBurn').textContent = a.rmr ? r0(a.avgOut) : '—';
   $('stBal').textContent = (a.rmr && a.logged) ? ((a.avgBal > 0 ? '+' : '') + r0(a.avgBal)) : '—';
   $('stBal').style.color = a.avgBal > 0 ? C_SUR : C_DEF;
+  const neu = list.filter(d => d.neuplny).length;
   $('stCover').textContent = a.logged < a.days
-    ? 'Pozor: ' + dnu(a.days - a.logged) + ' bez záznamu, do průměru příjmu se ' + plur(a.days - a.logged, 'nepočítá', 'nepočítají', 'nepočítá') + '.'
+    ? 'Pozor: ' + dnu(a.days - a.logged) + ' se do průměru příjmu ' +
+      plur(a.days - a.logged, 'nepočítá', 'nepočítají', 'nepočítá') +
+      (neu ? ' (z toho ' + neu + ' ' + plur(neu, 'označený', 'označené', 'označených') +
+        ' jako nekompletní; alkohol se z nich počítá dál)' : '') + '.'
     : 'Kompletní data za celé období.';
 
   $('chKcal').innerHTML = a.logged ? svgBars(list, a) : '<p class="tiny muted">Zatím žádná data.</p>';
   $('chWeight').innerHTML = svgWeight(list, a);
   renderZdravi(list);
+  renderTyden(list);
   $('stWeightTxt').innerHTML = a.wFirst !== null && a.wLast !== null
     ? 'Od ' + r1(a.wFirst) + ' na ' + r1(a.wLast) + ' kg (' + (a.dKg > 0 ? '+' : '') + r1(a.wLast - a.wFirst) + ' kg)'
       + (a.realTdee ? '<br><b style="color:#e8ecf3">Reálný výdej podle váhy: ' + r0(a.realTdee) + ' kcal/den</b>'
@@ -4082,17 +4101,69 @@ async function renderStats() {
   $('stInsights').innerHTML = insights(list, a).map(t => '<p style="margin:0 0 8px">' + t + '</p>').join('')
     || '<p class="tiny muted">Zatím málo dat na postřehy.</p>';
 
+  /* Kolikrát a kolik. Samotné „celkem X kcal“ neřekne, jestli je to jedna velká
+     výjimka, nebo každodenní zvyk — a to jsou dvě úplně jiná řešení. */
   const tot = {};
-  list.forEach(d => d.items.forEach(it => { tot[it.name] = (tot[it.name] || 0) + it.kcal; }));
-  const top = Object.entries(tot).sort((x, y) => y[1] - x[1]).slice(0, 8);
-  const sumAll = Object.values(tot).reduce((x, y) => x + y, 0) || 1;
-  $('stTop').innerHTML = top.length ? top.map(([nm, k]) => `
+  list.forEach(d => d.items.forEach(it => {
+    const t = tot[it.name] || (tot[it.name] = { k: 0, n: 0 });
+    t.k += it.kcal; t.n++;
+  }));
+  const top = Object.entries(tot).sort((x, y) => y[1].k - x[1].k).slice(0, 8);
+  const sumAll = Object.values(tot).reduce((x, y) => x + y.k, 0) || 1;
+  $('stTop').innerHTML = top.length ? top.map(([nm, t]) => `
     <div class="item"><div class="grow"><div class="nm">${esc(nm)}</div>
-      <div class="sub">${pctTxt(k / sumAll * 100)} celkového příjmu</div></div>
-    <div class="kc">${r0(k)}<span class="tiny muted"> kcal</span></div></div>`).join('')
+      <div class="sub">${t.n}× · ø ${r0(t.k / t.n)} kcal · ${pctTxt(t.k / sumAll * 100)} celkového příjmu</div></div>
+    <div class="kc">${r0(t.k)}<span class="tiny muted"> kcal</span></div></div>`).join('')
     : '<p class="tiny muted">Zatím žádná data.</p>';
 }
 
+/* Všední dny proti víkendu. Že příjem kolísá, statistika říká už teď — ale ne kdy.
+   Skoro nikdy to není náhodný šum, bývá to pátek a víkend, a to se dá řešit adresně.
+   Příjem počítáme jen z kompletních dnů (jako všechny ostatní průměry), alkohol ze
+   všech — ten se zapisuje i ve dnech označených jako nekompletní. */
+function tydenniVzorec(list) {
+  const jeVikend = d => { const w = new Date(d.date + 'T12:00:00').getDay(); return w === 0 || w === 6; };
+  const skup = v => {
+    const dny = list.filter(d => jeVikend(d) === v);
+    const kompl = dny.filter(d => d.logged);
+    return {
+      dnu: kompl.length,
+      k: kompl.length ? kompl.reduce((a, x) => a + x.k, 0) / kompl.length : 0,
+      // alkohol se dělí všemi dny skupiny, stejně jako v kartě Alkohol
+      alc: dny.length ? dny.reduce((a, x) => a + x.alc, 0) / dny.length : 0
+    };
+  };
+  const p = skup(false), v = skup(true);
+  if (p.dnu < 3 || v.dnu < 2) return null;   // míně už není vzorec, ale náhoda
+  const rozdil = v.k - p.k;
+  // o kolik by se hnul týdenní průměr, kdyby víkend držel úroveň všedních dnů
+  return { p, v, rozdil, naTyden: rozdil * 2 / 7 };
+}
+function renderTyden(list) {
+  const t = tydenniVzorec(list), karta = $('tydenKarta');
+  if (!t) { karta.style.display = 'none'; return; }
+  karta.style.display = '';
+  const max = Math.max(t.p.k, t.v.k) || 1;
+  const radek = (nm, sk, col) => `
+    <div class="bar" style="margin-bottom:8px"><div class="t"><span>${nm}</span>
+      <span class="mono">${r0(sk.k)} kcal · ${dnu(sk.dnu)}</span></div>
+      <div class="track"><div class="fill" style="width:${Math.min(100, sk.k / max * 100)}%;background:${col}"></div></div></div>`;
+  const zav = Math.abs(t.rozdil) < 150
+    ? 'Víkendy držíš na stejné úrovni jako všední dny — tady není co zlepšovat.'
+    : t.rozdil > 0
+      ? 'O víkendu sníš <b>o ' + r0(t.rozdil) + ' kcal víc</b> než ve všední den. ' +
+        'Na týdenním průměru to dělá <b>' + r0(t.naTyden) + ' kcal/den</b> — o tolik by klesl, ' +
+        'kdyby víkend držel úroveň všedních dnů.'
+      : 'O víkendu jíš <b>o ' + r0(-t.rozdil) + ' kcal méně</b> než ve všední den. ' +
+        'Pokud po víkendu bývá hlad, stojí za zvážení rozložit to rovnoměrněji.';
+  const alk = (t.p.alc > 0 || t.v.alc > 0)
+    ? '<p class="tiny muted" style="margin:8px 0 0">Alkohol: po–pá <b>' + r1(t.p.alc) +
+      ' g/den</b> · so–ne <b>' + r1(t.v.alc) + ' g/den</b>' +
+      (t.v.alc > t.p.alc * 2 && t.v.alc > 5 ? ' — víkendový alkohol je tu hlavní rozdíl.' : '') + '</p>'
+    : '';
+  $('stTyden').innerHTML = radek('po–pá', t.p, '#6ea8ff') + radek('so–ne', t.v, '#f0a742') +
+    '<p class="tiny" style="margin:8px 0 0">' + zav + '</p>' + alk;
+}
 function insights(list, a) {
   const out = [];
   const ok = '<span style="color:#3fbf7f">●</span> ', wr = '<span style="color:#f0a742">●</span> ',
@@ -4107,9 +4178,14 @@ function insights(list, a) {
       r0(a.tK) + ', ' +
       (Math.abs(dp) <= 8 ? 'to je na cíli' : (dp > 0 ? 'o ' + r0(dp) + ' % nad cílem' : 'o ' + r0(-dp) + ' % pod cílem')) + '.');
   }
-  if (a.sdK > a.avgK * 0.25 && a.logged >= 5)
+  if (a.sdK > a.avgK * 0.25 && a.logged >= 5) {
+    // když za kolísáním stojí víkend, řekni to rovnou — obecná rada se špatně použije
+    const tv = tydenniVzorec(list);
     out.push(wr + 'Příjem hodně kolísá (' + r0(a.minK) + '–' + r0(a.maxK) + ' kcal). ' +
-      'Vyrovnanější dny se snáz drží.');
+      (tv && tv.rozdil >= 300
+        ? 'Velkou část toho dělá víkend — o ' + r0(tv.rozdil) + ' kcal/den víc než po–pá.'
+        : 'Vyrovnanější dny se snáz drží.'));
+  }
   if (a.tP && a.avgP < a.tP * 0.85)
     out.push(wr + 'Bílkoviny <b>' + r0(a.avgP) + ' g</b> proti cíli ' + r0(a.tP) + ' g — chybí ti ' +
       r0(a.tP - a.avgP) + ' g denně.');
@@ -4159,6 +4235,10 @@ function summaryText() {
   L.push('VÝDEJ');
   L.push('  klidový: ' + (a.rmr || 'nenastaven') + ' kcal/den');
   L.push('  aktivní (hodinky + cvičení): průměr ' + r0(a.avgBurn) + ' kcal, zadáno ' + a.burnDays + '/' + a.days + ' dnů');
+  if (a.neuplnych)
+    L.push('  POZOR: ' + a.neuplnych + ' ' + plur(a.neuplnych, 'den je označený', 'dny jsou označené', 'dnů je označených') +
+      ' jako nekompletní (jídlo se nestihlo zapsat celé). Do průměrů příjmu se nepočítají, ' +
+      'takže skutečný příjem mohl být vyšší. Alkohol z nich započítaný je.');
   const wkTot = list.reduce((x, d) => x + (d.wk || 0), 0);
   if (wkTot > 0) L.push('  z toho zapsané cvičení: ' + r0(wkTot) + ' kcal za období');
   L.push('  celkem: ' + r0(a.avgOut) + ' kcal/den');
@@ -4196,35 +4276,6 @@ function summaryText() {
 /* --- hledání v deníku ---------------------------------------------
    Prohledává zapsané záznamy, ne databázi potravin: zajímá nás „kdy jsem tohle
    naposledy jedl a kolikrát", ne „mám to uložené". */
-let hlT = null;
-function hlLater() { clearTimeout(hlT); hlT = setTimeout(hledejDenik, 300); }
-async function hledejDenik() {
-  const q = ($('hlQ').value || '').trim().toLowerCase();
-  const out = $('hlOut');
-  if (q.length < 2) { out.innerHTML = '<p class="tiny muted" style="margin:0">Napiš aspoň dvě písmena.</p>'; return; }
-  const vse = (await dbAll('log')).filter(r => (r.name || '').toLowerCase().indexOf(q) >= 0 && r.date <= curDate);
-  if (!vse.length) { out.innerHTML = '<p class="tiny muted" style="margin:0">Nic takového jsi nezapsal.</p>'; return; }
-  vse.sort((a, b) => (b.date + ' ' + b.ts).localeCompare(a.date + ' ' + a.ts));
-  const dni = new Set(vse.map(r => r.date));
-  const posl = vse[0];
-  const odKdy = Math.round((new Date(curDate + 'T12:00:00') - new Date(posl.date + 'T12:00:00')) / 86400000);
-  const kcal = vse.reduce((a, r) => a + (r.kcal || 0), 0);
-  const alc = vse.reduce((a, r) => a + (r.alc || 0), 0);
-  const m30 = vse.filter(r => r.date > dstr(new Date(new Date(curDate + 'T12:00:00') - 30 * 86400000))).length;
-  out.innerHTML = `
-    <p class="tiny" style="margin:0 0 8px">
-      <b>${vse.length}×</b> celkem${vse.length !== dni.size ? ' (' + dnu(dni.size) + ')' : ''} ·
-      <b>${m30}×</b> za posledních 30 dní ·
-      naposledy <b>${odKdy === 0 ? 'dnes' : odKdy === 1 ? 'včera' : 'před ' + dnu(odKdy)}</b><br>
-      celkem ${r0(kcal)} kcal${alc > 0 ? ' · ' + r1(alc) + ' g alkoholu' : ''}
-    </p>` +
-    vse.slice(0, 12).map(r => `
-      <div class="item" onclick="skocNaDen('${r.date}')" style="cursor:pointer">
-        <div class="grow"><div class="nm">${esc(r.name)}</div>
-          <div class="sub">${czd(r.date)} · ${r0(r.amount)} ${r.unit || 'g'}${r.meal ? ' · ' + mealName(r.meal) : ''}</div></div>
-        <div class="kc">${r0(r.kcal)}<span class="tiny muted"> kcal</span></div></div>`).join('') +
-    (vse.length > 12 ? '<p class="tiny muted" style="margin:8px 0 0">Zobrazeno 12 nejnovějších z ' + vse.length + '.</p>' : '');
-}
 function skocNaDen(d) { curDate = d; go('day'); renderDay(); }
 
 /* --- rozbor období přes Claude API --- */
@@ -4332,7 +4383,8 @@ async function denikRun() {
   box.innerHTML = radky.map(g => {
     const odstup = Math.round((dnes - new Date(g.posl + 'T12:00:00')) / 86400000);
     const kdy = odstup <= 0 ? 'dnes' : odstup === 1 ? 'včera' : 'před ' + dnu(odstup);
-    return `<div class="item"><div class="grow">
+    // proklik na den zbyl po zrušené druhé kartě hledání — skáče na poslední výskyt
+    return `<div class="item" onclick="skocNaDen('${g.posl}')" style="cursor:pointer"><div class="grow">
       <div class="nm">${esc(g.n)}</div>
       <div class="sub">naposledy ${kdy} (${czd(g.posl)}) · ${g.kolik}× ·
         ø ${r0(g.mn / g.kolik)} ${esc(g.jd)} · celkem ${r0(g.kcal)} kcal</div></div>

@@ -17,7 +17,58 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.11-70** (`APP_VERSION` v `index.html`, cache `kaltrack-v70` v `sw.js`).
+Aktuální verze: **2026.08.19-73** (`APP_VERSION` v `index.html`, cache `kaltrack-v73` v `sw.js`).
+
+### Novinky ve v73 — zrušená duplicitní karta hledání
+
+Na Statistikách byly **dvě karty se stejným nadpisem „Hledat v deníku“**, každá nad
+jinou implementací. Pocházelo to už z prvního nahrání do gitu, ne z pozdějších změn.
+
+- Zrušena ta slabší (`hlQ` / `hlOut` a funkce `hlLater`, `hledejDenik`): hledala jen
+  podle podřetězce a **neuměla diakritiku**, takže „svickova“ nenašla „Svíčkovou“.
+- Zůstala `denikQ` — hledá přes `matchWords` (i bez diakritiky), seskupuje podle názvu
+  a byla pokrytá testem.
+- **Proklik na den se nezahodil.** Uměla ho jen zrušená karta; přenesen do zbylé —
+  klik na řádek skočí na **poslední výskyt** dané potraviny (`skocNaDen(g.posl)`).
+- testy: `test56.js` navíc hlídá, že je karta na Statistikách **jen jedna** a že proklik
+  přepne na Hlavní na správný den.
+
+### Novinky ve v72 — všední dny proti víkendu, četnost u zdrojů kalorií
+
+Statistika už dřív říkala, že příjem kolísá, ale ne **kdy**. Skoro nikdy to není
+náhodný šum — bývá to víkend, a to už se dá řešit adresně.
+
+- **Nová karta `#tydenKarta`** (za grafem denního příjmu) porovnává průměr po–pá
+  a so–ne. `tydenniVzorec(list)` počítá obojí a navíc `naTyden = rozdíl × 2 / 7` —
+  o kolik by klesl **týdenní** průměr, kdyby víkend držel úroveň všedních dnů.
+  To je číslo, se kterým se dá něco dělat; samotný rozdíl málo.
+- **Kompletnost se dodržuje i tady:** do příjmu jdou jen dny s `logged`, alkohol se
+  dělí **všemi** dny skupiny — stejně jako v kartě Alkohol a v souladu s v71.
+- Karta se schová, dokud není aspoň **3 všední a 2 víkendové** kompletní dny; míně
+  už není vzorec, ale náhoda.
+- **Postřeh o kolísání** nově jmenuje víkend, když je rozdíl ≥ 300 kcal. Obecná rada
+  „vyrovnanější dny se snáz drží“ se špatně použije.
+- **Zdroje kalorií** ukazují `30× · ø 2000 kcal · 18 % celkového příjmu`. Samotné
+  „celkem X kcal“ neřekne, jestli je to jedna velká výjimka, nebo každodenní zvyk.
+  Nadpis opraven na **Největší** zdroje — třídí se podle kalorií, ne podle četnosti.
+- testy `test66.js` — schovaná karta bez dat, obě čísla, rozdíl i přepočet na týden,
+  alkohol v obou skupinách, postřeh, četnost u zdrojů a souhra s nekompletním dnem
+  (osekaný víkendový den průměr nesrazí, ale alkohol z něj se počítá dál).
+
+### Novinky ve v71 — nekompletní dny se nepočítají do průměrů
+
+Některé dny se prostě nestihne zapsat všechno jídlo. Takový den předtím srážel
+průměrný příjem níž, než jaká byla realita — a statistika vypadala lépe, než byla.
+
+- Zaškrtávací políčko `#dNeuplny` v kartě **Záznam dne**; ukládá `daily.neuplny`.
+- `statsData` dává `logged: !!b && !dd.neuplny` — den má zápis, ale do průměrů,
+  reálného výdeje ani bilance nejde.
+- **Alkohol se počítá dál.** Ten se zapisuje vždycky, a jde jinou cestou (`alcStats`),
+  takže se příznaku nedotýká. Je to vědomá asymetrie, ne přehlédnutí.
+- `#stCover` řekne, kolik dnů je označených a že alkohol z nich plátí; `balHint` u
+  takového dne přizná, že bilance je jen orientační; `summaryText()` na to upozorní
+  Clauda, ať z děravých dat nedělá závěry.
+- testy `test65.js`.
 
 ### Novinky ve v70 — zdravotní metriky ze snímku a karta Zdraví
 
@@ -742,7 +793,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 64 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 66 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |

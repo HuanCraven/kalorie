@@ -127,7 +127,10 @@ const PROSTREDI = require('./prostredi');
   ck('kód nenese heslo k šifrování', qr.indexOf('tajneheslo') < 0 && !qrO.pass);
 
   const E = await novy();
-  await E.evaluate(async () => { syCfg = { repo: '', token: '', path: 'kalorie-sync.json', last: 0, on: false }; await syStore(); await loadSync(); });
+  // last: Date.now() — s nulou si zařízení po spárování spustí vlastní synchronizaci
+  // (focus/visibility) a testovanému syncNow už nezbude co stáhnout. Na obsah přenosu
+  // `last` vliv nemá, je to jen brzda automatických běhů.
+  await E.evaluate(async () => { syCfg = { repo: '', token: '', path: 'kalorie-sync.json', last: Date.now(), on: false }; await syStore(); await loadSync(); });
   ck('nespárované zařízení nesynchronizuje', !(await E.evaluate(() => syCfg.on)));
   ck('cizí text se jako kód nepřijme', !(await E.evaluate(() => syQrUse('8594001020304'))));
   ck('cizí JSON se jako kód nepřijme', !(await E.evaluate(() => syQrUse('{"neco":"jineho"}'))));
