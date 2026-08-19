@@ -484,6 +484,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="seg" id="alcTrendSeg" style="margin-bottom:10px">
     <button data-t="7" onclick="setAlcOkno(7)">7 dní</button>
     <button data-t="30" class="on" onclick="setAlcOkno(30)">30 dní</button>
+    <button data-t="90" onclick="setAlcOkno(90)">90 dní</button>
   </div>
   <div id="alcTrend" style="margin:8px 0 4px"></div>
 
@@ -1123,7 +1124,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.19-74';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.19-75';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3872,6 +3873,9 @@ function limitBlock(s) {
 }
 
 /* Vývoj klouzavého 30denního průměru — jediné číslo srovnatelné s limitem. */
+// „dělí se vždycky třiceti" — číslovka musí sedět na zvolené okno, jinak text
+// tvrdí něco jiného než graf
+const ALC_CIS = { 7: 'sedmi', 30: 'třiceti', 90: 'devadesáti' };
 function svgAlcTrend(long, trend, lim, okno) {
   const pts = [];
   for (let i = 0; i < long.length; i++) if (trend[i] !== null) pts.push({ d: long[i].d, v: trend[i] });
@@ -3906,7 +3910,7 @@ function svgAlcTrend(long, trend, lim, okno) {
     <p class="tiny muted" style="margin:6px 0 0">Teď <b style="color:var(--fg)">${r1(last.v)} g/den</b>,
       za posledních 14 dní ${smer > 0.3 ? 'stoupl o ' + r1(smer) + ' g' :
         smer < -0.3 ? 'klesl o ' + r1(-smer) + ' g' : 'se drží'}.
-      Křivka klesá každý den, kdy nepiješ — dělí se vždycky ${okno === 7 ? 'sedmi' : 'třiceti'}.</p>`;
+      Křivka klesá každý den, kdy nepiješ — dělí se vždycky ${ALC_CIS[okno] || okno}.</p>`;
 }
 
 /* Denní záznamy — otázka „kdy a kolik", ne „jsem v limitu". */

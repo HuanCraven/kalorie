@@ -17,7 +17,20 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.19-74** (`APP_VERSION` v `index.html`, cache `kaltrack-v74` v `sw.js`).
+Aktuální verze: **2026.08.19-75** (`APP_VERSION` v `index.html`, cache `kaltrack-v75` v `sw.js`).
+
+### Novinky ve v75 — okno u křivky sjednoceno na 7 / 30 / 90
+
+Přepínač okna dostal třetí možnost, aby odpovídal přepínači období nad ním —
+dva různě dlouhé výběry na jedné stránce působily jako nedodělek.
+
+- `ALC_CIS` mapuje okno na číslovku v textu pod grafem (sedmi / třiceti /
+  devadesáti). Dvojitý ternár by u tří hodnot přestal být čitelný.
+- **Mez:** `long` v `alcStats` drží 150 dnů, takže devadesátidenní křivka má
+  nejvýš 61 bodů (~2 měsíce). Na směr to stačí; kdyby bylo potřeba víc historie,
+  je to jedno číslo v `alcStats`. Bez 90 dnů záznamů se místo grafu ukáže hláška.
+- testy: `test54.js` navíc ověřuje třetí tlačítko, jeho číslovku a hlavně že okna
+  jdou z týchž dat za sebou 7 > 30 > 90 (~30 / ~7 / ~2,3 g/den).
 
 ### Novinky ve v74 — přepínatelné okno u křivky alkoholu
 

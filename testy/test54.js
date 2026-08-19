@@ -111,8 +111,8 @@ const PROSTREDI = require('./prostredi');
      křivka umí klesnout i po dni, kdy se pilo. Sedmidenní okno reaguje hned. */
   await p.evaluate(async () => {
     const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
-    // záznam 60 dní zpět, aby měl trend od čeho počítat
-    await dbPut('log', { id: 'stary', date: den(60), productId: 'quick', name: 'Jídlo', unit: 'porce',
+    // záznam 120 dní zpět, aby měla z čeho počítat i devadesátidenní křivka
+    await dbPut('log', { id: 'stary', date: den(120), productId: 'quick', name: 'Jídlo', unit: 'porce',
       amount: 1, meal: 'obed', kcal: 500, p: 10, c: 50, f: 10, ts: Date.now() });
     for (let i = 0; i < 7; i++)
       await dbPut('log', { id: 'v' + i, date: den(i), productId: 'alk', name: 'Víno', unit: 'ml',
@@ -121,7 +121,7 @@ const PROSTREDI = require('./prostredi');
   });
   await p.waitForTimeout(800);
 
-  ck('křivka má přepínač okna', (await p.locator('#alcTrendSeg button').count()) === 2);
+  ck('křivka má přepínač okna 7/30/90', (await p.locator('#alcTrendSeg button').count()) === 3);
   ck('výchozí okno je 30 dní', await p.evaluate(() =>
     document.querySelector('#alcTrendSeg button[data-t="30"]').classList.contains('on')));
   ck('nadpis uvádí 30denní průměr', (await p.textContent('#alcTrendHead')).indexOf('30denního') > 0,
@@ -140,7 +140,18 @@ const PROSTREDI = require('./prostredi');
   ck('věta pod grafem mluví o sedmi',
      (await p.textContent('#alcTrend')).indexOf('sedmi') > 0);
   ck('zvýrazněné je jen jedno okno', (await p.locator('#alcTrendSeg button.on').count()) === 1);
+  await p.click('#alcTrendSeg button[data-t="90"]'); await p.waitForTimeout(700);
+  ck('nadpis se přepne na 90denní', (await p.textContent('#alcTrendHead')).indexOf('90denního') > 0,
+     await p.textContent('#alcTrendHead'));
+  const t90 = ted(await p.textContent('#alcTrend'));
+  ck('devadesátidenní okno rozředí sedm večerů nejvíc', t90 > 1.5 && t90 < 3.5, 'teď ' + t90 + ' g/den');
+  ck('okna jdou za sebou 7 > 30 > 90', t7 > t30 && t30 > t90, [t7, t30, t90].join(' > '));
+  ck('věta pod grafem mluví o devadesáti',
+     (await p.textContent('#alcTrend')).indexOf('devadesáti') > 0);
   ck('přepnutí okna nesahne na období grafů', (await p.textContent('#alcDryOf')) === 'z 90');
+
+  await p.click('#alcTrendSeg button[data-t="30"]'); await p.waitForTimeout(600);
+  ck('dá se vrátit zpět na 30', (await p.textContent('#alcTrendHead')).indexOf('30denního') > 0);
 
   console.log(errs.length ? '\nERRORS: ' + errs.join(' | ') : '');
   // „Teď X g/den" z patičky grafu; deklarace se vytáhne nahoru, volá se výš
