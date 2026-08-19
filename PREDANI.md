@@ -17,7 +17,74 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.19-75** (`APP_VERSION` v `index.html`, cache `kaltrack-v75` v `sw.js`).
+Aktuální verze: **2026.08.20-77** (`APP_VERSION` v `index.html`, cache `kaltrack-v77` v `sw.js`).
+
+### Novinky ve v77 — oprava: datum ze snímku přebíjelo zvolený den
+
+Uživatel si na Pohybu nastavil 19. 8., nahrál snímek Zeppu, ten se přečetl správně
+— a záznam nebyl nikde. Ani na 19., ani na 20., a karta Zdraví ve statistikách
+nenaskočila (ta se přitom ukáže už při jediném dni s daty).
+
+Příčina: `jeDatum` kontrolovalo **jen tvar** `RRRR-MM-DD`, ne smysl, a datum ze
+snímku mělo přednost před otevřeným dnem. V zadání pro API se přitom o klíči
+`datum` u denního přehledu **nepsalo vůbec nic** — byl jen v šabloně JSON, takže
+si ho model mohl vymyslet. Stačilo, aby vrátil datum v budoucnosti.
+
+Den v budoucnosti je pak **neviditelný**: `statsData` staví řadu pozpátku od
+`curDate`, takže se do statistik nedostane, a na Hlavní na něj člověk nepřepne,
+protože neví kam. Zápis proběhl, ale nebylo ho kde najít.
+
+- `rozumneDatum(x)` — kromě tvaru hlídá, že datum není v budoucnosti a není
+  starší než 400 dní. Neprojde-li, platí otevřený den. Platí i pro data
+  u jednotlivých tréninků.
+- **Den je v návrhu jako pole `#fitNavrhDatum`** a jde ho před uložením přepnout.
+  Dřív se tam jen malým písmem psalo „Dnes" a měnit to nešlo.
+- Potvrzení po uložení říká den vždycky (`Zapsáno na …`), ne jen při neshodě.
+- Zadání pro API nově říká: datum **nech prázdné**, vyplň jen při jednoznačně
+  viditelném celém datu včetně roku, a nikdy nehádej podle názvu dne v týdnu.
+- testy `test64.js`: budoucí i přes rok staré datum se zahodí, rozumné se použije,
+  ruční přepnutí dne rozhoduje o tom, kam se zapíše, a zadání o datu mluví.
+
+### Novinky ve v76 — oprava: Záznam dne mazal čísla ze snímku hodinek
+
+`saveDaily()` skládalo záznam dne od nuly (`rec = { date: curDate }`) a uložilo ho
+přes celý původní. Formulář ale zná jen výdej, váhu a příznak nekompletního dne —
+takže **každé uložení smazalo tep, HRV, spánek, hluboký, REM, skóre i kroky**,
+které do téhož záznamu zapsal snímek hodinek (v70).
+
+Stačilo zaškrtnout „nekompletní den" nebo zapsat váhu. Riziko vzniklo ve v70, kdy
+do `daily` přibyly zdravotní metriky, ale v71 ho výrazně zvýšilo — přibyl důvod
+do té karty sahat i ve dnech, kdy by ji člověk jinak nechal být.
+
+- Nově se záznam **načte a přepíšou se jen spravovaná pole**. Prázdné pole klíč
+  maže (`delete`), aby dál platilo, že vymazáním hodnoty se hodnota ruší.
+- `total` se přitom neztrácel — `loadDaily()` ho do formuláře doplní —, takže
+  výdej v bilanci byl v pořádku. Mizela jen zdravotní čísla a karta Zdraví pak
+  neměla z čeho kreslit.
+- testy `test65.js`: po zápisu snímku se zaškrtne příznak a zapíše váha a ověří
+  se, že tep, HRV, spánek, kroky, skóre i výdej zůstaly; a že vymazané pole
+  hodnotu pořád ruší.
+
+**Zbývá:** `stav_treninku` se ze snímku čte do `fitDenNavrh.stav`, ale nikde se
+nezobrazuje ani neukládá — mrtvá větev, k rozhodnutí, jestli ji zobrazit, nebo
+přestat o ni API žádat.
+
+#### Past v testech: UTC proti místnímu času
+
+Při té příležitosti se ukázalo, proč sady občas padaly „samy od sebe". Osm z nich
+počítalo dny přes `toISOString().slice(0,10)`, tedy **v UTC**, kdežto aplikace
+používá `dstr()` v **místním** čase. Ve středoevropském létě (UTC+2) se obojí mezi
+**půlnocí a druhou hodinou** liší o den — testy pak zapisovaly na jiný den, než
+který si aplikace otevřela, a padala tvrzení jako „návrat na dnešek" nebo „výdej
+a váha přežijí restart". Přes den to nikdy neselhalo, takže to vypadalo náhodně.
+
+Nově je v `prostredi.js` sdílená `den(n)` v místním čase; v prohlížeči se používá
+`dstr()` přímo z aplikace. `test8.js` má výpočet vlastní, protože běží nad
+`manifest.json`, kde aplikace načtená není.
+
+Pozor při přidávání do `prostredi.js`: soubor končí `module.exports = {…}`, takže
+připsat `exports.neco` **za** ten řádek nefunguje — vlastnost sedne na zahozený
+objekt. Přidávat se musí do té složené závorky.
 
 ### Novinky ve v75 — okno u křivky sjednoceno na 7 / 30 / 90
 

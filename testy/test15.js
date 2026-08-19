@@ -1,6 +1,6 @@
 const { chromium } = require('playwright');
 const PROSTREDI = require('./prostredi');
-const dd = n => { const x=new Date(); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
+const dd = PROSTREDI.den;   // místní datum jako v aplikaci, ne UTC
 (async () => {
   const b = await chromium.launch({executablePath:PROSTREDI.EXE});
   const p = await (await b.newContext({viewport:{width:390,height:844}})).newPage();

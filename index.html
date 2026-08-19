@@ -1124,7 +1124,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.19-75';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.20-77';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3618,23 +3618,29 @@ function mimoMeze(pole, v) {
 async function saveDaily() {
   const burn = $('dBurn').value.trim(), w = $('dWeight').value.trim();
   const tot = $('dTotal').value.trim();
-  const rec = { date: curDate };
-  if ($('dNeuplny').checked) rec.neuplny = true;
+  /* Záznam dne nese i čísla ze snímku hodinek (tep, HRV, spánek, kroky, skóre),
+     o kterých tenhle formulář neví. Skládat ho od nuly je proto mazalo — stačilo
+     zaškrtnout „nekompletní den" nebo zapsat váhu. Načteme stávající a přepíšeme
+     jen pole, která formulář opravdu spravuje; prázdné pole klíč odstraní, aby
+     zůstalo platit, že vymazáním hodnoty se hodnota ruší. */
+  const rec = await dbGet('daily', curDate) || {};
+  rec.date = curDate;
+  if ($('dNeuplny').checked) rec.neuplny = true; else delete rec.neuplny;
   if (tot !== '') {
     const t = n(tot), chyba = mimoMeze('total', t);
     if (chyba) { toast(chyba); await loadDaily(); return; }
     rec.total = t;
-  }
+  } else delete rec.total;
   if (burn !== '') {
     const b = n(burn), chyba = mimoMeze('burn', b);
     if (chyba) { toast(chyba); await loadDaily(); return; }
     rec.burn = b;
-  }
+  } else delete rec.burn;
   if (w !== '') {
     const kg = n(w), chyba = mimoMeze('weight', kg);
     if (chyba) { toast(chyba); await loadDaily(); return; }
     rec.weight = kg;
-  }
+  } else delete rec.weight;
   await dbPut('daily', rec);
   toast('Uloženo');
   renderDay();
@@ -5699,6 +5705,10 @@ A) DENNÍ PŘEHLED (kroky, kalorie, spánek, tep…)
      (DÉLKA SPÁNKU 06:29 → "06:29"; HLUBOKÝ SPÁNEK 01:03 → "01:03")
    spanek_skore = číslo u popisku SPÁNEK v horním kruhu
    stav_treninku = číslo u STAV TRÉNINKU
+   datum NECH PRÁZDNÉ. Na úvodní obrazovce hodinek datum obvykle není a aplikace
+     použije den, který si uživatel sám zvolil. Vyplň ho jedině tehdy, když je na
+     snímku jednoznačně vidět celé datum včetně roku, ve tvaru RRRR-MM-DD.
+     Nikdy datum nehádej ani neodvozuj z názvu dne v týdnu.
    Co na snímku není, nech 0 nebo prázdné. Slovní hodnocení (STŘEDNÍ, NORMÁLNÍ,
    DOBRÁ) ignoruj, ber jen čísla.
 
@@ -5752,8 +5762,19 @@ function zpracujFitFoto(text) {
   } catch (e) { o = null; }
   o = o || {};
   const jeDatum = x => /^\d{4}-\d{2}-\d{2}$/.test(String(x || ''));
+  /* Správný tvar ještě neznamená správné datum. Na úvodní obrazovce Zeppu datum
+     většinou není, takže si ho model klidně vymyslí — a den v budoucnosti je pak
+     neviditelný: statistiky staví řadu pozpátku od dneška, takže se do nich
+     nedostane, a na Hlavní na něj člověk nepřepne, protože neví kam. Datum ze
+     snímku proto platí, jen když dává smysl; jinak rozhoduje otevřený den. */
+  const rozumneDatum = x => {
+    if (!jeDatum(x)) return false;
+    const dnes = dstr(new Date());
+    const rok = dstr(new Date(Date.now() - 400 * 86400000));
+    return x <= dnes && x >= rok;
+  };
   // datum může přijít nahoře i u jednotlivého tréninku — bereme oboje
-  const datum = jeDatum(o.datum) ? o.datum : curDate;
+  const datum = rozumneDatum(o.datum) ? o.datum : curDate;
   const typ = String(o.typ || '').toLowerCase();
 
   fitNavrh = [];
@@ -5773,7 +5794,7 @@ function zpracujFitFoto(text) {
       min: Math.max(0, r0(n(z.minuty))),
       kcal: Math.max(0, r0(n(z.kcal))),
       typ: String(z.kcal_typ || 'nevim').toLowerCase(),
-      datum: jeDatum(z.datum) ? z.datum : datum,
+      datum: rozumneDatum(z.datum) ? z.datum : datum,
       ber: true
     })).filter(z => z.nazev && (z.min > 0 || z.kcal > 0));
   }
@@ -5800,8 +5821,10 @@ function renderFitNavrh() {
           oninput="fitDenNavrh.${klic}=n(this.value)"><span class="tiny muted" style="align-self:center">${jednotka}</span>
       </div>` : '';
     $('fitNavrhList').innerHTML = `
-      <p class="tiny muted" style="margin:0 0 6px">${d.datum === curDate ? 'Dnes' : czd(d.datum)}${
-        d.kroky ? ' · ' + d.kroky + ' kroků' : ''}</p>
+      <div class="fld" style="margin:0 0 10px"><label>Zapsat na den</label>
+        <input type="date" id="fitNavrhDatum" value="${d.datum}"
+          onchange="fitDenNavrh.datum = this.value || fitDenNavrh.datum"></div>
+      ${d.kroky ? '<p class="tiny muted" style="margin:0 0 6px">' + d.kroky + ' kroků</p>' : ''}
       ${radek('Celkový výdej', d.kcal, 'kcal', 'kcal')}
       ${radek('Klidový tep', d.tep, 'tep', 'tep/min')}
       ${radek('Variabilita tepu (HRV)', d.hrv, 'hrv', 'ms')}
@@ -5863,7 +5886,7 @@ async function fitNavrhSave() {
     await dbPut('daily', den);
     const kdy = d.datum;
     fitNavrhZahod();
-    toast(kdy === curDate ? 'Zapsáno' : 'Zapsáno na ' + czd(kdy));
+    toast('Zapsáno na ' + czd(kdy));
     await loadDaily(); renderDay(); renderFit();
     return;
   }

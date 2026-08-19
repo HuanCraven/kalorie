@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const PROSTREDI = require('./prostredi');
 const SAL={hits:[{_source:{code:'8594001222222',product_name:'Croissant máslový',brands:'Penam',
   countries_tags:['en:czech-republic'],nutriments:{'energy-kcal_100g':392,proteins_100g:7.5,carbohydrates_100g:43,fat_100g:20,fiber_100g:2.1,salt_100g:0.8}}}]};
-const d = n => { const x=new Date(); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
+const d = PROSTREDI.den;   // místní datum jako v aplikaci, ne UTC
 (async () => {
   const b = await chromium.launch({executablePath:PROSTREDI.EXE});
   const p = await (await b.newContext({viewport:{width:390,height:844}})).newPage();

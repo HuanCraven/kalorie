@@ -150,13 +150,13 @@ const num=v=>parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(',','.'));
   await p.click('#logList .item .grow >> nth=0'); await p.waitForTimeout(400);
   const dBefore = await p.inputValue('#poDate');
   await p.evaluate(()=>{ const d=new Date(); d.setDate(d.getDate()-2);
-    setAddDate(d.toISOString().slice(0,10)); });
+    setAddDate(dstr(d)); });
   await p.waitForTimeout(600);
   ck('panel zůstane otevřený', await p.isVisible('#modPortion'));
   await p.click('#poAdd'); await p.waitForTimeout(700);
   const moved = await p.evaluate(async ()=>{
     const d=new Date(); d.setDate(d.getDate()-2);
-    return (await dbByIdx('log','date',d.toISOString().slice(0,10))).length; });
+    return (await dbByIdx('log','date',dstr(d))).length; });
   ck('úprava přesune záznam na nový den', moved===1, moved+' záznam');
   await p.evaluate(()=>setAddDate(dstr(new Date()))); await p.waitForTimeout(600);
 

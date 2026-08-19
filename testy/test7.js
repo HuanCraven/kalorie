@@ -10,7 +10,7 @@ const PROSTREDI = require('./prostredi');
 
   // --- naseed 30 dní dat přímo do IndexedDB (deterministicky)
   const seeded = await p.evaluate(async () => {
-    const today = new Date(); const ds = d => d.toISOString().slice(0,10);
+    const today = new Date(); const ds = dstr;
     const day = i => { const x = new Date(today); x.setDate(x.getDate()-i); return ds(x); };
     // cíl 2000 kcal, rmr 1750
     goals = {kcal:2000,p:130,c:220,f:65,alc:0,rmr:1750};

@@ -48,4 +48,13 @@ async function blokujVenek(ctx, onBlok) {
   });
 }
 
-module.exports = { EXE, DIR, blokujVenek };
+/* Datum v MÍSTNÍM čase, stejně jako dstr() v aplikaci. Testy dřív používaly
+   toISOString(), tedy UTC — mezi půlnocí a druhou hodinou se obojí liší o den
+   a sady pak padaly „náhodně" jen v tom okně. */
+const den = n => {
+  const x = new Date(); x.setDate(x.getDate() + (n || 0));
+  return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') +
+    '-' + String(x.getDate()).padStart(2, '0');
+};
+
+module.exports = { EXE, DIR, blokujVenek, den };

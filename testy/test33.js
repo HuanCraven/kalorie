@@ -11,7 +11,7 @@ const PROSTREDI = require('./prostredi');
   // 30 dní: příjem 2400, aktivní 600, váha 84 → dyn cíl = 1800+600−400 = 2000
   await p.evaluate(async ()=>{
     for (let i=29;i>=0;i--){
-      const x=new Date(); x.setDate(x.getDate()-i); const d=x.toISOString().slice(0,10);
+      const x=new Date(); x.setDate(x.getDate()-i); const d=dstr(x);
       await dbPut('log',{date:d,productId:'x',name:'Strava',unit:'g',meal:'obed',amount:500,
         kcal:2400,p:140,c:250,f:80,fib:30,salt:5,ts:Date.now()-i*86400000});
       await dbPut('daily',{date:d,burn:600,weight:84});

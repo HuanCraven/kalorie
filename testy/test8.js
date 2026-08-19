@@ -20,7 +20,8 @@ const PROSTREDI = require('./prostredi');
       t.objectStore('products').put({id:'8590000111222',barcode:'8590000111222',name:'Tvaroh Albert',
         brand:'Albert',unit:'g',kcal:75,p:13,c:4,f:0.5,fib:0,salt:0.1,serving:250,source:'manual',uses:3,
         createdAt:1,updatedAt:1});
-      t.objectStore('log').put({date:new Date().toISOString().slice(0,10),productId:'8590000111222',
+      t.objectStore('log').put({date:(()=>{const x=new Date();return x.getFullYear()+'-'+
+        String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');})(),productId:'8590000111222',
         name:'Tvaroh Albert',unit:'g',amount:250,kcal:187.5,p:32.5,c:10,f:1.25,ts:1});
       t.objectStore('meta').put({k:'goals',v:{kcal:2300,p:150,c:230,f:70,alc:120}});
       t.objectStore('meta').put({k:'drinks',v:[{nm:'Plzeň 0,5 l',ml:500,abv:4.4,c:3.8}]});

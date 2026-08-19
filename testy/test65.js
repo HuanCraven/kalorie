@@ -73,6 +73,38 @@ const PROSTREDI = require('./prostredi');
   ck('odškrtnutím se příznak zruší',
      !(await p.evaluate(async () => (await dbGet('daily', curDate)).neuplny)));
 
+  /* ---- 4b. formulář dne nesmí smazat čísla ze snímku (v76) --------
+     Záznam dne zná jen výdej, váhu a příznak. Když se skládal od nuly, každé
+     uložení smazalo tep, HRV, spánek i kroky, které tam zapsal snímek hodinek. */
+  await p.evaluate(async () => {
+    await dbPut('daily', { date: curDate, total: 2650, kroky: 9800, tep: 54, hrv: 42,
+      spanek: 430, hluboky: 95, rem: 80, skore: 82 });
+    go('day'); await loadDaily(); return renderDay();
+  });
+  await p.waitForTimeout(600);
+  await p.check('#dNeuplny'); await p.waitForTimeout(700);
+  const poZaskrtnuti = await p.evaluate(() => dbGet('daily', curDate));
+  ck('zaškrtnutí nekompletního dne nechá čísla z hodinek být',
+     poZaskrtnuti.tep === 54 && poZaskrtnuti.hrv === 42 && poZaskrtnuti.spanek === 430 &&
+     poZaskrtnuti.kroky === 9800 && poZaskrtnuti.skore === 82, JSON.stringify(poZaskrtnuti));
+  ck('a celkový výdej zůstane taky', poZaskrtnuti.total === 2650, JSON.stringify(poZaskrtnuti));
+
+  await p.fill('#dWeight', '81.5');
+  await p.dispatchEvent('#dWeight', 'change');
+  await p.waitForTimeout(700);
+  const poVaze = await p.evaluate(() => dbGet('daily', curDate));
+  ck('zápis váhy je nechá být také',
+     poVaze.tep === 54 && poVaze.spanek === 430 && poVaze.weight === 81.5, JSON.stringify(poVaze));
+
+  // vymazání pole musí hodnotu pořád rušit — jinak by nešlo nic vzít zpátky
+  await p.fill('#dWeight', '');
+  await p.dispatchEvent('#dWeight', 'change');
+  await p.waitForTimeout(700);
+  const poVymazani = await p.evaluate(() => dbGet('daily', curDate));
+  ck('vymazané pole hodnotu zruší, zbytek zůstane',
+     poVymazani.weight === undefined && poVymazani.tep === 54, JSON.stringify(poVymazani));
+  await p.uncheck('#dNeuplny'); await p.waitForTimeout(600);
+
   /* ---- 5. souhrn pro Claude o tom ví ------------------------------- */
   await p.evaluate(async () => {
     const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };

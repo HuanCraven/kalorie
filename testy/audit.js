@@ -21,7 +21,7 @@ function ck(name, cond, detail){
 }
 const num=v=>parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(',','.'));
 const near=(a,b,t)=>Math.abs(num(a)-Number(b))<=(t||1);
-const dd=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+const dd=PROSTREDI.den;   // místní datum jako v aplikaci, ne UTC
 
 (async () => {
   const b = await chromium.launch({executablePath:PROSTREDI.EXE});
@@ -202,7 +202,7 @@ Celkem 508 kcal.`); await p.waitForTimeout(400);
   sec('12 · Statistiky');
   await p.evaluate(async ()=>{                       // 30 dní historie s known hodnotami
     for (let i=29;i>=1;i--){
-      const x=new Date(); x.setDate(x.getDate()-i); const d=x.toISOString().slice(0,10);
+      const x=new Date(); x.setDate(x.getDate()-i); const d=dstr(x);
       await dbPut('log',{date:d,productId:'x',name:'Strava',unit:'g',meal:'obed',amount:500,
         kcal:2000,p:150,c:200,f:70,fib:30,salt:5,ts:Date.now()-i*86400000});
       await dbPut('daily',{date:d,burn:500,weight:+(85-(29-i)*0.03).toFixed(1)});

@@ -58,7 +58,7 @@ const OFF_SEARCH = {products:[
   // --- kopie jídla ze včerejška
   const y = await p.evaluate(async () => {
     const d = new Date(); d.setDate(d.getDate()-1);
-    const k = d.toISOString().slice(0,10);
+    const k = dstr(d);
     await dbPut('log',{date:k,productId:'x',name:'Ovesná kaše',unit:'g',meal:'snidane',amount:250,
       kcal:320,p:11,c:52,f:6,fib:7,salt:0.1,ts:Date.now()-86400000});
     await dbPut('log',{date:k,productId:'x',name:'Banán',unit:'g',meal:'snidane',amount:120,

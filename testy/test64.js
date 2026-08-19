@@ -113,6 +113,11 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   ck('denní souhrn se pozná', await p.evaluate(() => !!fitDenNavrh));
   ck('a nabídne se jako celkový výdej',
      (await p.textContent('#fitNavrhList')).indexOf('Celkový výdej') >= 0);
+  ck('v návrhu je pole s dnem, na který se zapíše',
+     await p.isVisible('#fitNavrhDatum'));
+  ck('a je přednastavené na otevřený den',
+     (await p.inputValue('#fitNavrhDatum')) === (await p.evaluate(() => curDate)),
+     await p.inputValue('#fitNavrhDatum'));
 
   await p.click('text=Zapsat do deníku');
   await p.waitForTimeout(900);
@@ -237,6 +242,49 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   });
   await p.waitForTimeout(800);
   ck('bez zdravotních dat je karta schovaná', !(await p.isVisible('#zdraviKarta')));
+
+  /* ---- datum ze snímku nesmí přebít zvolený den (v77) -------------
+     jeDatum kontrolovalo jen tvar, takže vymyšlené datum v budoucnosti prošlo
+     a záznam skončil na dni, který není vidět ve statistikách ani na Hlavní. */
+  const budouci = await p.evaluate(() => {
+    const x = new Date(); x.setDate(x.getDate() + 30); return dstr(x);
+  });
+  const stary = await p.evaluate(() => {
+    const x = new Date(); x.setDate(x.getDate() - 500); return dstr(x);
+  });
+  const vcera = await p.evaluate(() => {
+    const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - 1); return dstr(x);
+  });
+
+  claude.odpoved = '{"typ":"den","datum":"' + budouci + '","kcal_celkem":2400,"kroky":100,"zaznamy":[],"pozn":""}';
+  await p.evaluate(() => go('fit'));
+  await nahraj();
+  ck('datum v budoucnosti se zahodí',
+     (await p.inputValue('#fitNavrhDatum')) === (await p.evaluate(() => curDate)),
+     'nabídnuto: ' + await p.inputValue('#fitNavrhDatum') + ', čekáno curDate');
+
+  claude.odpoved = '{"typ":"den","datum":"' + stary + '","kcal_celkem":2400,"kroky":100,"zaznamy":[],"pozn":""}';
+  await nahraj();
+  ck('datum starší než rok se zahodí taky',
+     (await p.inputValue('#fitNavrhDatum')) === (await p.evaluate(() => curDate)),
+     await p.inputValue('#fitNavrhDatum'));
+
+  claude.odpoved = '{"typ":"den","datum":"' + vcera + '","kcal_celkem":2400,"kroky":100,"zaznamy":[],"pozn":""}';
+  await nahraj();
+  ck('rozumné datum ze snímku se použije',
+     (await p.inputValue('#fitNavrhDatum')) === vcera, await p.inputValue('#fitNavrhDatum'));
+
+  // a hlavně: uživatel si den může přepnout sám
+  await p.fill('#fitNavrhDatum', vcera);
+  await p.dispatchEvent('#fitNavrhDatum', 'change');
+  await p.click('text=Zapsat do deníku');
+  await p.waitForTimeout(900);
+  const naVcerejsku = await p.evaluate(d => dbGet('daily', d), vcera);
+  ck('zápis jde na den zvolený v poli', naVcerejsku && naVcerejsku.total === 2400,
+     JSON.stringify(naVcerejsku));
+
+  // zadání pro API musí o datu vůbec mluvit — dřív tam o něm nebylo nic
+  ck('zadání říká, kdy datum vyplnit', claude.zadani.indexOf('NECH PR') >= 0);
 
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
