@@ -1131,7 +1131,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.20-78';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.20-79';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3668,7 +3668,8 @@ async function renderHodinky() {
     return;
   }
   const dnes = dstr(new Date());
-  const budoucich = dny.filter(d => d.date > dnes).length;
+  const mez = dstr(new Date(Date.now() - 60 * 86400000));
+  const podezrelych = dny.filter(d => d.date > dnes || d.date < mez).length;
   box.innerHTML = dny.map(d => {
     const co = [];
     if (d.total > 0) co.push(r0(d.total) + ' kcal');
@@ -3676,15 +3677,16 @@ async function renderHodinky() {
     if (d.tep > 0) co.push('tep ' + r0(d.tep));
     if (d.hrv > 0) co.push('HRV ' + r0(d.hrv));
     if (d.spanek > 0) co.push('spánek ' + min2cas(d.spanek));
-    const zle = d.date > dnes;
+    const znacka = d.date > dnes ? 'budoucí den' : (d.date < mez ? 'starší než dva měsíce' : '');
     return `<div class="item">
       <div class="grow" onclick="skocNaDen('${sid(d.date)}')" style="cursor:pointer">
-        <div class="nm">${czd(d.date)}${zle ? ' <span style="color:var(--warn)">· budoucí den</span>' : ''}</div>
+        <div class="nm">${czdR(d.date)}${znacka ? ' <span style="color:var(--warn)">· ' + znacka + '</span>' : ''}</div>
         <div class="sub">${co.join(' · ')}</div></div>
       <button class="btn sm dan" onclick="smazHodinky('${sid(d.date)}')">Smazat</button></div>`;
-  }).join('') + (budoucich
-    ? '<p class="tiny" style="margin:10px 0 0;color:var(--warn)">Den v budoucnosti je zápis, ' +
-      'který se trefil na špatné datum. Smaž ho a nahraj snímek znovu na správný den.</p>'
+  }).join('') + (podezrelych
+    ? '<p class="tiny" style="margin:10px 0 0;color:var(--warn)">Označený den je nejspíš zápis, ' +
+      'který se trefil na špatné datum — nejčastěji o rok vedle. Smaž ho a nahraj snímek ' +
+      'znovu na správný den.</p>'
     : '');
 }
 /* Maže jen čísla ze snímku. Váha a příznak nekompletního dne se snímkem nesouvisí,
@@ -3692,11 +3694,11 @@ async function renderHodinky() {
    aby se nevrátil ze druhého zařízení). */
 async function smazHodinky(datum) {
   const d = await dbGet('daily', datum); if (!d) return;
-  if (!confirm('Smazat čísla z hodinek z ' + czd(datum) + '? Váha a příznak dne zůstanou.')) return;
+  if (!confirm('Smazat čísla z hodinek z ' + czdR(datum) + '? Váha a příznak dne zůstanou.')) return;
   HODINKY_KLICE.forEach(k => delete d[k]);
   const zbylo = Object.keys(d).some(k => k !== 'date' && k !== 'upd');
   if (zbylo) await dbPut('daily', d); else await dbDel('daily', datum);
-  toast('Smazáno z ' + czd(datum));
+  toast('Smazáno z ' + czdR(datum));
   await renderHodinky();
   if (datum === curDate) { await loadDaily(); renderDay(); }
 }
@@ -4028,6 +4030,11 @@ function svgWeight(list, a) {
       <span style="color:${C_INK}">●</span> jednotlivá vážení</div>`;
 }
 const czd = s => { const d = new Date(s + 'T12:00:00'); return d.getDate() + '. ' + (d.getMonth() + 1) + '.'; };
+/* Totéž i s rokem. Bez něj vypadá 19. 8. 2025 a 19. 8. 2026 stejně — a špatný rok
+   je nejčastější omyl, kterého se model u data ze snímku dopustí. Používá se všude,
+   kam se zapisuje datum přečtené ze snímku, a ve výpisu, který slouží k jeho hledání. */
+const czdR = s => { const d = new Date(s + 'T12:00:00');
+  return d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear(); };
 function stTip(i) {
   const d = statCache.list[i]; if (!d) return;
   const el = $('stTipTxt'); if (!el) return;
@@ -5824,8 +5831,10 @@ function zpracujFitFoto(text) {
   const rozumneDatum = x => {
     if (!jeDatum(x)) return false;
     const dnes = dstr(new Date());
-    const rok = dstr(new Date(Date.now() - 400 * 86400000));
-    return x <= dnes && x >= rok;
+    // 60 dní, ne rok: snímek z hodinek se nahrává týž večer nebo pár dní zpětně,
+    // kdežto o rok posunuté datum je typický omyl modelu — dřív (400 dní) prošel
+    const mez = dstr(new Date(Date.now() - 60 * 86400000));
+    return x <= dnes && x >= mez;
   };
   // datum může přijít nahoře i u jednotlivého tréninku — bereme oboje
   const datum = rozumneDatum(o.datum) ? o.datum : curDate;
@@ -5940,7 +5949,7 @@ async function fitNavrhSave() {
     await dbPut('daily', den);
     const kdy = d.datum;
     fitNavrhZahod();
-    toast('Zapsáno na ' + czd(kdy));
+    toast('Zapsáno na ' + czdR(kdy));
     await loadDaily(); renderDay(); renderFit();
     return;
   }

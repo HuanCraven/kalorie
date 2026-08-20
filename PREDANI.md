@@ -17,7 +17,30 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.20-78** (`APP_VERSION` v `index.html`, cache `kaltrack-v78` v `sw.js`).
+Aktuální verze: **2026.08.20-79** (`APP_VERSION` v `index.html`, cache `kaltrack-v79` v `sw.js`).
+
+### Novinky ve v79 — oprava: špatný rok procházel a výpis ho skrýval
+
+Uživatel v novém výpisu uviděl **dvakrát „19. 8."** se stejnými čísly. Databáze
+`daily` je klíčovaná datem, dva záznamy tedy nemůžou mít týž klíč — nešlo o
+duplicitu, ale o **dva různé roky**. Dvě vlastní chyby naráz:
+
+1. `czd()` vypisuje jen `19. 8.` **bez roku**, takže v kartě, jejímž jediným
+   smyslem je najít špatně zařazené datum, byl ten rozdíl neviditelný.
+2. `rozumneDatum` z v77 pouštělo **400 dní** zpátky. Špatný rok je přesně 365 dní,
+   takže prošel — a protože je v minulosti, neoznačil se ani jako budoucí den.
+   Kontrola tedy chytala jen tu méně pravděpodobnou půlku omylů.
+
+- Nové `czdR(s)` přidává rok. Používá se ve výpisu, v potvrzení po uložení snímku
+  i v dotazu před mazáním — tedy všude, kde se pracuje s datem přečteným ze snímku.
+  Obyčejné `czd()` zůstává, jinde je rok navíc jen šum.
+- Okno v `rozumneDatum` zúženo na **60 dní**. Snímek se nahrává týž večer nebo pár
+  dní zpětně; o rok posunuté datum je naopak typický omyl modelu.
+- Výpis označuje **cokoli mimo okno**, ne jen budoucnost, a v poznámce rovnou říká,
+  že nejčastější případ je „o rok vedle".
+- testy `test67.js` rozšířeny o týž den o rok zpět: rok musí být v textu vidět,
+  loňský den označený, smazatelný — a takové datum už ze snímku vůbec neprojde,
+  zatímco týden zpátky ano.
 
 ### Novinky ve v78 — výpis dnů se záznamem z hodinek
 
