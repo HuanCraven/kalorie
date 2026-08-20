@@ -971,6 +971,13 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
+    <h3>Dny se záznamem z hodinek</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Kde všude leží čísla ze snímku Zeppu.
+      Klepnutím na den se na něj přepneš.</p>
+    <div id="hodinkyList"></div>
+  </div>
+
+  <div class="card">
     <h3>Verze a aktualizace</h3>
     <div class="row" style="justify-content:space-between;margin-bottom:10px">
       <span class="tiny muted">Nainstalovaná verze</span>
@@ -1124,7 +1131,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.20-77';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.20-78';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1589,7 +1596,7 @@ function go(p) {
   if (p === 'stats') renderStats();
   if (p === 'alc') renderAlc();
   if (p === 'fit') renderFit();
-  if (p === 'set') dynUi();
+  if (p === 'set') { dynUi(); renderHodinky(); }
   window.scrollTo(0, 0);
 }
 function closeMod(id) { $(id).classList.remove('on'); }
@@ -3645,6 +3652,53 @@ async function saveDaily() {
   toast('Uloženo');
   renderDay();
   if ($('p-fit').classList.contains('on')) renderFit();
+}
+/* Kde všude leží čísla ze snímku hodinek. Vzniklo poté, co se jeden zápis trefil
+   na datum v budoucnosti a nebylo ho kde najít: statistiky staví řadu dnů pozpátku
+   od dneška, takže budoucí den se do nich nedostane, a na Hlavní na něj člověk
+   nepřepne, protože neví kam. Tenhle výpis je jediné místo, kde je vidět všechno. */
+const HODINKY_KLICE = ['total', 'kroky', 'tep', 'hrv', 'spanek', 'hluboky', 'rem', 'skore'];
+async function renderHodinky() {
+  const box = $('hodinkyList'); if (!box) return;
+  const dny = (await dbAll('daily'))
+    .filter(d => HODINKY_KLICE.some(k => typeof d[k] === 'number' && d[k] > 0))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  if (!dny.length) {
+    box.innerHTML = '<p class="tiny muted" style="margin:0">Zatím jsi žádný snímek z hodinek nenahrál.</p>';
+    return;
+  }
+  const dnes = dstr(new Date());
+  const budoucich = dny.filter(d => d.date > dnes).length;
+  box.innerHTML = dny.map(d => {
+    const co = [];
+    if (d.total > 0) co.push(r0(d.total) + ' kcal');
+    if (d.kroky > 0) co.push(r0(d.kroky) + ' kroků');
+    if (d.tep > 0) co.push('tep ' + r0(d.tep));
+    if (d.hrv > 0) co.push('HRV ' + r0(d.hrv));
+    if (d.spanek > 0) co.push('spánek ' + min2cas(d.spanek));
+    const zle = d.date > dnes;
+    return `<div class="item">
+      <div class="grow" onclick="skocNaDen('${sid(d.date)}')" style="cursor:pointer">
+        <div class="nm">${czd(d.date)}${zle ? ' <span style="color:var(--warn)">· budoucí den</span>' : ''}</div>
+        <div class="sub">${co.join(' · ')}</div></div>
+      <button class="btn sm dan" onclick="smazHodinky('${sid(d.date)}')">Smazat</button></div>`;
+  }).join('') + (budoucich
+    ? '<p class="tiny" style="margin:10px 0 0;color:var(--warn)">Den v budoucnosti je zápis, ' +
+      'který se trefil na špatné datum. Smaž ho a nahraj snímek znovu na správný den.</p>'
+    : '');
+}
+/* Maže jen čísla ze snímku. Váha a příznak nekompletního dne se snímkem nesouvisí,
+   takže zůstávají; když po nich v záznamu nic nezbude, zmizí celý (i s náhrobkem,
+   aby se nevrátil ze druhého zařízení). */
+async function smazHodinky(datum) {
+  const d = await dbGet('daily', datum); if (!d) return;
+  if (!confirm('Smazat čísla z hodinek z ' + czd(datum) + '? Váha a příznak dne zůstanou.')) return;
+  HODINKY_KLICE.forEach(k => delete d[k]);
+  const zbylo = Object.keys(d).some(k => k !== 'date' && k !== 'upd');
+  if (zbylo) await dbPut('daily', d); else await dbDel('daily', datum);
+  toast('Smazáno z ' + czd(datum));
+  await renderHodinky();
+  if (datum === curDate) { await loadDaily(); renderDay(); }
 }
 async function setMode(dyn) {
   goals.dyn = !!dyn;

@@ -17,7 +17,25 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.20-77** (`APP_VERSION` v `index.html`, cache `kaltrack-v77` v `sw.js`).
+Aktuální verze: **2026.08.20-78** (`APP_VERSION` v `index.html`, cache `kaltrack-v78` v `sw.js`).
+
+### Novinky ve v78 — výpis dnů se záznamem z hodinek
+
+Dohra k v77: jeden zápis se stihl trefit na datum v budoucnosti ještě před
+opravou a nebylo ho kde najít. Nový výpis ve **Víc → Data** je jediné místo, kde
+jsou vidět **všechny** dny s čísly ze snímku, včetně budoucích.
+
+- `renderHodinky()` vypíše dny, kde je aspoň jedno z `HODINKY_KLICE`
+  (`total`, `kroky`, `tep`, `hrv`, `spanek`, `hluboky`, `rem`, `skore`), od
+  nejnovějšího. Den jen s váhou se nevypisuje — o snímek nejde.
+- **Budoucí den je označený** a doprovázený vysvětlením, že jde o zápis na špatné
+  datum. To je celý důvod, proč výpis vznikl.
+- Klepnutí na řádek přepne na ten den; `smazHodinky()` maže **jen** čísla ze
+  snímku. Váha a příznak nekompletního dne zůstávají, protože se snímkem
+  nesouvisí; když po nich nic nezbude, jde pryč celý záznam přes `dbDel`, tedy
+  i s náhrobkem, aby se nevrátil ze druhého zařízení.
+- testy `test67.js` — prázdný stav, výběr dnů, označení budoucího, smazání
+  celého záznamu i jen jeho části se zachováním váhy a příznaku.
 
 ### Novinky ve v77 — oprava: datum ze snímku přebíjelo zvolený den
 
@@ -895,7 +913,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 66 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 67 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |
