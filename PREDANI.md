@@ -17,7 +17,31 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.20-80** (`APP_VERSION` v `index.html`, cache `kaltrack-v80` v `sw.js`).
+Aktuální verze: **2026.08.21-81** (`APP_VERSION` v `index.html`, cache `kaltrack-v81` v `sw.js`).
+
+### Novinky ve v81 — zadání hledalo popisky, které na obrazovce nejsou
+
+Uživatel hlásil, že se ze snímku nenačetl klidový tep a že modelu dělá potíž
+spojit si HRV s variabilitou tepové frekvence. Zadání totiž jmenovalo u obou
+hodnot **jediný přesný popisek velkými písmeny**:
+
+    tep = KLIDOVÝ SRDEČNÍ TEP, číslo tepů za minutu
+    hrv = VARIABILITA TEPOVÉ FREKVENCE, číslo v ms
+
+Jenže Zepp své dlaždice takhle nepopisuje — HRV je na obrazovce prakticky vždy
+jen zkratka a klidový tep bývá „Klidový tep" nebo „Srdeční tep". Když model
+popisek v zadaném tvaru nenajde, nic nevyplní a napíše to do `pozn`; chová se
+tedy správně, jen měl špatně popsané, co hledat. Rozlišení to nebylo, tahle cesta
+jede na 1568 px (`apiAsk(..., detail = true)`).
+
+- U tepu se vyjmenovaly obvyklé podoby popisku a přidalo se, že **okamžitý tep
+  z probíhajícího měření ani denní rozsah nejsou klidový tep** — do trendu
+  a do korelace s alkoholem by okamžitá hodnota napáchala víc škody než užitku,
+  takže se v takovém případě nechá 0 a napíše se to do `pozn`.
+- U HRV se říká výslovně, že dlaždice bývá popsaná jen zkratkou.
+- U obou je uvedený obvyklý rozsah (40–90, resp. 15–120 ms).
+- testy `test64.js`: zadání jmenuje zkratku HRV, zná víc podob popisku u tepu
+  a rozlišuje klidový tep od okamžitého.
 
 ### Novinky ve v80 — přestali jsme žádat o stav tréninku
 
