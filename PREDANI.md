@@ -17,7 +17,17 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.20-79** (`APP_VERSION` v `index.html`, cache `kaltrack-v79` v `sw.js`).
+Aktuální verze: **2026.08.20-80** (`APP_VERSION` v `index.html`, cache `kaltrack-v80` v `sw.js`).
+
+### Novinky ve v80 — přestali jsme žádat o stav tréninku
+
+`stav_treninku` se ze snímku četl do `fitDenNavrh.stav`, ale nikde se nezobrazoval
+ani neukládal. Byla to mrtvá větev, která v každém dotazu na API stála tokeny.
+Uživatel rozhodl ji zrušit, ne dodělat — z devíti čísel ze snímku Zeppu se tedy
+čte osm. Pryč je z šablony JSON, z popisu v zadání i z parsování.
+
+- testy `test64.js`: zadání už `stav_treninku` nezmiňuje, a když ho model pošle
+  sám od sebe, do `fitDenNavrh` se nedostane.
 
 ### Novinky ve v79 — oprava: špatný rok procházel a výpis ho skrýval
 
@@ -106,9 +116,8 @@ do té karty sahat i ve dnech, kdy by ji člověk jinak nechal být.
   se, že tep, HRV, spánek, kroky, skóre i výdej zůstaly; a že vymazané pole
   hodnotu pořád ruší.
 
-**Zbývá:** `stav_treninku` se ze snímku čte do `fitDenNavrh.stav`, ale nikde se
-nezobrazuje ani neukládá — mrtvá větev, k rozhodnutí, jestli ji zobrazit, nebo
-přestat o ni API žádat.
+(`stav_treninku` byl mrtvá větev — četl se, ale nikde se nezobrazoval ani
+neukládal. Ve v80 se o něj přestalo žádat.)
 
 #### Past v testech: UTC proti místnímu času
 
@@ -217,7 +226,8 @@ průměrný příjem níž, než jaká byla realita — a statistika vypadala l�
 
 Ze **stejného snímku** (úvodní obrazovka Zeppu) se čte devět čísel místo dvou:
 celkový výdej, kroky, klidový tep, HRV, délka spánku, hluboký, REM, skóre spánku,
-stav tréninku. Ukládají se do `daily` — žádný nový store, takže se to samo
+stav tréninku (ten od **v80** už ne — viz výše, byl to mrtvý údaj).
+Ukládají se do `daily` — žádný nový store, takže se to samo
 synchronizuje i zálohuje.
 
 - **Časy se převádějí na minuty** (`cas2min`): `06:29` → 389. Jinak by nešly

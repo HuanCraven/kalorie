@@ -186,6 +186,10 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   await nahraj();
   ck('zadání říká Claudeovi, co má číst',
      claude.zadani.indexOf('VARIABILITA') > 0 && claude.zadani.indexOf('KLIDOVÝ') > 0);
+  // v80: stav tréninku se nikde nezobrazoval ani neukládal, tak se o něj přestalo žádat
+  ck('o stav tréninku se už nežádá', claude.zadani.indexOf('stav_treninku') < 0);
+  ck('a když ho model pošle sám, nikam se nedostane',
+     await p.evaluate(() => fitDenNavrh && fitDenNavrh.stav === undefined));
   ck('návrh ukáže tep i spánek',
      (await p.textContent('#fitNavrhList')).indexOf('Klidový tep') >= 0 &&
      (await p.textContent('#fitNavrhList')).indexOf('Délka spánku') >= 0);

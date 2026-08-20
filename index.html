@@ -1131,7 +1131,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.20-79';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.20-80';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -5752,7 +5752,7 @@ const CVICENI_PROMPT =
 Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
 {"typ":"den","datum":"","kcal_celkem":0,"kroky":0,"tep":0,"hrv":0,
  "spanek":"","spanek_hluboky":"","spanek_rem":"","spanek_skore":0,
- "stav_treninku":0,"zaznamy":[],"pozn":""}
+ "zaznamy":[],"pozn":""}
 
 Dvě možnosti:
 
@@ -5765,7 +5765,6 @@ A) DENNÍ PŘEHLED (kroky, kalorie, spánek, tep…)
    spanek, spanek_hluboky, spanek_rem = časy PŘESNĚ jak jsou napsané, tvar "HH:MM"
      (DÉLKA SPÁNKU 06:29 → "06:29"; HLUBOKÝ SPÁNEK 01:03 → "01:03")
    spanek_skore = číslo u popisku SPÁNEK v horním kruhu
-   stav_treninku = číslo u STAV TRÉNINKU
    datum NECH PRÁZDNÉ. Na úvodní obrazovce hodinek datum obvykle není a aplikace
      použije den, který si uživatel sám zvolil. Vyplň ho jedině tehdy, když je na
      snímku jednoznačně vidět celé datum včetně roku, ve tvaru RRRR-MM-DD.
@@ -5848,7 +5847,7 @@ function zpracujFitFoto(text) {
       datum: datum, kcal: r0(n(o.kcal_celkem)), kroky: r0(n(o.kroky)),
       tep: r0(n(o.tep)), hrv: r0(n(o.hrv)),
       spanek: cas2min(o.spanek), hluboky: cas2min(o.spanek_hluboky), rem: cas2min(o.spanek_rem),
-      skore: r0(n(o.spanek_skore)), stav: r0(n(o.stav_treninku))
+      skore: r0(n(o.spanek_skore))
     };
   } else {
     const zaz = Array.isArray(o.zaznamy) ? o.zaznamy : [];
