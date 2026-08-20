@@ -1131,7 +1131,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-81';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-82';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -5757,25 +5757,33 @@ Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
 Dvě možnosti:
 
 A) DENNÍ PŘEHLED (kroky, kalorie, spánek, tep…)
-   typ = "den", zaznamy nech prázdné a vyplň, co na snímku vidíš:
-   kcal_celkem = číslo u popisku KALORIE (kolik za den spálil)
-   kroky = počet kroků
-   tep = KLIDOVÝ tep, číslo tepů za minutu. Dlaždice bývá popsaná různě:
-     "Klidový tep", "Klidová tepová frekvence", "Srdeční tep", "Tep", "HR".
-     Ber jen klidovou hodnotu, bývá 40-90. Když je na snímku jen okamžitý tep
-     z právě probíhajícího měření nebo rozsah za den (třeba 52-131), nech 0
-     a napiš to do pozn — okamžitý tep není totéž co klidový.
-   hrv = variabilita tepové frekvence, číslo v ms, bývá 15-120. Dlaždice je
-     skoro vždycky popsaná jen zkratkou "HRV", ne celým názvem — hledej ji tak.
-   spanek, spanek_hluboky, spanek_rem = časy PŘESNĚ jak jsou napsané, tvar "HH:MM"
-     (DÉLKA SPÁNKU 06:29 → "06:29"; HLUBOKÝ SPÁNEK 01:03 → "01:03")
-   spanek_skore = číslo u popisku SPÁNEK v horním kruhu
-   datum NECH PRÁZDNÉ. Na úvodní obrazovce hodinek datum obvykle není a aplikace
-     použije den, který si uživatel sám zvolil. Vyplň ho jedině tehdy, když je na
-     snímku jednoznačně vidět celé datum včetně roku, ve tvaru RRRR-MM-DD.
-     Nikdy datum nehádej ani neodvozuj z názvu dne v týdnu.
-   Co na snímku není, nech 0 nebo prázdné. Slovní hodnocení (STŘEDNÍ, NORMÁLNÍ,
-   DOBRÁ) ignoruj, ber jen čísla.
+   typ = "den", zaznamy nech prázdné a vyplň, co na snímku vidíš.
+
+   Nahoře je kruhová grafika se třemi čísly:
+   spanek_skore = číslo VLEVO u popisku SPÁNEK (skóre spánku, bývá 0-100)
+   kroky = velké číslo UPROSTŘED u popisku KROKY
+   kcal_celkem = číslo VPRAVO u popisku KALORIE (denní výdej)
+
+   Pod tím je seznam ZÁKLADNÍ METRIKY, kde má každý řádek popisek a hodnotu:
+   tep = hodnota u řádku KLIDOVÝ SRDEČNÍ TEP (nebo KLIDOVÝ TEP). Když tenhle
+     řádek na snímku je, JE to klidový tep — vyplň ho, i kdyby ti číslo přišlo
+     nízké; 40-60 je u trénovaných lidí běžné. Nulu nech jedině tehdy, když
+     řádek s KLIDOVÝM tepem na snímku vůbec není a je vidět jen okamžitý tep
+     z probíhajícího měření nebo rozsah za den (třeba 52-131).
+   hrv = hodnota u řádku VARIABILITA TEPOVÉ FREKVENCE, někdy popsaného jen
+     zkratkou HRV. Číslo v ms, bývá 15-120.
+   spanek, spanek_hluboky, spanek_rem = časy PŘESNĚ jak jsou napsané u řádků
+     DÉLKA SPÁNKU, HLUBOKÝ SPÁNEK a REM SPÁNEK, tvar "HH:MM"
+     (DÉLKA SPÁNKU 05:44 → "05:44"; HLUBOKÝ SPÁNEK 00:50 → "00:50")
+
+   Slovní hodnocení pod čísly (NORMÁLNÍ, OPTIMÁLNÍ, PODPRŮMĚRNÉ, DÁVEJTE POZOR,
+   STŘEDNÍ) jsou jen komentáře, ne hodnoty — ignoruj je.
+
+   datum NECH PRÁZDNÉ. Nahoře na obrazovce bývá datum BEZ ROKU (třeba "20. 8.");
+     takové datum NEPOUŽÍVEJ a rok si k němu nedomýšlej — aplikace použije den,
+     který si uživatel sám zvolil. Vyplň datum jedině tehdy, když je vidět celé
+     včetně roku, ve tvaru RRRR-MM-DD.
+   Co na snímku opravdu není, nech 0 nebo prázdné.
 
 B) SEZNAM TRÉNINKŮ (jednotlivé aktivity s délkou)
    typ = "treninky"

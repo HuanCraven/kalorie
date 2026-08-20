@@ -185,15 +185,23 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
     spanek_skore: 68, stav_treninku: 2, zaznamy: [], pozn: '' });
   await nahraj();
   ck('zadání říká Claudeovi, co má číst',
-     claude.zadani.indexOf('variabilita') > 0 && claude.zadani.indexOf('KLIDOV') > 0);
-  /* v81: dřív tam byl jen jeden přesný popisek velkými písmeny, jenže Zepp
-     dlaždice takhle nepopisuje — HRV je na obrazovce jen zkratka. */
-  ck('zadání hledá HRV i podle zkratky',
-     claude.zadani.indexOf('zkratkou') > 0 && claude.zadani.indexOf('HRV') > 0);
-  ck('a zná víc podob popisku u tepu',
-     claude.zadani.indexOf('Klidový tep') > 0 && claude.zadani.indexOf('Srdeční tep') > 0);
-  ck('a rozlišuje klidový tep od okamžitého',
-     claude.zadani.indexOf('okamžitý tep není totéž') > 0);
+     claude.zadani.indexOf('VARIABILITA TEPOV') > 0 && claude.zadani.indexOf('KLIDOV') > 0);
+  /* v82: popisky jsou opsané ze skutečné obrazovky Zeppu. v81 k nim přidala
+     varování před okamžitým tepem a model si podle něj rozmluvil i platnou
+     hodnotu z řádku KLIDOVÝ SRDEČNÍ TEP — proto teď zadání říká opak. */
+  ck('řádek s klidovým tepem se má vyplnit',
+     claude.zadani.indexOf('JE to klidový tep') > 0);
+  ck('a nízké číslo není důvod ho zahodit',
+     claude.zadani.indexOf('40-60') > 0);
+  ck('nulu jen když řádek chybí',
+     claude.zadani.indexOf('vůbec není') > 0);
+  ck('zadání zná i zkratku HRV', claude.zadani.indexOf('zkratkou HRV') > 0);
+  ck('popisuje horní kruh kvůli skóre spánku',
+     claude.zadani.indexOf('VLEVO u popisku SPÁNEK') > 0);
+  ck('varuje před datem bez roku',
+     claude.zadani.indexOf('BEZ ROKU') > 0);
+  ck('a slovní hodnocení označí za komentáře',
+     claude.zadani.indexOf('PODPRŮMĚRNÉ') > 0);
   // v80: stav tréninku se nikde nezobrazoval ani neukládal, tak se o něj přestalo žádat
   ck('o stav tréninku se už nežádá', claude.zadani.indexOf('stav_treninku') < 0);
   ck('a když ho model pošle sám, nikam se nedostane',

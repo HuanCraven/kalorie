@@ -17,7 +17,37 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-81** (`APP_VERSION` v `index.html`, cache `kaltrack-v81` v `sw.js`).
+Aktuální verze: **2026.08.21-82** (`APP_VERSION` v `index.html`, cache `kaltrack-v82` v `sw.js`).
+
+### Novinky ve v82 — zadání opsané ze skutečné obrazovky Zeppu
+
+Uživatel poslal snímek úvodní obrazovky Zeppu a ukázalo se, že **v81 věc zhoršila**.
+Na obrazovce je řádek `KLIDOVÝ SRDEČNÍ TEP 47` — tedy přesně ten popisek, který
+v zadání byl už předtím. Nechyběl. Chybu způsobilo varování přidané ve v81
+(„když je na snímku jen okamžitý tep, nech 0"): model si podle něj **platnou
+hodnotu sám rozmluvil** a napsal do `pozn`, že tep není klidový. Opatrnost proti
+špatnému číslu vyhodila i to správné.
+
+Zadání je proto nově opsané ze skutečné obrazovky, ne odhadnuté:
+
+- **Horní kruh** má tři čísla a popisuje se výslovně: vlevo SPÁNEK (skóre),
+  uprostřed KROKY, vpravo KALORIE. Dřív u skóre stálo jen „číslo u popisku SPÁNEK
+  v horním kruhu" a model tvrdil, že tam skóre není, přestože bylo.
+- **Klidový tep** se obrátil naruby: když řádek `KLIDOVÝ SRDEČNÍ TEP` na snímku
+  je, **JE** to klidový tep a má se vyplnit i při nízkém čísle (40–60 je u
+  trénovaných lidí běžné). Nula se nechá, jen když ten řádek chybí a je vidět
+  pouze okamžitý tep nebo denní rozsah.
+- **Datum je na obrazovce bez roku** (`20. 8.`) — tím se konečně vysvětlila
+  původní záhada z v77/v79: model rok neviděl a domyslel si ho špatně. Zadání teď
+  takové datum výslovně zakazuje použít.
+- **Slovní hodnocení** jsou vyjmenovaná podle skutečnosti (NORMÁLNÍ, OPTIMÁLNÍ,
+  PODPRŮMĚRNÉ, DÁVEJTE POZOR) a označená za komentáře, ne hodnoty.
+- Ostatní popisky (`VARIABILITA TEPOVÉ FREKVENCE`, `DÉLKA SPÁNKU`, `HLUBOKÝ
+  SPÁNEK`, `REM SPÁNEK`) odpovídají obrazovce doslova.
+
+**Poučení:** dvě verze zadání se psaly podle odhadu, jak asi obrazovka vypadá.
+Jeden snímek od uživatele to vyřešil líp než obojí dohromady. U čtení z obrázku
+je potřeba vidět předlohu, ne si ji představovat.
 
 ### Novinky ve v81 — zadání hledalo popisky, které na obrazovce nejsou
 
