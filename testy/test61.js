@@ -37,10 +37,16 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   /* ---- 1. panel je dostupný vedle Hledat a Popsat ------------------ */
   await p.click('nav button[data-p="scan"]');
   const panely = await p.$$eval('#addSeg button', bs => bs.map(b => b.textContent.trim()));
-  ck('Zadat má panely včetně Vyfotit', panely.join('|') === 'Časté|Hledat|Popsat|Vyfotit', panely.join('|'));
-  await p.click('#addSeg button[data-s="lab"]');
+  // v97: zakládání potraviny z obalu se přesunulo do Jídel — nezapisuje do dne
+  ck('Zadat má jen cesty zápisu dne', panely.join('|') === 'Časté|Hledat|Popsat', panely.join('|'));
+  const jidla = await p.$$eval('#dbSeg button', bs => bs.map(b => b.textContent.trim()));
+  ck('a zakládání z obalu je v Jídlech', jidla.indexOf('Z obalu') >= 0, jidla.join('|'));
+  await p.click('nav button[data-p="db"]');
+  await p.click('#dbSeg button[data-d="obal"]');
   await p.waitForTimeout(200);
-  ck('panel Vyfotit se otevře', await p.isVisible('#s-lab'));
+  ck('panel Z obalu se otevře', await p.isVisible('#dbObal'));
+  ck('a schová hledání v databázi, protože nejde o procházení',
+     !(await p.isVisible('#dbHledatKarta')));
 
   /* ---- 2. bez klíče se řekne, jak dál ------------------------------ */
   ck('bez klíče panel řekne, co chybí',
@@ -90,7 +96,7 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   /* ---- 4. opsaná tabulka se jako odhad neoznačuje ------------------- */
   claude.odpoved = '{"nazev":"Tvaroh měkký","znacka":"Pilos","jed":"g","kcal":75,"b":12,' +
     '"s":4,"t":0.5,"vlaknina":0,"sul":0.1,"porce":0,"abv":0,"zdroj":"etiketa"}';
-  await p.evaluate(() => { go('scan'); setAdd('lab'); });
+  await p.evaluate(() => { go('db'); setDbMode('obal'); });
   await vyfot();
   ck('u opsané tabulky se varování neukáže',
      !(await p.evaluate(() => document.getElementById('edOdhad').style.display !== 'none')));
@@ -103,7 +109,7 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   // když tabulka nebyla čitelná. Teď se v takovém případě nevyplňuje nic.
   claude.odpoved = '{"nazev":"","znacka":"","jed":"g","kcal":0,"b":0,"s":0,"t":0,' +
     '"vlaknina":0,"sul":0,"porce":0,"abv":0,"zdroj":"necitelne"}';
-  await p.evaluate(() => { go('scan'); setAdd('lab'); });
+  await p.evaluate(() => { go('db'); setDbMode('obal'); });
   await vyfot();
   const po = await p.evaluate(() => ({
     nazev: document.getElementById('edName').value,
@@ -172,7 +178,7 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   /* ---- 8. alkohol z obalu se dostane do pole abv -------------------- */
   claude.odpoved = '{"nazev":"Pivo 12","znacka":"Pilsner","jed":"ml","kcal":43,"b":0.5,' +
     '"s":3.8,"t":0,"vlaknina":0,"sul":0,"porce":500,"abv":5,"zdroj":"etiketa"}';
-  await p.evaluate(() => { go('scan'); setAdd('lab'); });
+  await p.evaluate(() => { go('db'); setDbMode('obal'); });
   await vyfot();
   ck('procenta alkoholu se předvyplní', (await p.inputValue('#edAbv')) === '5', await p.inputValue('#edAbv'));
 

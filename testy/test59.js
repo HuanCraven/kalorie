@@ -22,8 +22,7 @@ const PROSTREDI = require('./prostredi');
   // (v61 přibyl panel Vyfotit, což je samostatný způsob zápisu, a proto sem patří.
   //  v96 přibyly Časté a jsou první — nejrychlejší cesta má být na ráně.)
   ck('Zadat nabízí Časté, Hledat i Popsat',
-     panely[0] === 'Časté' && panely.indexOf('Hledat') > 0 && panely.indexOf('Popsat') > 0,
-     panely.join(' | '));
+     panely.join('|') === 'Časté|Hledat|Popsat', panely.join(' | '));
   ck('Kód, Ručně ani Recept nejsou samostatné panely',
      !panely.some(t => ['Kód', 'Ručně', 'Recept'].indexOf(t) >= 0), panely.join(' | '));
 

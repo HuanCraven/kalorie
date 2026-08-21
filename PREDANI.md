@@ -17,7 +17,27 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-96** (`APP_VERSION` v `index.html`, cache `kaltrack-v96` v `sw.js`).
+Aktuální verze: **2026.08.21-97** (`APP_VERSION` v `index.html`, cache `kaltrack-v97` v `sw.js`).
+
+### Novinky ve v97 — „Z obalu" patří do Jídel, Časté se řadí podle času
+
+Uživatel se zeptal, jestli nejsou záložky „Vyfotit" a „Popsat" funkčně totéž.
+Nejsou — Popsat zapisuje jídlo do dne, Vyfotit zakládá potravinu do databáze —
+ale otázka trefila skutečný problém: **obě tlačítka se jmenovala „📷 Vyfotit"
+a obě posílala fotku Claudeovi.** Názvy popisovaly způsob zadání, ne výsledek.
+
+Rozhodlo pravidlo, které v projektu už platilo. U přesunu Receptu do Jídel stojí
+v komentáři: *„je to správa databáze, ne zápis dne."* Zakládání potraviny z obalu
+je táž kategorie.
+
+- Panel `s-lab` přesunut ze Zadat do Jídel jako `dbObal`, záložka **„Z obalu"**
+  vedle Receptu. Zadat má nově tři záložky a všechny zapisují dnešní jídlo.
+- Hledací pole nad seznamem se schovává i u „Z obalu", stejně jako u Receptu —
+  pravidlo bylo, jen platilo pro jediný případ.
+- **Časté se řadí pevně podle času jídel** (snídaně → večerní svačina). Ve v95 se
+  blok podle denní doby vytahoval nahoru, jenže pak se seznam během dne hýbal pod
+  rukama. Uživatelův návrh; pevné pořadí je předvídatelnější.
+- testy `test61.js` na nové umístění, `test59.js` na tři záložky Zadat.
 
 ### Novinky ve v96 — Časté se přestěhovaly na Zadat
 

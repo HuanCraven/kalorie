@@ -285,7 +285,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button data-s="caste" class="on" onclick="setAdd('caste')">Časté</button>
     <button data-s="find" onclick="setAdd('find')">Hledat</button>
     <button data-s="photo" onclick="setAdd('photo')">Popsat</button>
-    <button data-s="lab" onclick="setAdd('lab')">Vyfotit</button>
   </div>
 
   <!-- Co člověk jí opakovaně. Bylo na Hlavní, jenže po rozdělení na chody zabralo
@@ -301,19 +300,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <!-- Zavedení nové potraviny z fotky. Panel je jen rozcestník: fotku převezme
        formulář nové potraviny, kde je i ruční cesta bez API klíče. -->
-  <div class="pane" id="s-lab">
-  <div class="card">
-    <h3>Nová potravina z fotky</h3>
-    <p class="tiny muted" style="margin:0 0 10px">Pro potravinu, kterou nemáš v databázi
-      a nemá čitelný čárový kód. Vyfoť <b>tabulku výživových údajů</b> — z ní se čísla opíšou
-      přesně. Když tabulka není vidět, odhadnou se podle výrobku na obalu.</p>
-    <button class="btn pri full dotyk" onclick="document.getElementById('obalFile').click()">📷 Vyfotit</button>
-    <input type="file" id="obalFile" accept="image/*" capture="environment" style="display:none"
-      onchange="gotObal(this)">
-    <p class="tiny muted" style="margin:10px 0 0" id="obalNote"></p>
-  </div>
-  </div>
-
   <div class="pane" id="s-code">
   <button class="btn" style="margin-bottom:10px" onclick="setAdd('find')">‹ Zpět na hledání</button>
   <div class="card">
@@ -773,6 +759,22 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button data-d="zaklad" onclick="setDbMode('zaklad')">Základní</button>
     <button data-d="ext" onclick="setDbMode('ext')">ČR</button>
     <button data-d="rec" onclick="setDbMode('rec')">Recept</button>
+    <button data-d="obal" onclick="setDbMode('obal')">Z obalu</button>
+  </div>
+
+  <!-- Nová potravina z fotky obalu. Byla na Zadat, jenže nezapisuje do dne —
+       zakládá záznam do databáze, stejně jako Recept, a proto patří sem. -->
+  <div id="dbObal" style="display:none">
+  <div class="card">
+    <h3>Nová potravina z fotky</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Pro potravinu, kterou nemáš v databázi
+      a nemá čitelný čárový kód. Vyfoť <b>tabulku výživových údajů</b> — z ní se čísla opíšou
+      přesně. Když tabulka není vidět, odhadnou se podle výrobku na obalu.</p>
+    <button class="btn pri full dotyk" onclick="document.getElementById('obalFile').click()">📷 Vyfotit</button>
+    <input type="file" id="obalFile" accept="image/*" capture="environment" style="display:none"
+      onchange="gotObal(this)">
+    <p class="tiny muted" style="margin:10px 0 0" id="obalNote"></p>
+  </div>
   </div>
 
   <div id="dbRec" style="display:none">
@@ -1173,7 +1175,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-96';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-97';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1880,11 +1882,10 @@ async function casteZDeniku(dnu) {
 async function renderCaste() {
   if (!$('favList')) return;
   casteCache = await casteZDeniku(60);
-  // chod podle denní doby jde nahoru — ráno chce člověk snídani, ne večeři
-  const ted = defaultMeal(), poradi = MEALS.map(x => x.k);
-  const od = poradi.indexOf(ted);
-  const chody = poradi.slice(od).concat(poradi.slice(0, od));
-  const bloky = chody.map(k => {
+  /* Pevné pořadí podle času jídel: snídaně, svačina, oběd… Dřív se blok podle
+     denní doby vytahoval nahoru, jenže pak se seznam během dne hýbal pod rukama
+     a člověk hledal, kam se mu co posunulo. */
+  const bloky = MEALS.map(x => x.k).map(k => {
     const polozky = casteCache.filter(g => g.chod === k).slice(0, 4);
     if (!polozky.length) return '';
     return '<div class="casteChod"><span class="tiny muted">' + mealName(k) + '</span>' +
@@ -1988,8 +1989,12 @@ function setDbMode(m) {
   // Recept je skládání nové potraviny ze surovin, ne procházení databáze —
   // proto se mu schová i hledací pole nad seznamem.
   $('dbRec').style.display = m === 'rec' ? '' : 'none';
-  $('dbHledatKarta').style.display = m === 'rec' ? 'none' : '';
+  // Recept ani Z obalu nejsou procházení databáze, ale zakládání nové potraviny —
+  // proto se jim schová i hledací pole nad seznamem.
+  $('dbObal').style.display = m === 'obal' ? '' : 'none';
+  $('dbHledatKarta').style.display = (m === 'rec' || m === 'obal') ? 'none' : '';
   if (m === 'rec') { renderRec(); return; }
+  if (m === 'obal') return;
   $('dbSearch').placeholder = {
     moje: 'Hledat v mé databázi…', jidla: 'Hledat v hotových jídlech…',
     zaklad: 'Hledat v základních potravinách…', ext: 'Hledat v externí databázi…'
