@@ -189,19 +189,14 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   /* v82: popisky jsou opsané ze skutečné obrazovky Zeppu. v81 k nim přidala
      varování před okamžitým tepem a model si podle něj rozmluvil i platnou
      hodnotu z řádku KLIDOVÝ SRDEČNÍ TEP — proto teď zadání říká opak. */
-  ck('řádek s klidovým tepem se má vyplnit',
-     claude.zadani.indexOf('JE to klidový tep') > 0);
-  ck('a nízké číslo není důvod ho zahodit',
-     claude.zadani.indexOf('40-60') > 0);
-  ck('nulu jen když řádek chybí',
-     claude.zadani.indexOf('vůbec není') > 0);
-  /* v83: model bral hodnotu z řádku STAV TRÉNINKU, který je hned nad klidovým
-     tepem. Od v80 nemá v JSON své pole, tak ho zkoušel přiřadit k tepu. */
-  ck('zadání varuje před sousedním řádkem STAV TRÉNINKU',
-     claude.zadani.indexOf('STAV TRÉNINKU') > 0 && claude.zadani.indexOf('SOUSEDN') > 0);
-  ck('a říká, že záporné číslo není tep',
-     claude.zadani.indexOf('záporné číslo není nikdy tep') > 0);
-  ck('zadání zná i zkratku HRV', claude.zadani.indexOf('zkratkou HRV') > 0);
+  /* v84: přiřazení řádků k polím dělá kód. Model dvakrát tvrdil, že klidový tep
+     na snímku není — řádky KLIDOVÝ SRDEČNÍ TEP a VARIABILITA TEPOVÉ FREKVENCE
+     jsou sousední a oba mají v názvu „tep", tak si je slil do jednoho. */
+  ck('zadání chce opsat všechny řádky',
+     claude.zadani.indexOf('OPIŠ VŠECHNY') > 0);
+  ck('a zakazuje slučovat řádky se stejným slovem',
+     claude.zadani.indexOf('neslučuj') > 0);
+  ck('zadání zná i zkratku HRV', claude.zadani.indexOf('zkratka HRV') > 0);
   ck('popisuje horní kruh kvůli skóre spánku',
      claude.zadani.indexOf('VLEVO u popisku SPÁNEK') > 0);
   ck('varuje před datem bez roku',
@@ -311,6 +306,43 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
 
   // zadání pro API musí o datu vůbec mluvit — dřív tam o něm nebylo nic
   ck('zadání říká, kdy datum vyplnit', claude.zadani.indexOf('NECH PR') >= 0);
+
+  /* ---- klidový tep se vezme z opsaných řádků (v84) -----------------
+     Přesně ta situace ze snímku Zeppu: model pole tep nevyplní a řádek STAV
+     TRÉNINKU se záporným číslem leží hned nad klidovým tepem. */
+  await p.evaluate(async () => {
+    await new Promise(res => { const t = db.transaction('daily', 'readwrite'); t.objectStore('daily').clear(); t.oncomplete = res; });
+    go('fit');
+  });
+  claude.odpoved = JSON.stringify({ typ: 'den', datum: '', kcal_celkem: 3146, kroky: 17446,
+    tep: 0, hrv: 0, spanek: '', spanek_hluboky: '', spanek_rem: '', spanek_skore: 0,
+    radky: [
+      { popis: 'DÉLKA SPÁNKU', hodnota: '05:44' },
+      { popis: 'HLUBOKÝ SPÁNEK', hodnota: '00:50' },
+      { popis: 'REM SPÁNEK', hodnota: '01:30' },
+      { popis: 'STAV TRÉNINKU', hodnota: '-16' },
+      { popis: 'KLIDOVÝ SRDEČNÍ TEP', hodnota: '47' },
+      { popis: 'VARIABILITA TEPOVÉ FREKVENCE', hodnota: '62' }
+    ], zaznamy: [], pozn: '' });
+  await nahraj();
+  const zRadku = await p.evaluate(() => fitDenNavrh);
+  ck('klidový tep se vezme z opsaného řádku', zRadku && zRadku.tep === 47, JSON.stringify(zRadku));
+  ck('a HRV ze svého, ne z téhož řádku', zRadku && zRadku.hrv === 62, JSON.stringify(zRadku));
+  ck('sousední STAV TRÉNINKU se nikam nedostane',
+     zRadku && zRadku.tep !== -16 && zRadku.hrv !== -16 && zRadku.kcal !== -16);
+  ck('časy spánku se převedou na minuty',
+     zRadku && zRadku.spanek === 344 && zRadku.hluboky === 50 && zRadku.rem === 90,
+     JSON.stringify(zRadku));
+  ck('v návrhu je klidový tep vidět',
+     (await p.textContent('#fitNavrhList')).indexOf('Klidový tep') >= 0);
+
+  // vyplněné pole má přednost před opisem — když model přiřadí sám a dobře
+  claude.odpoved = JSON.stringify({ typ: 'den', datum: '', kcal_celkem: 2000, kroky: 100,
+    tep: 51, hrv: 0, spanek: '', spanek_hluboky: '', spanek_rem: '', spanek_skore: 0,
+    radky: [{ popis: 'KLIDOVÝ SRDEČNÍ TEP', hodnota: '47' }], zaznamy: [], pozn: '' });
+  await nahraj();
+  ck('vyplněné pole má přednost před opisem',
+     (await p.evaluate(() => fitDenNavrh.tep)) === 51);
 
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();

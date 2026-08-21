@@ -17,7 +17,41 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-83** (`APP_VERSION` v `index.html`, cache `kaltrack-v83` v `sw.js`).
+Aktuální verze: **2026.08.21-84** (`APP_VERSION` v `index.html`, cache `kaltrack-v84` v `sw.js`).
+
+### Novinky ve v84 — model opisuje, přiřazuje kód
+
+v83 nepomohla. Model tentokrát napsal, že *„klidový srdeční tep není na snímku
+vidět; HRV hodnota 62 je převzata z řádku VARIABILITA TEPOVÉ FREKVENCE"* —
+přestože řádek `KLIDOVÝ SRDEČNÍ TEP 47` na snímku je.
+
+Příčina je nejspíš tahle: **`KLIDOVÝ SRDEČNÍ TEP` a `VARIABILITA TEPOVÉ FREKVENCE`
+jsou sousední řádky a oba mají v názvu slovo „TEP".** Model si je slévá do
+jednoho — přečte jeden „tepový" řádek, přiřadí ho k HRV a druhý pak nevidí.
+Ostatní metriky takového dvojníka nemají, proto fungují.
+
+Tři pokusy to spravit zpřesňováním zadání (v81, v82, v83) selhaly, dva z toho věc
+zhoršily. Proto změna přístupu: **model dělá jen to, co mu jde — opisuje —,
+a rozhodování dělá kód.**
+
+- Do odpovědi přibylo pole `radky`: doslovný opis **všech** řádků seznamu
+  ZÁKLADNÍ METRIKY jako `{"popis":"KLIDOVÝ SRDEČNÍ TEP","hodnota":"47"}`, včetně
+  těch, pro které žádné pole neexistuje. Zadání výslovně zakazuje řádky slučovat.
+- Přiřazení dělá `zpracujFitFoto` přes `norm()` a hledání podklíčů (`klidov`,
+  `variabilit`, `delka+spank`…). Zkouší se víc podob popisku popořadě, takže se
+  pozná i řádek popsaný jen zkratkou (`HRV`).
+- **Přímo vyplněné pole má přednost** — když model přiřadí sám a dobře, nic se
+  nepřepisuje. `radky` slouží jako záchrana, ne jako náhrada.
+- Řádky bez odpovídajícího pole (`STAV TRÉNINKU`) se prostě nikam netrefí, takže
+  už není potřeba je v zadání zvlášť zakazovat.
+- testy `test64.js`: přesná situace ze snímku — `tep` prázdný, v `radky` je
+  `STAV TRÉNINKU -16` hned nad `KLIDOVÝ SRDEČNÍ TEP 47`. Ověřuje se, že tep vyjde
+  47, HRV 62, že se −16 nikam nedostane, že se časy převedou na minuty a že
+  vyplněné pole má přednost před opisem.
+
+**Poučení:** když model opakovaně chybuje v rozhodování, nemá smysl psát mu delší
+instrukce. Je lepší zúžit jeho úlohu na to, co zvládá spolehlivě, a rozhodnutí
+přesunout do kódu, kde jde otestovat.
 
 ### Novinky ve v83 — model bral tep ze sousedního řádku
 

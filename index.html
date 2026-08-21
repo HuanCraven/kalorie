@@ -1131,7 +1131,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-83';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-84';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -5752,7 +5752,7 @@ const CVICENI_PROMPT =
 Odpověz POUZE tímto JSON blokem, bez úvodu a bez komentáře:
 {"typ":"den","datum":"","kcal_celkem":0,"kroky":0,"tep":0,"hrv":0,
  "spanek":"","spanek_hluboky":"","spanek_rem":"","spanek_skore":0,
- "zaznamy":[],"pozn":""}
+ "radky":[],"zaznamy":[],"pozn":""}
 
 Dvě možnosti:
 
@@ -5764,25 +5764,21 @@ A) DENNÍ PŘEHLED (kroky, kalorie, spánek, tep…)
    kroky = velké číslo UPROSTŘED u popisku KROKY
    kcal_celkem = číslo VPRAVO u popisku KALORIE (denní výdej)
 
-   Pod tím je seznam ZÁKLADNÍ METRIKY, kde má každý řádek popisek a hodnotu:
-   POZOR NA SOUSEDNÍ ŘÁDEK: hned NAD klidovým tepem bývá řádek STAV TRÉNINKU
-     s číslem, které často bývá ZÁPORNÉ (třeba -16). To NENÍ tep ani nic jiného,
-     co se vyplňuje — ten řádek úplně přeskoč a k žádnému poli ho nepřiřazuj.
-     Obecně platí: řádek, který níže nemá své pole, do odpovědi nepatří.
-   tep = hodnota u řádku KLIDOVÝ SRDEČNÍ TEP (nebo KLIDOVÝ TEP). Vždy kladné
-     celé číslo, obvykle 40-90; záporné číslo není nikdy tep. Když tenhle řádek
-     na snímku je, JE to klidový tep — vyplň ho, i kdyby ti číslo přišlo nízké;
-     40-60 je u trénovaných lidí běžné. Nulu nech jedině tehdy, když řádek
-     s KLIDOVÝM tepem na snímku vůbec není a je vidět jen okamžitý tep
-     z probíhajícího měření nebo rozsah za den (třeba 52-131).
-   hrv = hodnota u řádku VARIABILITA TEPOVÉ FREKVENCE, někdy popsaného jen
-     zkratkou HRV. Číslo v ms, bývá 15-120.
-   spanek, spanek_hluboky, spanek_rem = časy PŘESNĚ jak jsou napsané u řádků
-     DÉLKA SPÁNKU, HLUBOKÝ SPÁNEK a REM SPÁNEK, tvar "HH:MM"
-     (DÉLKA SPÁNKU 05:44 → "05:44"; HLUBOKÝ SPÁNEK 00:50 → "00:50")
+   Pod tím je seznam ZÁKLADNÍ METRIKY. Do "radky" OPIŠ VŠECHNY jeho řádky,
+   shora dolů, přesně jak jsou napsané:
+   radky = [{"popis":"KLIDOVÝ SRDEČNÍ TEP","hodnota":"47"},
+            {"popis":"VARIABILITA TEPOVÉ FREKVENCE","hodnota":"62"}]
+   Opiš i řádky, kterým nerozumíš nebo pro které tu není žádné pole. Nic
+   nevynechávej a hlavně nic neslučuj: každý řádek je samostatná položka, i když
+   mají dva sousední řádky v názvu totéž slovo (třeba TEP). Přiřazení k polím si
+   udělá aplikace sama — ty jen věrně opisuj.
+   hodnota = jen to velké číslo nebo čas, bez slovního hodnocení pod ním
+   (NORMÁLNÍ, OPTIMÁLNÍ, PODPRŮMĚRNÉ, DÁVEJTE POZOR, STŘEDNÍ).
 
-   Slovní hodnocení pod čísly (NORMÁLNÍ, OPTIMÁLNÍ, PODPRŮMĚRNÉ, DÁVEJTE POZOR,
-   STŘEDNÍ) jsou jen komentáře, ne hodnoty — ignoruj je.
+   Pole níže vyplň podle týchž řádků, když je poznáš:
+   tep = KLIDOVÝ SRDEČNÍ TEP · hrv = VARIABILITA TEPOVÉ FREKVENCE (někdy jen zkratka HRV)
+   spanek / spanek_hluboky / spanek_rem = DÉLKA SPÁNKU / HLUBOKÝ SPÁNEK /
+     REM SPÁNEK, časy ve tvaru "HH:MM" (05:44 → "05:44"; 00:50 → "00:50")
 
    datum NECH PRÁZDNÉ. Nahoře na obrazovce bývá datum BEZ ROKU (třeba "20. 8.");
      takové datum NEPOUŽÍVEJ a rok si k němu nedomýšlej — aplikace použije den,
@@ -5859,14 +5855,39 @@ function zpracujFitFoto(text) {
 
   fitNavrh = [];
   fitDenNavrh = null;
-  if (typ === 'den' && (n(o.kcal_celkem) > 0 || cas2min(o.spanek) > 0 || n(o.tep) > 0)) {
+  /* Přiřazení řádků k polím dělá kód, ne model. Dvakrát totiž tvrdil, že klidový
+     tep na snímku není, přestože tam byl: řádky KLIDOVÝ SRDEČNÍ TEP a VARIABILITA
+     TEPOVÉ FREKVENCE jsou sousední a oba mají v názvu „tep", tak si je slil do
+     jednoho. Opisovat řádky mu jde, rozhodovat hůř — tak ať každý dělá své. */
+  const radek = (...klice) => {
+    for (const r of (Array.isArray(o.radky) ? o.radky : [])) {
+      const popis = norm(r && r.popis);
+      if (popis && klice.every(k => popis.indexOf(k) >= 0)) return r.hodnota;
+    }
+    return '';
+  };
+  /* Každý klíč je jedna podoba popisku; „+" spojuje slova, která musí padnout obě.
+     Zkouší se popořadě, ať se pozná i řádek popsaný jen zkratkou. */
+  const zRadku = klice => {
+    for (const k of klice) { const v = radek(...String(k).split('+')); if (v !== '' && v != null) return v; }
+    return '';
+  };
+  const cislo = (primo, ...klice) => n(primo) > 0 ? n(primo) : n(zRadku(klice));
+  const minuty = (primo, ...klice) => cas2min(primo) > 0 ? cas2min(primo) : cas2min(zRadku(klice));
+  const den = {
+    datum: datum,
+    kcal: r0(cislo(o.kcal_celkem, 'kalorie')),
+    kroky: r0(cislo(o.kroky, 'kroky')),
+    tep: r0(cislo(o.tep, 'klidov', 'klidovy+tep')),
+    hrv: r0(cislo(o.hrv, 'variabilit', 'hrv')),
+    spanek: minuty(o.spanek, 'delka+spank'),
+    hluboky: minuty(o.spanek_hluboky, 'hlubok'),
+    rem: minuty(o.spanek_rem, 'rem'),
+    skore: r0(cislo(o.spanek_skore, 'skore'))
+  };
+  if (typ === 'den' && (den.kcal > 0 || den.spanek > 0 || den.tep > 0)) {
     // denní přehled: výdej nahradí výpočet, zdravotní čísla jdou k němu
-    fitDenNavrh = {
-      datum: datum, kcal: r0(n(o.kcal_celkem)), kroky: r0(n(o.kroky)),
-      tep: r0(n(o.tep)), hrv: r0(n(o.hrv)),
-      spanek: cas2min(o.spanek), hluboky: cas2min(o.spanek_hluboky), rem: cas2min(o.spanek_rem),
-      skore: r0(n(o.spanek_skore))
-    };
+    fitDenNavrh = den;
   } else {
     const zaz = Array.isArray(o.zaznamy) ? o.zaznamy : [];
     fitNavrh = zaz.map(z => ({
