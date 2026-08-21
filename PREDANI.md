@@ -17,7 +17,36 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-86** (`APP_VERSION` v `index.html`, cache `kaltrack-v86` v `sw.js`).
+Aktuální verze: **2026.08.21-87** (`APP_VERSION` v `index.html`, cache `kaltrack-v87` v `sw.js`).
+
+### Novinky ve v87 — jedna denní řada pro celou aplikaci
+
+První ze dvou kroků sjednocení (viz analýza soudržnosti). `statsData` a `alcStats`
+si dosud stavěly denní řadu každý po svém, takže „průměr za období" znamenal na
+každé stránce něco trochu jiného a stejná data se procházela dvakrát.
+
+- Nová `denniRada(days, konec, zdroj)` je **jediné místo**, kde se z databáze
+  skládá „den po dni". `zdrojDnu()` načte `log`, `daily` a cvičení jednou a dá se
+  sdílet mezi voláními.
+- `statsData(days)` je nově tenká slupka nad `denniRada`; test to hlídá porovnáním
+  celých řad.
+- `alcStats(z)` staví `long` z téže řady (`ALC_RADA = 150`, dřív bezejmenná 150
+  v ruční smyčce) a `days` je z ní jen výřez posledních 90. Zmizely dvě ruční
+  smyčky přes dny. Kalendářní měsíc a „od začátku" zůstávají mimo okno, protože
+  odpovídají na jinou otázku.
+- `renderStats` čte databázi **jednou** místo dvakrát a předá zdroj obojímu.
+
+**Výjimka, na které uživatel trval a která se snadno setře:** pravidlo je teď
+napsané přímo nad `denniRada`. `logged` filtruje příjem, výdej, bilanci a makra;
+`alc` se **nefiltruje nikdy** — počítá se i z nekompletních dnů a den bez zápisu
+je nula, ne chybějící údaj.
+
+- testy `test65.js`: nekompletní dny jsou v řadě poznat, nejdou do příjmu, ale
+  alkohol si nesou dál; den bez zápisu je u alkoholu nula; součet gramů z řady
+  sedí; `statsData` a `denniRada` dávají doslova tutéž řadu.
+
+Regrese prošla 68/68 **beze změny testů** — to byl smysl toho, dělat přesun jako
+samostatnou verzi bez viditelné změny.
 
 ### Novinky ve v86 — do křivek zdraví jde klepnout
 

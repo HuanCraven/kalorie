@@ -1140,7 +1140,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-86';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-87';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3782,18 +3782,35 @@ async function renderBalance(intake, wk) {
 }
 
 /* --- sběr dat --- */
-async function statsData(days) {
-  const all = await dbAll('log');
-  const dl = await dbAll('daily');
-  const wk = await workoutByDay();          // cvičení se přičítá k aktivním kcal
-  const dmap = {}; dl.forEach(d => dmap[d.date] = d);
+/* ---------------- denní řada ----------------
+   Jediné místo, kde se z databáze skládá „den po dni". Všechno, co se počítá za
+   období — statistiky, alkohol i karta Zdraví — vychází odsud, aby „průměr za
+   třicet dní" znamenal všude totéž.
+
+   Dvě pravidla, která se snadno pletou:
+   · `logged` = den má zápis a NENÍ označený jako nekompletní. Podle něj se filtruje
+     příjem, výdej, bilance a makra; z osekaného dne by průměr vyšel níž, než co se
+     doopravdy snědlo.
+   · `alc` se NEFILTRUJE nikdy. Počítá se i z nekompletních dnů a den bez jediného
+     zápisu je nula, ne chybějící údaj. Alkohol si uživatel hlídá vždycky, jídlo ne —
+     je to vědomá výjimka, ne opomenutí. Kdo bude tuhle funkci měnit, ať ji zachová. */
+async function zdrojDnu() {
+  return {
+    all: await dbAll('log'),
+    dl: await dbAll('daily'),
+    wk: await workoutByDay()                // cvičení se přičítá k aktivním kcal
+  };
+}
+function denniRada(days, konec, z) {
+  const dmap = {}; z.dl.forEach(d => dmap[d.date] = d);
+  const all = z.all, wk = z.wk;
   const byDay = {};
   all.forEach(r => {
     const b = byDay[r.date] || (byDay[r.date] = { k: 0, p: 0, c: 0, f: 0, alc: 0, items: [] });
     b.k += r.kcal; b.p += r.p; b.c += r.c; b.f += r.f; b.alc += r.alc || 0;
     b.items.push({ name: r.name, kcal: r.kcal });
   });
-  const list = [], base = new Date(curDate + 'T12:00:00');
+  const list = [], base = new Date(konec + 'T12:00:00');
   for (let i = days - 1; i >= 0; i--) {
     const x = new Date(base); x.setDate(x.getDate() - i);
     const key = dstr(x), b = byDay[key], dd = dmap[key] || {};
@@ -3801,10 +3818,7 @@ async function statsData(days) {
     list.push({
       date: key, k: b ? b.k : 0, p: b ? b.p : 0, c: b ? b.c : 0, f: b ? b.f : 0,
       alc: b ? b.alc : 0, items: b ? b.items : [],
-      /* `logged` znamená „počítá se do průměrů". Nekompletní den zápis má, ale
-         do průměrů, reálného výdeje ani bilance nepatří — číslo by bylo nižší,
-         než co se doopravdy snědlo. Alkohol jde jinou cestou (alcStats), takže
-         se počítá dál. */
+      // viz pravidla nahoře: do průměrů příjmu jdou jen kompletní dny…
       logged: !!b && !dd.neuplny,
       neuplny: !!dd.neuplny && !!b,
       burn: (typeof dd.burn === 'number') ? dd.burn + w : (w > 0 ? w : null),
@@ -3820,6 +3834,9 @@ async function statsData(days) {
     });
   }
   return list;
+}
+async function statsData(days) {
+  return denniRada(days, curDate, await zdrojDnu());
 }
 function agg(list, w0) {
   const rmr = goals.rmr || 0;
@@ -4163,8 +4180,10 @@ function renderZdravi(list) {
 }
 
 async function renderStats() {
-  alcCache = await alcStats();
-  const list = await statsData(period);
+  // jedno čtení databáze pro statistiky i alkohol — obojí staví z téže řady
+  const zdroj = await zdrojDnu();
+  alcCache = await alcStats(zdroj);
+  const list = denniRada(period, curDate, zdroj);
   const a = agg(list, await lastWeight(list[0].date));
   statCache = { list, a };
   ['per7', 'per30', 'per90'].forEach(id =>
@@ -5521,25 +5540,22 @@ async function importAlc() {
   renderDay(); renderAlc();
 }
 
-async function alcStats() {
-  const all = await dbAll('log');
+/* Kolik dnů zpět se drží řada pro křivku trendu. Devadesátidenní okno z ní udělá
+   nejvýš 61 bodů; kdyby bylo potřeba víc historie, je to tohle jedno číslo. */
+const ALC_RADA = 150;
+/* Alkohol vychází z téže denní řady jako zbytek aplikace (`denniRada`), aby
+   „průměr za období" znamenal všude totéž. Jediný rozdíl je záměrný: gramy se
+   NEFILTRUJÍ podle `logged`, takže se počítají i z nekompletních dnů a den bez
+   zápisu je nula. Volitelný `z` umožní sdílet jedno čtení databáze s renderStats. */
+async function alcStats(z) {
+  const zdroj = z || await zdrojDnu();
+  const all = zdroj.all;
+  const long = denniRada(ALC_RADA, curDate, zdroj).map(d => ({ d: d.date, g: d.alc }));
+  const days = long.slice(-90);
+  const sum = k => days.slice(-k).reduce((a, x) => a + x.g, 0);
+  // měsíc a „od začátku" jdou mimo okno, ty se počítají z celého deníku
   const byDay = {};
   all.forEach(r => { if (r.alc) byDay[r.date] = (byDay[r.date] || 0) + r.alc; });
-  const long = [];
-  {
-    const bs = new Date(curDate + 'T12:00:00');
-    for (let i = 149; i >= 0; i--) {
-      const x = new Date(bs); x.setDate(x.getDate() - i);
-      const k = dstr(x); long.push({ d: k, g: byDay[k] || 0 });
-    }
-  }
-  const days = [];
-  const base = new Date(curDate + 'T12:00:00');
-  for (let i = 89; i >= 0; i--) {
-    const x = new Date(base); x.setDate(x.getDate() - i);
-    const k = dstr(x); days.push({ d: k, g: byDay[k] || 0 });
-  }
-  const sum = k => days.slice(-k).reduce((a, x) => a + x.g, 0);
 
   // kalendářní měsíc prohlíženého dne — dělí se počtem dnů, které už uplynuly
   const cur = new Date(curDate + 'T12:00:00'), now = new Date();

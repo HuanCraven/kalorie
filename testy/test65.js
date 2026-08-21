@@ -46,6 +46,39 @@ const PROSTREDI = require('./prostredi');
   ck('alkohol z nekompletních dnů se započítá', Math.round(alk * 10) / 10 === 2,
      'ø 30 dní: ' + alk + ' (3 dny × 20 g / 30)');
 
+  /* ---- 2b. výjimka drží i po sjednocení řady (v87) -----------------
+     Příjem i alkohol nově vycházejí z jedné denní řady (denniRada). Pravidlo
+     musí zůstat asymetrické: `logged` filtruje příjem, alkohol se nefiltruje
+     nikdy — ani u nekompletních dnů, ani u dnů úplně bez zápisu. */
+  const rada = await p.evaluate(async () => {
+    const z = await zdrojDnu();
+    const r = denniRada(14, curDate, z);
+    const neu = r.filter(d => d.neuplny);
+    const prazdne = r.filter(d => !d.logged && !d.neuplny);
+    return {
+      neuplnych: neu.length,
+      neuplneMajiAlk: neu.length > 0 && neu.every(d => d.alc > 0),
+      neuplneNejsouLogged: neu.every(d => !d.logged),
+      prazdnyJeNula: prazdne.every(d => d.alc === 0),
+      soucetAlk: r.reduce((a, d) => a + d.alc, 0)
+    };
+  });
+  ck('nekompletní dny jsou v řadě poznat', rada.neuplnych === 3, JSON.stringify(rada));
+  ck('a nepočítají se do příjmu', rada.neuplneNejsouLogged, JSON.stringify(rada));
+  ck('ale alkohol si nesou dál', rada.neuplneMajiAlk, JSON.stringify(rada));
+  ck('den bez zápisu je u alkoholu nula, ne chybějící údaj', rada.prazdnyJeNula,
+     JSON.stringify(rada));
+  ck('součet gramů z řady sedí na zapsané pití', rada.soucetAlk === 60,
+     'čekáno 60 g (3 dny x 20 g), je ' + rada.soucetAlk);
+
+  // statsData je nově jen tenká slupka nad denniRada — musí dávat totéž
+  const shoda = await p.evaluate(async () => {
+    const a = await statsData(14);
+    const b = denniRada(14, curDate, await zdrojDnu());
+    return JSON.stringify(a) === JSON.stringify(b);
+  });
+  ck('statsData a denniRada dávají tutéž řadu', shoda);
+
   /* ---- 3. bez příznaku průměr klesne ------------------------------- */
   await p.evaluate(async () => {
     const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
