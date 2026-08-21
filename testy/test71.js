@@ -90,6 +90,41 @@ const PROSTREDI = require('./prostredi');
   ck('zapíše se do zvoleného chodu, ne podle hodin', testo && testo.meal === 'obed',
      JSON.stringify(testo));
 
+  /* ---- 6. sbalování chodů (v101) -----------------------------------
+     Největší kus Hlavní zabírají rozepsané chody. Sbalení si aplikace pamatuje
+     v meta, které se nesynchronizuje — je to zvyk na tomhle telefonu, ne data. */
+  await p.evaluate(() => { go('day'); return renderDay(); });
+  await p.waitForTimeout(600);
+  const radku = () => p.locator('#logList .item').count();
+  const pred = await radku();
+  ck('chody jsou zprvu rozbalené', pred > 0, 'řádků: ' + pred);
+
+  await p.click('#jidlo-obed .chodBtn');
+  await p.waitForTimeout(600);
+  const po = await radku();
+  ck('sbalením zmizí položky toho chodu', po < pred, pred + ' → ' + po);
+  ck('ale záhlaví zůstane, aby bylo kam přidávat',
+     await p.isVisible('#jidlo-obed .chodBtn'));
+  ck('u sbaleného chodu je vidět počet položek',
+     (await p.textContent('#jidlo-obed')).indexOf('kcal · ') > 0,
+     (await p.textContent('#jidlo-obed')).replace(/\s+/g, ' ').slice(0, 60));
+  ck('ostatní chody zůstaly rozbalené',
+     (await p.locator('#jidlo-vecere .item').count()) > 0);
+
+  ck('stav se uloží', await p.evaluate(async () => {
+    const m = await dbGet('meta', 'sbaleno');
+    return !!m && m.v.indexOf('obed') >= 0;
+  }));
+  await p.reload();
+  await p.waitForFunction(() => typeof db !== 'undefined' && db, null, { timeout: 15000 });
+  await p.waitForTimeout(900);
+  ck('a přežije zavření aplikace',
+     (await p.locator('#jidlo-obed .item').count()) === 0);
+
+  await p.click('#jidlo-obed .chodBtn');
+  await p.waitForTimeout(600);
+  ck('rozbalením se položky vrátí', (await p.locator('#jidlo-obed .item').count()) > 0);
+
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
   process.exit(0);

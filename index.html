@@ -161,6 +161,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   /* Zaškrtávátko pro výběr položek — samostatný dotykový cíl vedle názvu, aby
      klepnutí na řádek dál otvíralo úpravu. */
   .item > .vyb{width:20px;height:20px;margin:0 10px 0 0;flex:none;accent-color:var(--acc)}
+  /* Záhlaví chodu je tlačítko na sbalení; „+" a „⧉ včera" vedle něj zůstávají
+     samostatné, aby se do sbaleného chodu dalo pořád přidávat. */
+  .chodBtn{display:flex;align-items:center;gap:6px;background:transparent;border:0;
+           padding:2px 0;cursor:pointer;color:inherit;font:inherit}
+  .chodBtn .sip{color:var(--dim);font-size:14px;line-height:1;width:10px}
+  .chodBtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -1217,7 +1223,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-100';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-101';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1579,6 +1585,7 @@ function offCachePut(k, v) {
   fillGoals();
   renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
   // po prvním úspěšném zpracování fotky se návody sbalí — tlačítka zůstávají
+  await nactiSbaleno();
   const fotoOk = await dbGet('meta', 'fotoOk');
   await loadApi();
   await loadSync();
@@ -1867,9 +1874,15 @@ async function renderDay() {
     return `
       <div style="margin-bottom:10px" id="jidlo-${g.m.k}">
         <div class="mealhead">
-          <span class="n">${g.m.n}</span>
+          <button class="chodBtn" onclick="sbalChod('${g.m.k}')"
+            aria-expanded="${sbaleno.has(g.m.k) ? 'false' : 'true'}"
+            aria-label="${sbaleno.has(g.m.k) ? 'Rozbalit' : 'Sbalit'} ${g.m.n}">
+            <span class="sip">${sbaleno.has(g.m.k) ? '›' : '⌄'}</span>
+            <span class="n">${g.m.n}</span>
+          </button>
           <span class="row" style="gap:6px;align-items:center">
-            <span class="tiny muted mono">${g.rows.length ? r0(kc) + ' kcal' : '—'}</span>
+            <span class="tiny muted mono">${g.rows.length
+              ? r0(kc) + ' kcal' + (sbaleno.has(g.m.k) ? ' · ' + g.rows.length : '') : '—'}</span>
             ${g.m.k === 'nezar' ? '' : `
               <button class="btn sm dotyk" onclick="copyMeal('${g.m.k}')"
                 aria-label="Zkopírovat ${g.m.n} ze včerejška">⧉ včera</button>
@@ -1877,7 +1890,7 @@ async function renderDay() {
                 aria-label="Přidat do ${g.m.n}">+</button>`}
           </span>
         </div>
-        ${g.rows.map(row).join('')}
+        ${sbaleno.has(g.m.k) ? '' : g.rows.map(row).join('')}
       </div>`;
   }).join('');
 
@@ -1958,6 +1971,19 @@ async function zapisCaste(chod, i) {
    režimu — jinak by se muselo přidat další tlačítko a člověk by netušil, že se
    dá vybírat. Lišta s akcemi naskočí, teprve když je něco vybrané. */
 const jeDatumTvar = x => /^\d{4}-\d{2}-\d{2}$/.test(String(x || ''));
+/* Sbalené chody. Ukládá se do `meta`, které se nesynchronizuje — je to zvyk
+   na tomhle telefonu, ne data. Prázdný chod se sbalit dá taky; jeho záhlaví
+   zůstane, takže je pořád kam přidat. */
+let sbaleno = new Set();
+async function nactiSbaleno() {
+  try { const m = await dbGet('meta', 'sbaleno'); sbaleno = new Set((m && m.v) || []); }
+  catch (e) { sbaleno = new Set(); }
+}
+async function sbalChod(k) {
+  if (sbaleno.has(k)) sbaleno.delete(k); else sbaleno.add(k);
+  await dbPut('meta', { k: 'sbaleno', v: [...sbaleno] });
+  renderDay();
+}
 let vybrane = new Set();
 function vybrPrepni(id) {
   id = Number(id) || 0; if (!id) return;

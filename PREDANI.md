@@ -17,7 +17,23 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-100** (`APP_VERSION` v `index.html`, cache `kaltrack-v100` v `sw.js`).
+Aktuální verze: **2026.08.21-101** (`APP_VERSION` v `index.html`, cache `kaltrack-v101` v `sw.js`).
+
+### Novinky ve v101 — chody jdou sbalit
+
+Návrh uživatele na kompaktnější Hlavní. Největší kus stránky zabírají rozepsané
+chody, takže se sbalují ony.
+
+- Záhlaví chodu je nově tlačítko (`chodBtn`) se šipkou podle stavu.
+- **Záhlaví zůstane i po sbalení**, takže „+" i „⧉ včera" fungují dál — sbalit
+  hotový oběd a pak si vzpomenout na kávu je běžná situace.
+- U sbaleného chodu je vedle kalorií vidět **počet položek**, ať je jasné, kolik
+  se tam schovalo.
+- Stav se ukládá do `meta` pod klíč `sbaleno`. **Meta se nesynchronizuje**, a je to
+  tak správně: je to zvyk na jednom telefonu, ne data. Kdyby se přenášel, sbalovalo
+  by se uživateli pod rukama podle druhého zařízení.
+- testy `test71.js` — osm kontrol včetně toho, že sbalení přežije zavření aplikace
+  (test se kvůli tomu opravdu reloaduje).
 
 ### Novinky ve v100 — výběr více položek, kopie na jiný den, chod u rozboru
 
