@@ -17,7 +17,37 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-97** (`APP_VERSION` v `index.html`, cache `kaltrack-v97` v `sw.js`).
+Aktuální verze: **2026.08.21-98** (`APP_VERSION` v `index.html`, cache `kaltrack-v98` v `sw.js`).
+
+### Novinky ve v98 — novou potravinu jde i popsat, nejen vyfotit
+
+Návrh uživatele: u zakládání nové potraviny mít totéž, co umí „Popsat" u zápisu
+dne — větu, fotku, nebo obojí. Půlka cesty už existovala: neznámý čárový kód
+otevírá formulář nové potraviny s předvyplněným kódem a ten formulář **už měl
+tlačítko „Vyfotit tabulku"**. Chybělo k tomu říct něco slovy.
+
+Žebřík v `LABEL_PROMPT` má nově čtyři stupně místo tří:
+
+| co je k dispozici | `zdroj` |
+| --- | --- |
+| čitelná tabulka | `etiketa` — opíše se |
+| tabulka nečitelná + popis | `popis` — odhad podle popisu |
+| jen obal bez popisu | `odhad` — odhad podle názvu na obalu |
+| ani jedno | `necitelne` |
+
+- V zadání stojí výslovně: **„Popis má přednost před tím, co si domýšlíš
+  z obrázku — vím, co jsem koupil."** Řeší to případ rozmazané etikety u výrobku,
+  který uživatel bezpečně zná.
+- Pole `edPopis` ve formuláři; `apiPrompt('label')` ho připojí. Dřív se doplňující
+  text bral jen u `photo`, u `label` se zahazoval.
+- **Samotný popis bez fotky** jde taky (`apiText` místo `apiAsk`) — tlačítko se
+  přepne na „Odhadnout z popisu" a je to i levnější na tokeny.
+- `processLabel` rozlišuje tři úrovně důvěry: opsaná tabulka bez varování, odhad
+  z popisu a odhad z obalu s vlastní hláškou. Táž zásada jako u `necitelne` z v65.
+- Nečitelná fotka už není slepá ulička — hláška poradí připsat, co to je, a když
+  popis už je, ať se upřesní.
+- Formulář při otevření popis i fotku vynuluje; patří k jedné potravině.
+- testy `test61.js`.
 
 ### Novinky ve v97 — „Z obalu" patří do Jídel, Časté se řadí podle času
 

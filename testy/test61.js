@@ -182,6 +182,38 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   await vyfot();
   ck('procenta alkoholu se předvyplní', (await p.inputValue('#edAbv')) === '5', await p.inputValue('#edAbv'));
 
+  /* ---- popis jako třetí opora (v98) --------------------------------
+     Dřív byl žebřík dvoustupňový: čitelná tabulka, nebo název na obalu. Když
+     nebylo ani jedno, aplikace to vzdala — i když uživatel věděl, co to je. */
+  ck('zadání ví, že fotka nemusí být',
+     claude.zadani.indexOf('Fotka nemusí být vůbec') > 0);
+  ck('a že popis má přednost před domýšlením z obrázku',
+     claude.zadani.indexOf('Popis má přednost') > 0);
+
+  await p.evaluate(() => { go('db'); setDbMode('obal'); openEdit(null); });
+  await p.waitForTimeout(400);
+  ck('formulář má pole na popis', await p.isVisible('#edPopis'));
+  ck('bez fotky i popisu se nic nenabízí', !(await p.isVisible('#apiLabBtn')));
+
+  await p.fill('#edPopis', 'tvaroh polotučný Pilos');
+  await p.waitForTimeout(300);
+  ck('se samotným popisem se nabídne odhad',
+     (await p.textContent('#apiLabBtn')).indexOf('Odhadnout z popisu') >= 0,
+     await p.textContent('#apiLabBtn'));
+
+  claude.odpoved = JSON.stringify({ nazev: 'Tvaroh polotučný', znacka: 'Pilos', jed: 'g',
+    kcal: 130, tuky: 4.5, sacharidy: 3.5, bilkoviny: 18, vlaknina: 0, sul: 0.1,
+    porce: 250, abv: 0, zdroj: 'popis' });
+  await p.click('#apiLabBtn');
+  await p.waitForTimeout(1200);
+  ck('popis se pošle Claudeovi',
+     claude.zadani.indexOf('tvaroh polotučný Pilos') > 0);
+  ck('a formulář se vyplní', (await p.inputValue('#edKcal')) === '130',
+     await p.inputValue('#edKcal'));
+  ck('u odhadu z popisu se to řekne',
+     (await p.textContent('#edOdhad')).indexOf('podle tvého popisu') > 0,
+     await p.textContent('#edOdhad'));
+
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
   process.exit(0);

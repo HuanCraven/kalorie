@@ -1101,14 +1101,19 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <div class="fld"><label>Čárový kód</label><input id="edCode" class="mono" inputmode="numeric"></div>
     </div>
     <div class="card" style="background:var(--card2);margin-bottom:12px">
-      <h3 style="margin-bottom:8px">Vyplnit z fotky etikety</h3>
+      <h3 style="margin-bottom:8px">Vyplnit z fotky nebo popisu</h3>
+      <div class="fld" style="margin-bottom:8px">
+        <textarea id="edPopis" rows="2" oninput="labUi()"
+          placeholder="tvaroh polotučný Pilos, kelímek 250 g"></textarea>
+      </div>
       <button class="btn sm full" onclick="document.getElementById('labFile').click()">📷 Vyfotit tabulku</button>
       <input type="file" id="labFile" accept="image/*" capture="environment" style="display:none" onchange="gotLabel(this)">
       <img id="labPrev" style="display:none;width:100%;border-radius:10px;margin-bottom:8px">
       <button class="btn sm pri full" id="apiLabBtn" style="margin-bottom:8px;display:none"
         onclick="apiLabel()">✨ Přečíst hned (Claude API)</button>
       <p class="tiny muted" style="margin:8px 0 0">Nejpřesnější je tabulka „Výživové údaje" na zadní
-        straně obalu — z ní se čísla opisují. Když ji nevyfotíš, odhadnou se podle výrobku na obalu.</p>
+        straně obalu — z ní se čísla opisují. Není-li čitelná, pomůže popis: podle něj se hodnoty
+        odhadnou. Jde použít samotná fotka, samotný popis i obojí.</p>
       <p class="tiny" id="edOdhad" style="margin:8px 0 0;color:var(--warn);display:none">⚠ Tohle je
         odhad podle obalu, ne opsaná tabulka. Projdi čísla, než potravinu uložíš.</p>
       <p class="tiny" id="edPozor" style="margin:8px 0 0;color:var(--warn);display:none"></p>
@@ -1175,7 +1180,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-97';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-98';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3050,6 +3055,10 @@ function openEdit(id, presetCode) {
   $('edFib').value = p ? (p.fib || '') : '';
   $('edSalt').value = p ? (p.salt || '') : '';
   $('edUnit').value = p ? p.unit : 'g';
+  // popis i fotka patří k jedné potravině — při otevření formuláře jdou pryč
+  if ($('edPopis')) $('edPopis').value = '';
+  labelFile = null;
+  if ($('labPrev')) $('labPrev').style.display = 'none';
   $('edUnitTxt').textContent = p ? p.unit : 'g';
   $('edServ').value = p && p.serving ? p.serving : '';
   $('edDel').style.display = p ? '' : 'none';
@@ -5250,7 +5259,8 @@ async function apiAsk(file, prompt, detail) {
 /* pro API vždy plné zadání (režim projektu se týká jen sdílení do chatu) */
 function apiPrompt(kind) {
   const base = kind === 'label' ? LABEL_PROMPT : AI_PROMPT;
-  const note = (kind === 'label' ? '' : (($('photoNote') || {}).value || '')).trim();
+  const pole = kind === 'label' ? 'edPopis' : 'photoNote';
+  const note = (($(pole) || {}).value || '').trim();
   return note ? base + '\n\nDoplňující informace ode mě: ' + note : base;
 }
 /* Jedna cesta pro obojí: věta, fotka, nebo obojí zároveň. Fotka bez věty je
@@ -5275,17 +5285,29 @@ async function apiEstimate() {
     btn.disabled = false; btn.textContent = '✨ Rozebrat (Claude API)';
   }
 }
+/* Tlačítko dává smysl, jakmile je čím se řídit: fotka, popis, nebo obojí.
+   Samotný popis je čistý odhad, proto se posílá textem bez obrázku. */
+function labUi() {
+  const b = $('apiLabBtn'); if (!b) return;
+  const popis = (($('edPopis') || {}).value || '').trim();
+  const ma = !!labelFile || popis.length >= 3;
+  b.style.display = (ma && apiCfg.key) ? '' : 'none';
+  b.textContent = labelFile ? '✨ Přečíst hned (Claude API)' : '✨ Odhadnout z popisu (Claude API)';
+}
 async function apiLabel() {
-  if (!labelFile) { toast('Nejdřív vyfoť tabulku'); return; }
+  const popis = (($('edPopis') || {}).value || '').trim();
+  if (!labelFile && popis.length < 3) { toast('Vyfoť tabulku nebo napiš, co to je'); return; }
   const btn = $('apiLabBtn');
-  btn.disabled = true; btn.textContent = 'Čtu etiketu…';
+  btn.disabled = true; btn.textContent = labelFile ? 'Čtu etiketu…' : 'Odhaduji z popisu…';
   try {
-    const txt = await apiAsk(labelFile, apiPrompt('label'), true);   // drobný tisk
+    const txt = labelFile
+      ? await apiAsk(labelFile, apiPrompt('label'), true)   // drobný tisk
+      : await apiText(apiPrompt('label'), 800);
     processLabel(txt);
   } catch (e) {
     toast('✕ ' + (e.name === 'AbortError' ? 'vypršel čas' : e.message));
   } finally {
-    btn.disabled = false; btn.textContent = '✨ Přečíst hned (Claude API)';
+    btn.disabled = false; labUi();
   }
 }
 
@@ -5305,13 +5327,17 @@ Klíče jsou schválně ve stejném pořadí, v jakém stojí řádky v české 
 výživových údajů: energie, tuky, sacharidy, bílkoviny, sůl. Opisuj řádek po řádku
 a drž se NÁZVŮ klíčů, ne pořadí — bílkoviny patří do "bilkoviny", tuky do "tuky".
 
-Postupuj takto:
+Fotka nemusí být vůbec — pak se řiď jen popisem ode mě (viz konec zadání).
+
+Postupuj takto, shora dolů, a použij první možnost, která vyjde:
 - Je-li na fotce čitelná tabulka "Výživové údaje", jen ji PŘEPIŠ a dej "zdroj":"etiketa".
   Nic si nedomýšlej, co tam není, nech 0.
-- Je-li tabulka nečitelná nebo není vidět, ale na obalu bezpečně PŘEČTEŠ název výrobku,
-  odhadni hodnoty podle běžného složení té potraviny a dej "zdroj":"odhad".
-- Nedokážeš-li název na obalu přečíst, dej "zdroj":"necitelne", "nazev" nech prázdný
-  a všechna čísla nech 0.
+- Není-li tabulka čitelná, ale dole je ode mě POPIS, ze kterého poznáš, o co jde,
+  odhadni hodnoty podle běžného složení té potraviny a dej "zdroj":"popis".
+  Popis má přednost před tím, co si domýšlíš z obrázku — vím, co jsem koupil.
+- Není-li popis, ale na obalu bezpečně PŘEČTEŠ název výrobku, odhadni podle něj
+  a dej "zdroj":"odhad".
+- Nemáš-li ani jedno, dej "zdroj":"necitelne", "nazev" nech prázdný a čísla nech 0.
 
 NIKDY si nedomýšlej, o jaký výrobek jde. Raději vrať "necitelne" než špatný název —
 uživatel podle toho zapisuje, co snědl, a špatná potravina je horší než žádná.
@@ -5348,6 +5374,7 @@ function gotLabel(inp) {
   labelFile = f;
   const img = $('labPrev'); img.src = URL.createObjectURL(f); img.style.display = '';
   inp.value = '';
+  labUi();
   toast('Etiketa načtena — pošli ji Claudeovi');
 }
 /* nouzové čtení tabulky z volného textu: "Energie 1550 kJ / 370 kcal", "Bílkoviny 8,2 g" */
@@ -5410,8 +5437,10 @@ function processLabel(text) {
   if (String(o.zdroj || '').toLowerCase().indexOf('necit') >= 0 ||
       (!String(o.nazev || '').trim() && !n(o.kcal))) {
     $('edOdhad').style.display = 'none';
-    
-    toast('Z fotky se to přečíst nedá — vyfoť tabulku zblízka a ostře');
+    const mamPopis = (($('edPopis') || {}).value || '').trim().length >= 3;
+    toast(mamPopis
+      ? 'Z fotky ani popisu se to určit nedá — zkus popis upřesnit'
+      : 'Z fotky se to přečíst nedá — vyfoť tabulku zblízka, nebo připiš, co to je');
     return;
   }
   const setIf = (id, v) => { if (v !== undefined && v !== null && v !== '' && n(v) !== 0) $(id).value = n(v); };
@@ -5437,11 +5466,18 @@ function processLabel(text) {
   $('edPozor').style.display = zivin.hlaska ? '' : 'none';
   setIf('edFib', o.vlaknina); setIf('edSalt', o.sul); setIf('edServ', o.porce);
   setIf('edAbv', o.abv);              // pivo a spol. se pak počítají i do alkoholu
-   $('labPrev').style.display = 'none'; labelFile = null;
-  // Odhad z obalu je něco jiného než opsaná tabulka — ať je poznat, co je potřeba ověřit.
-  const odhad = String(o.zdroj || '').toLowerCase().indexOf('odhad') >= 0;
+  $('labPrev').style.display = 'none'; labelFile = null; labUi();
+  /* Opsaná tabulka, odhad podle popisu a odhad z obalu si nezaslouží stejnou
+     důvěru — ať je na první pohled poznat, co je potřeba ověřit. */
+  const zdroj = String(o.zdroj || '').toLowerCase();
+  const podlePopisu = zdroj.indexOf('popis') >= 0;
+  const odhad = podlePopisu || zdroj.indexOf('odhad') >= 0;
+  $('edOdhad').innerHTML = podlePopisu
+    ? '⚠ Tohle je odhad podle tvého popisu, ne opsaná tabulka. Projdi čísla, než potravinu uložíš.'
+    : '⚠ Tohle je odhad podle obalu, ne opsaná tabulka. Projdi čísla, než potravinu uložíš.';
   $('edOdhad').style.display = odhad ? '' : 'none';
-  toast(odhad ? 'Odhadnuto z obalu — zkontroluj čísla' : 'Vyplněno z etikety — zkontroluj a ulož');
+  toast(podlePopisu ? 'Odhadnuto z popisu — zkontroluj čísla'
+    : odhad ? 'Odhadnuto z obalu — zkontroluj čísla' : 'Vyplněno z etikety — zkontroluj a ulož');
 }
 
 /* ---------------- alkohol ---------------- */
