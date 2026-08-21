@@ -1223,7 +1223,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-101';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-102';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1586,7 +1586,6 @@ function offCachePut(k, v) {
   renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
   // po prvním úspěšném zpracování fotky se návody sbalí — tlačítka zůstávají
   await nactiSbaleno();
-  const fotoOk = await dbGet('meta', 'fotoOk');
   await loadApi();
   await loadSync();
   await loadCrypt();
@@ -3679,7 +3678,7 @@ function tryLines(src) {
 
 function parseAI(txt) {
   const src = String(txt || '').trim();
-  if (!src) throw new Error('Pole je prázdné — nejdřív vlož odpověď.');
+  if (!src) throw new Error('Claude nevrátil žádný text — zkus to prosím znovu.');
   let d = tryJson(src) || tryTable(src) || tryLines(src);
   if (!d) {
     const e = new Error('nerozpoznaný formát');
@@ -3721,8 +3720,8 @@ function processAI(text) {
       '<p class="tiny" style="color:var(--warn);margin:0 0 6px">Nerozpoznal jsem formát odpovědi.</p>' +
       (e.preview ? '<p class="tiny muted" style="margin:0 0 8px;word-break:break-word">Začátek toho, co jsi vložil:<br><code>'
         + esc(e.preview) + '…</code></p>' : '') +
-      '<p class="tiny muted" style="margin:0">Napiš Claudeovi „vrať to znovu jen jako ten JSON blok" ' +
-      'a vlož odpověď znovu. Zvládnu i tabulku nebo seznam s kcal a makry.</p>';
+      '<p class="tiny muted" style="margin:0">Odpověď se nedala přečíst. Zkus rozbor spustit ' +
+      'znovu, nebo popis upřesni — zvládnu i tabulku nebo seznam s kcal a makry.</p>';
     $('aiNote').textContent = ''; $('aiTotK').textContent = '—'; $('aiTotM').textContent = '—';
     return;
   }
@@ -3827,7 +3826,6 @@ async function aiSave(asRecipe) {
   aiItems = []; $('aiCard').style.display = 'none'; 
   $('photoPrev').style.display = 'none'; photoFile = null;
   if ($('photoNote')) $('photoNote').value = '';
-  await dbPut('meta', { k: 'fotoOk', v: 1 });   // návody na Foto se od příště sbalí
   renderDb(); info();
   toast(asRecipe ? 'Přidáno a uloženo jako recept' : 'Přidáno do dneška');
   go('day'); renderDay();
@@ -5549,7 +5547,7 @@ function zkontrolujZiviny(d) {
 function processLabel(text) {
   let o;
   const src = String(text || '').trim();
-  if (!src) { toast('Nejdřív vlož odpověď'); return; }
+  if (!src) { toast('Claude nevrátil žádný text — zkus to znovu'); return; }
   try {
     let s = src.replace(/```[a-z]*/gi, '')
       .replace(/[\u201C\u201D\u201E]/g, '"').replace(/[\u2018\u2019]/g, "'");

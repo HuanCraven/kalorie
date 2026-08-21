@@ -17,7 +17,52 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-101** (`APP_VERSION` v `index.html`, cache `kaltrack-v101` v `sw.js`).
+Aktuální verze: **2026.08.21-102** (`APP_VERSION` v `index.html`, cache `kaltrack-v102` v `sw.js`).
+
+## Jak je aplikace poskládaná
+
+Jedna myšlenka, ze které plyne všechno ostatní: **aplikace vede jednu denní řadu** —
+co jsem přijal, co vydal, co to udělalo s váhou a se zdravím. Všechno ostatní je
+pohled na tuhle řadu skrz jedno zvolené okno. Do v87 se ta řada stavěla dvakrát,
+dvěma způsoby, a dívalo se na ni třemi nezávislými okny; sjednocení v87–v90 to
+srovnalo. Kdo sáhne na body níže, rozdrobí ji zpátky.
+
+| pravidlo | kde |
+|---|---|
+| `denniRada(days, konec, zdroj)` je jediné místo, kde se z databáze skládá „den po dni" | `statsData` i `alcStats` z ní staví |
+| `logged` = den má zápis a není nekompletní → filtruje příjem, výdej, bilanci, makra | `denniRada` |
+| **`alc` se nefiltruje nikdy** — i z nekompletních dnů, den bez zápisu je nula | `denniRada` |
+| jedno období `period` pro celou aplikaci | `setPeriod`, Statistiky i Alkohol |
+| do `daily` se zapisuje výhradně přes `zapisDen(datum, vlastnik, hodnoty)` | `DEN_POLE` |
+| `maloDat(co, chybi)` je jediná podoba hlášky „ještě nemám dost dat" | karty na Statistikách |
+| výdej dne řeší `vydejDne`: `daily.total` z hodinek přebíjí výpočet a nic se k němu nepřičítá | bilance i cíle |
+
+Ta výjimka u alkoholu je vědomá, ne opomenutí: uživatel si alkohol hlídá vždycky,
+jídlo ne. Trval na ní a snadno se setře — je proto napsaná přímo nad `denniRada`.
+
+Pevná okna zůstávají jen tam, kde odpovídají na **jinou otázku** než „jak jsem na
+tom za zvolené období": kalendářní měsíc, „od začátku měření" a limit alkoholu
+jako 30denní průměr. Všechna to mají v popisku.
+
+Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
+v87–v90 níže.
+
+### Novinky ve v102 — úklid zbytků po v67 a dokumentace
+
+Při přepisu skillu se ukázalo, že v67 nedomazala všechno, co slibovala.
+
+- **`meta fotoOk`** se pořád zapisovalo a načítalo do proměnné, kterou nikdo nečetl.
+  Sloužilo ke sbalení návodů na Foto, které s ruční cestou zmizely. Pryč obojí.
+- **Hlášky radily „vlož odpověď"**, ačkoli od v67 není kam — text chodí z API.
+  Přepsány na to, co se doopravdy stalo: Claude nevrátil text, zkus to znovu.
+- `SKILL.md` přepsán: nová sekce **Jednotící pravidla** (jedna denní řada, výjimka
+  u alkoholu, `zapisDen`, jedno období, `maloDat`), popis tří zadání pro API i s tím,
+  co se u nich draze zaplatilo, aktuální struktura stránek a poučení z testů.
+  Zastaralý byl popis ruční cesty přes projekt a `vydejDne` bez celkového výdeje.
+- `PREDANI.md` má nově nahoře **Jak je aplikace poskládaná**, aby se jádro nemuselo
+  luštit z 1400 řádků změn; do pravidel přibyla poučení z dneška a mezi zásadní
+  rozhodnutí zrušení ruční cesty, „model opisuje, kód přiřazuje" a pojmenovávání
+  podle výsledku.
 
 ### Novinky ve v101 — chody jdou sbalit
 
@@ -1479,6 +1524,18 @@ pravidel. Skill se načítá při startu session, takže se úprava projeví až
    jen po stisku Hledat a má vlastní hlídač (6/min) plus 24h paměť odpovědí.
    Nikdy nezavádět našeptávání proti OFF — vede k dočasnému zablokování IP.
 6. Data z NutriDatabáze se importují jen do telefonu, do repozitáře nepatří.
+7. **Odebereš-li pole z výčtu pro Claude, řekni mu, že ten údaj má ignorovat.**
+   Jinak se ho snaží někam zařadit — a zařadí ho špatně. Zrušení `stav_treninku`
+   ve v80 vypadalo jako neškodný úklid a rozbilo čtení klidového tepu.
+8. **Testy počítají dny v místním čase**, ne v UTC (`PROSTREDI.den`, v prohlížeči
+   `dstr`). Mezi půlnocí a druhou hodinou se obojí liší o den a sady pak padají
+   „náhodně" jen v tom okně.
+9. **Test si musí říct o svoje předpoklady**, ne je dědit z výchozího nastavení.
+   `test43` počítal s výchozím sedmidenním obdobím a padl, jakmile se změnilo na 30.
+10. **Sleduj návratový kód sady**, ne jen počet řádků s křížkem — test může spadnout
+    výjimkou a pak se tváří, že prošel. Kvůli tomu je kontrola kódu v `runall.sh`.
+11. **Chytej se významu, ne značky.** Tvrzení hledající `#stInsights p` padlo, jakmile
+    se z odstavců staly tlačítka; třída `.postreh` přestavbu přežije.
 
 ## Jak přidat další jídla
 
@@ -1507,6 +1564,11 @@ Pak `node build/build-jidla.js` a nahraj nové `jidla.js` + zvýšenou verzi.
 - import receptu z webové adresy — prohlížeč nesmí kvůli CORS stáhnout cizí stránku
   a aplikace nemá server; jediná cesta je vložit text ručně nebo přes Claude
 - databáze hotových jídel je zatím malá (95 položek), doplňuje se postupně
+- **zrušení zástupných `productId`** — bylo v plánu sjednocení jako bod 5 a po
+  prověření se stáhlo. Třída chyb kolem v60 je uzavřená jinak (`neniPotravina`,
+  guard v `saveProduct`, `opravZastupnaId`, jedenáct tvrzení v `test60`); přepis
+  všech řádků deníku a jeho rozeslání synchronizací by bylo nejvyšší riziko
+  z celého plánu výměnou za hezčí název pole
 
 ## Historie zásadních rozhodnutí
 
@@ -1516,5 +1578,16 @@ Pak `node build/build-jidla.js` a nahraj nové `jidla.js` + zvýšenou verzi.
 - **Dynamické cíle**: bílkoviny 2,0 g/kg a tuky 0,9 g/kg jsou pevné podle hmotnosti,
   sacharidy dopočítávají zbytek energie podle denního výdeje.
 - **Limit alkoholu** je klouzavý průměr za 30 dní, ne týdenní součet.
-- **Sdílení fotky na Androidu** vždy otevře nový chat mimo projekt. Proto se fotka
-  ukládá do telefonu a přikládá se ručně v projektovém chatu.
+- **Ruční posílání do chatu zrušeno** (v67). Sdílení fotky na Androidu vždy otevře
+  nový chat mimo projekt, takže cesta „ulož fotku → otevři projekt → přilož ručně"
+  byla krkolomná a uživatel ji nikdy nepoužil. Zůstal jediný způsob: klíč ke Claude
+  API uložený v aplikaci.
+- **Model opisuje, kód přiřazuje** (v84). Tři pokusy zpřesnit zadání u čtení snímku
+  hodinek selhaly a dva věc zhoršily. Když model opakovaně chybuje v rozhodování,
+  nemá smysl psát delší instrukce — je lepší zúžit mu úlohu na to, co zvládá
+  spolehlivě, a rozhodnutí přesunout do kódu, kde jde otestovat.
+- **Názvy podle výsledku, ne podle způsobu zadání** (v97, v99). „Vyfotit" a „Z obalu"
+  popisovaly, jak se údaj pořizuje; jakmile přibyly další cesty, začaly lhát.
+  Záložka se jmenuje „Přidat", protože to je, co udělá.
+- **Nástroje na zapisování patří na Zadat, správa databáze do Jídel.** Podle toho se
+  stěhoval Recept, později „Přidat" a Časté.
