@@ -17,7 +17,30 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-88** (`APP_VERSION` v `index.html`, cache `kaltrack-v88` v `sw.js`).
+Aktuální verze: **2026.08.21-89** (`APP_VERSION` v `index.html`, cache `kaltrack-v89` v `sw.js`).
+
+### Novinky ve v89 — do dne se zapisuje jedinou cestou
+
+Třetí bod sjednocení. Do jednoho záznamu `daily` píšou dvě strany a každá zná jen
+svoje pole: formulář spravuje uživatelské údaje, import ze snímku čísla z hodinek.
+Když si některá z nich skládala záznam od nuly, smazala té druhé její pole — to
+byla chyba ve v76. Tehdy se opravilo jedno místo ručně; teď je z toho pravidlo.
+
+- `zapisDen(datum, vlastnik, hodnoty)` je **jediné místo v aplikaci, které do
+  `daily` zapisuje**. V celém souboru zbyl jeden `dbPut('daily', …)`, uvnitř ní.
+- `DEN_POLE` drží dva seznamy: `uzivatel` = total, burn, weight, neuplny;
+  `hodinky` = total, kroky, tep, hrv, spanek, hluboky, rem, skore.
+- Pole, o kterém volající mlčí, zůstane nedotčené. Prázdná hodnota pole smaže.
+  Zbude-li jen datum, jde záznam pryč celý přes `dbDel`, tedy i s náhrobkem.
+- Neznámý vlastník **vyhodí chybu** — obejít to omylem nejde, a hlasité selhání
+  je lepší než tiché mazání cizích dat.
+- `HODINKY_KLICE` je nově totéž pole jako `DEN_POLE.hodinky`, aby se ty dva
+  seznamy nemohly rozejít.
+- testy `test65.js`: zápis uživatele nechá čísla z hodinek být a naopak, pole
+  o kterém se mlčí zůstane, cizí vlastník se odmítne, vyprázdněný záznam zmizí.
+
+**Kdo bude do dne přidávat další údaj, musí ho zapsat do jednoho z těch dvou
+seznamů** — jinak se neuloží vůbec.
 
 ### Novinky ve v88 — jedno období pro celou aplikaci
 

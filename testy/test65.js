@@ -136,6 +136,44 @@ const PROSTREDI = require('./prostredi');
   const poVymazani = await p.evaluate(() => dbGet('daily', curDate));
   ck('vymazané pole hodnotu zruší, zbytek zůstane',
      poVymazani.weight === undefined && poVymazani.tep === 54, JSON.stringify(poVymazani));
+
+  /* ---- 4c. zápis do dne vede jedinou cestou (v89) ------------------
+     Do jednoho dne píšou dvě strany a každá zná jen svoje pole. Dřív si formulář
+     skládal záznam od nuly a smazal tím čísla z hodinek (v76). Nově je `zapisDen`
+     jediné místo, které do `daily` píše, a přepíše výhradně pole svého vlastníka. */
+  const vlastnictvi = await p.evaluate(async () => {
+    const d = '2026-01-15';
+    await zapisDen(d, 'hodinky', { total: 2600, tep: 50, hrv: 44, spanek: 400 });
+    await zapisDen(d, 'uzivatel', { weight: 80.1, neuplny: true });
+    const poUzivateli = await dbGet('daily', d);
+    await zapisDen(d, 'hodinky', { tep: 52 });
+    const poHodinkach = await dbGet('daily', d);
+    let chyba = '';
+    try { await zapisDen(d, 'kdovico', { tep: 1 }); } catch (e) { chyba = e.message; }
+    return { poUzivateli, poHodinkach, chyba };
+  });
+  ck('zápis uživatele nechá čísla z hodinek být',
+     vlastnictvi.poUzivateli.tep === 50 && vlastnictvi.poUzivateli.spanek === 400,
+     JSON.stringify(vlastnictvi.poUzivateli));
+  ck('a přidá k nim svoje',
+     vlastnictvi.poUzivateli.weight === 80.1 && vlastnictvi.poUzivateli.neuplny === true);
+  ck('zápis z hodinek nechá být váhu i příznak dne',
+     vlastnictvi.poHodinkach.weight === 80.1 && vlastnictvi.poHodinkach.neuplny === true,
+     JSON.stringify(vlastnictvi.poHodinkach));
+  ck('pole, o kterém se mlčí, zůstane nedotčené',
+     vlastnictvi.poHodinkach.hrv === 44 && vlastnictvi.poHodinkach.tep === 52,
+     JSON.stringify(vlastnictvi.poHodinkach));
+  ck('cizí vlastník se odmítne', vlastnictvi.chyba.indexOf('vlastník') > 0,
+     vlastnictvi.chyba);
+
+  // vyprázdněný záznam jde pryč celý, ať v databázi nezůstávají prázdné dny
+  const prazdny = await p.evaluate(async () => {
+    const d = '2026-01-16';
+    await zapisDen(d, 'uzivatel', { weight: 79 });
+    await zapisDen(d, 'uzivatel', { weight: null });
+    return (await dbGet('daily', d)) || null;
+  });
+  ck('vyprázdněný záznam dne zmizí celý', prazdny === null, JSON.stringify(prazdny));
   await p.uncheck('#dNeuplny'); await p.waitForTimeout(600);
 
   /* ---- 5. souhrn pro Claude o tom ví ------------------------------- */
