@@ -195,6 +195,12 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
      claude.zadani.indexOf('40-60') > 0);
   ck('nulu jen když řádek chybí',
      claude.zadani.indexOf('vůbec není') > 0);
+  /* v83: model bral hodnotu z řádku STAV TRÉNINKU, který je hned nad klidovým
+     tepem. Od v80 nemá v JSON své pole, tak ho zkoušel přiřadit k tepu. */
+  ck('zadání varuje před sousedním řádkem STAV TRÉNINKU',
+     claude.zadani.indexOf('STAV TRÉNINKU') > 0 && claude.zadani.indexOf('SOUSEDN') > 0);
+  ck('a říká, že záporné číslo není tep',
+     claude.zadani.indexOf('záporné číslo není nikdy tep') > 0);
   ck('zadání zná i zkratku HRV', claude.zadani.indexOf('zkratkou HRV') > 0);
   ck('popisuje horní kruh kvůli skóre spánku',
      claude.zadani.indexOf('VLEVO u popisku SPÁNEK') > 0);

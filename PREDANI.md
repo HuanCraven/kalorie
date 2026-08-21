@@ -17,7 +17,31 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-82** (`APP_VERSION` v `index.html`, cache `kaltrack-v82` v `sw.js`).
+Aktuální verze: **2026.08.21-83** (`APP_VERSION` v `index.html`, cache `kaltrack-v83` v `sw.js`).
+
+### Novinky ve v83 — model bral tep ze sousedního řádku
+
+Po v82 se konečně načetlo skóre spánku, ale klidový tep dál chyběl. Poznámka od
+modelu to prozradila: *„Hodnota tepu **-16** je uvedena jako STAV TRÉNINKU
+OPTIMÁLNÍ."* Bral hodnotu z řádku, který je na obrazovce **hned nad** klidovým
+tepem.
+
+Souvislost s v80: tam se na přání uživatele zrušilo pole `stav_treninku`. Tím na
+obrazovce zůstal řádek, který v odpovědi **nemá kam patřit** — a model ho zkusil
+přiřadit k nejbližšímu číselnému poli, tedy k tepu. Sedí to i časově: 19. 8., před
+v80, se tep načítal správně. Odstranění pole tedy mělo vedlejší účinek, který
+nikoho nenapadl.
+
+- Zadání teď řádek `STAV TRÉNINKU` **výslovně zakazuje** a upozorňuje, že leží
+  hned nad klidovým tepem a bývá záporný.
+- Obecné pravidlo navíc: řádek, který nemá níže své pole, do odpovědi nepatří —
+  ať se stejná past nezopakuje u jiné metriky, kterou Zepp přidá.
+- U tepu je řečeno, že je to vždy kladné číslo 40–90 a **záporné číslo není nikdy
+  tep**.
+- testy `test64.js` na obojí.
+
+**Poučení:** když se z výčtu odebere pole, je potřeba modelu říct, že ten údaj má
+ignorovat. Jinak se ho snaží někam zařadit — a zařadí ho špatně.
 
 ### Novinky ve v82 — zadání opsané ze skutečné obrazovky Zeppu
 
