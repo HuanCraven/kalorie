@@ -321,6 +321,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <button class="btn pri" id="codeBtn" onclick="lookup(document.getElementById('manualCode').value.trim())">Hledat</button>
     </div>
     <p class="tiny muted" style="margin:8px 0 0">Číslice pod čárovým kódem. Funguje i bez kamery.</p>
+    <button class="btn full dotyk" style="margin-top:10px"
+      onclick="openEdit(null, document.getElementById('manualCode').value.trim())">
+      Není v databázi? Zadat rovnou</button>
   </div>
 
   <div class="card" id="recentCard" style="display:none">
@@ -759,20 +762,26 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button data-d="zaklad" onclick="setDbMode('zaklad')">Základní</button>
     <button data-d="ext" onclick="setDbMode('ext')">ČR</button>
     <button data-d="rec" onclick="setDbMode('rec')">Recept</button>
-    <button data-d="obal" onclick="setDbMode('obal')">Z obalu</button>
+    <button data-d="obal" onclick="setDbMode('obal')">Přidat</button>
   </div>
 
   <!-- Nová potravina z fotky obalu. Byla na Zadat, jenže nezapisuje do dne —
        zakládá záznam do databáze, stejně jako Recept, a proto patří sem. -->
   <div id="dbObal" style="display:none">
   <div class="card">
-    <h3>Nová potravina z fotky</h3>
+    <h3>Přidat potravinu</h3>
     <p class="tiny muted" style="margin:0 0 10px">Pro potravinu, kterou nemáš v databázi
-      a nemá čitelný čárový kód. Vyfoť <b>tabulku výživových údajů</b> — z ní se čísla opíšou
-      přesně. Když tabulka není vidět, odhadnou se podle výrobku na obalu.</p>
-    <button class="btn pri full dotyk" onclick="document.getElementById('obalFile').click()">📷 Vyfotit</button>
+      a nemá čitelný čárový kód. Nejpřesnější je <b>tabulka výživových údajů</b> — z ní se
+      čísla opíšou. Poslouží ale i fotka <b>samotné potraviny nebo obalu</b>; pak se hodnoty
+      odhadnou. V dalším kroku můžeš připsat, co to je, nebo všechno vyplnit sám.</p>
+    <div class="row" style="margin-bottom:8px">
+      <button class="btn pri grow dotyk" onclick="document.getElementById('obalFile').click()">📷 Vyfotit</button>
+      <button class="btn grow dotyk" onclick="document.getElementById('obalGal').click()">Z galerie</button>
+    </div>
     <input type="file" id="obalFile" accept="image/*" capture="environment" style="display:none"
       onchange="gotObal(this)">
+    <input type="file" id="obalGal" accept="image/*" style="display:none" onchange="gotObal(this)">
+    <button class="btn full dotyk" onclick="openEdit(null)">Vyplnit sám, bez fotky</button>
     <p class="tiny muted" style="margin:10px 0 0" id="obalNote"></p>
   </div>
   </div>
@@ -1106,14 +1115,19 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
         <textarea id="edPopis" rows="2" oninput="labUi()"
           placeholder="tvaroh polotučný Pilos, kelímek 250 g"></textarea>
       </div>
-      <button class="btn sm full" onclick="document.getElementById('labFile').click()">📷 Vyfotit tabulku</button>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn sm grow" onclick="document.getElementById('labFile').click()">📷 Vyfotit</button>
+        <button class="btn sm grow" onclick="document.getElementById('labGal').click()">Z galerie</button>
+      </div>
       <input type="file" id="labFile" accept="image/*" capture="environment" style="display:none" onchange="gotLabel(this)">
+      <input type="file" id="labGal" accept="image/*" style="display:none" onchange="gotLabel(this)">
       <img id="labPrev" style="display:none;width:100%;border-radius:10px;margin-bottom:8px">
       <button class="btn sm pri full" id="apiLabBtn" style="margin-bottom:8px;display:none"
         onclick="apiLabel()">✨ Přečíst hned (Claude API)</button>
       <p class="tiny muted" style="margin:8px 0 0">Nejpřesnější je tabulka „Výživové údaje" na zadní
-        straně obalu — z ní se čísla opisují. Není-li čitelná, pomůže popis: podle něj se hodnoty
-        odhadnou. Jde použít samotná fotka, samotný popis i obojí.</p>
+        straně obalu — z ní se čísla opisují. Poslouží i fotka samotné potraviny nebo obalu, pak jde
+        o odhad. Popis pomůže tam, kde z fotky poznat nejde. Použít jde fotka, popis i obojí —
+        a nic z toho není povinné, čísla můžeš vyplnit rovnou dole.</p>
       <p class="tiny" id="edOdhad" style="margin:8px 0 0;color:var(--warn);display:none">⚠ Tohle je
         odhad podle obalu, ne opsaná tabulka. Projdi čísla, než potravinu uložíš.</p>
       <p class="tiny" id="edPozor" style="margin:8px 0 0;color:var(--warn);display:none"></p>
@@ -1180,7 +1194,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-98';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-99';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -5364,6 +5378,7 @@ async function gotObal(inp) {
   labelFile = f;
   const img = $('labPrev'); img.src = URL.createObjectURL(f); img.style.display = '';
   $('edOdhad').style.display = 'none';
+  labUi();
   if (apiCfg.key) await apiLabel();
   else toast('Nejdřív vlož klíč ke Claude API v Nastavení → Propojení');
 }

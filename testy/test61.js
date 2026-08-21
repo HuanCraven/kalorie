@@ -40,7 +40,7 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   // v97: zakládání potraviny z obalu se přesunulo do Jídel — nezapisuje do dne
   ck('Zadat má jen cesty zápisu dne', panely.join('|') === 'Časté|Hledat|Popsat', panely.join('|'));
   const jidla = await p.$$eval('#dbSeg button', bs => bs.map(b => b.textContent.trim()));
-  ck('a zakládání z obalu je v Jídlech', jidla.indexOf('Z obalu') >= 0, jidla.join('|'));
+  ck('a zakládání potraviny je v Jídlech', jidla.indexOf('Přidat') >= 0, jidla.join('|'));
   await p.click('nav button[data-p="db"]');
   await p.click('#dbSeg button[data-d="obal"]');
   await p.waitForTimeout(200);
@@ -213,6 +213,35 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   ck('u odhadu z popisu se to řekne',
      (await p.textContent('#edOdhad')).indexOf('podle tvého popisu') > 0,
      await p.textContent('#edOdhad'));
+
+  /* ---- cesty k nové potravině (v99) --------------------------------
+     Uživatel našel tři díry: fotka šla jen z fotoaparátu, popisek mluvil jen
+     o tabulce, a do formuláře se nedalo dostat bez fotky. */
+  await p.evaluate(() => { closeMod('modEdit'); go('db'); setDbMode('obal'); });
+  await p.waitForTimeout(400);
+  ck('fotka jde i z galerie', await p.evaluate(() => !!document.getElementById('obalGal')));
+  ck('popisek mluví i o samotné potravině',
+     (await p.textContent('#dbObal')).indexOf('samotné potraviny') > 0);
+  ck('a nabízí vyplnit sám, bez fotky',
+     (await p.textContent('#dbObal')).indexOf('Vyplnit sám') > 0);
+
+  await p.click('#dbObal >> text=Vyplnit sám, bez fotky');
+  await p.waitForTimeout(400);
+  ck('otevře prázdný formulář nové potraviny',
+     (await p.textContent('#edTitle')) === 'Nová potravina' && (await p.inputValue('#edName')) === '');
+  await p.evaluate(() => closeMod('modEdit'));
+  await p.waitForTimeout(400);
+
+  // a totéž u čtení kódu, ať se nemusí napřed neúspěšně skenovat
+  await p.evaluate(() => { go('scan'); setAdd('code'); });
+  await p.waitForTimeout(400);
+  await p.fill('#manualCode', '8594001020304');
+  await p.click('#s-code >> text=Není v databázi? Zadat rovnou');
+  await p.waitForTimeout(400);
+  ck('od kódu se dá jít rovnou do formuláře',
+     (await p.textContent('#edTitle')) === 'Nová potravina');
+  ck('a napsaný kód se přenese', (await p.inputValue('#edCode')) === '8594001020304',
+     await p.inputValue('#edCode'));
 
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();

@@ -17,7 +17,28 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-98** (`APP_VERSION` v `index.html`, cache `kaltrack-v98` v `sw.js`).
+Aktuální verze: **2026.08.21-99** (`APP_VERSION` v `index.html`, cache `kaltrack-v99` v `sw.js`).
+
+### Novinky ve v99 — cesty k nové potravině a poctivější názvy
+
+Uživatel prošel v98 a našel tři díry a jeden zavádějící název.
+
+- **Fotka jen z fotoaparátu.** Vstupy měly `capture="environment"`, takže z galerie
+  nešlo nic vzít — ačkoli u „Popsat" to celou dobu bylo. Doplněno na obou místech,
+  v panelu i ve formuláři.
+- **Popisek mluvil jen o tabulce**, přestože zadání umí odhadnout i z obalu a od
+  v98 i z popisu. Nově: nejpřesnější je tabulka, poslouží i fotka samotné
+  potraviny nebo obalu, popis pomůže tam, kde z fotky poznat nejde, a nic z toho
+  není povinné.
+- **Do formuláře se nedalo dostat bez fotky.** Přibylo „Vyplnit sám, bez fotky"
+  v panelu a **„Není v databázi? Zadat rovnou"** u ručního zadání kódu. To druhé
+  je uživatelův postřeh: dřív se člověk musel napřed neúspěšně pokusit kód najít,
+  aby mu aplikace formulář nabídla. Napsaný kód se přenese.
+- **Záložka „Z obalu" přejmenována na „Přidat".** Název vznikl, když panel uměl
+  jen fotku obalu; jakmile přibyl popis a ruční cesta, začal lhát. Táž chyba jako
+  u „Vyfotit" — pojmenování podle způsobu, ne podle výsledku.
+- Drobnost: `gotObal` po vložení fotky nepřekresloval stav tlačítka.
+- testy `test61.js`.
 
 ### Novinky ve v98 — novou potravinu jde i popsat, nejen vyfotit
 
