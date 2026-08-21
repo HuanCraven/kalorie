@@ -17,7 +17,40 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-87** (`APP_VERSION` v `index.html`, cache `kaltrack-v87` v `sw.js`).
+Aktuální verze: **2026.08.21-88** (`APP_VERSION` v `index.html`, cache `kaltrack-v88` v `sw.js`).
+
+### Novinky ve v88 — jedno období pro celou aplikaci
+
+Druhý ze dvou kroků sjednocení. Aplikace měla **tři přepínače období na dvou
+stránkách**: `period` na Statistikách, `alcPeriod` na sloupce alkoholu a `alcOkno`
+na vyhlazení křivky. „Posledních třicet dní" se tedy nastavovalo třikrát a
+znamenalo pokaždé něco jiného.
+
+- Zůstal jediný `period`. `setPeriod` překreslí tu stránku, která je zrovna vidět,
+  a srovná oba přepínače, takže volba drží při přechodu mezi Statistikami
+  a Alkoholem.
+- `alcPeriod`, `alcOkno`, `setAlcPeriod`, `setAlcOkno` i `#alcTrendSeg` zrušeny.
+  Křivka alkoholu se vyhlazuje zvoleným obdobím.
+- **Výchozí období je nově 30 dní** (dřív 7 na Statistikách, 30 na Alkoholu).
+  Limit alkoholu je definovaný jako třicetidenní průměr a sedm dní je na váhu
+  i na reálný výdej příliš krátké okno.
+- **Pevná okna zůstala tam, kde odpovídají na jinou otázku:** dlaždice „za 7 dní"
+  a „ø 30 dní", limit, kalendářní měsíc a „od začátku měření". Všechna mají svůj
+  rozsah v popisku.
+- testy `test54.js` přepsány: zrušený přepínač už nesmí existovat, jedno přepnutí
+  posune sloupce i křivku naráz, okna jdou za sebou 7 > 30 > 90 a volba se drží
+  při přechodu na Statistiky a zpět.
+
+#### Dva testy měly skrytý předpoklad
+
+`test43` počítal průměrný výdej natvrdo pro sedmidenní období (`(6·1800 + 3142)/7
+≈ 1992`) a spoléhal na to, že Statistiky na sedmi dnech startují. Při třiceti
+vyjde 1845 — což hlásil. Aplikace počítala správně. Test si o období nově řekne
+sám, protože předpoklady má vyslovit, ne dědit z výchozího nastavení.
+
+`test54` si ověřoval „limit se počítá z 30 dní" oklikou přes nadpis křivky. Ten
+nově sleduje zvolené období, takže oklika přestala platit; nahrazena přímým
+ověřením, že `avg30` vyjde stejně při sedmi i devadesáti dnech.
 
 ### Novinky ve v87 — jedna denní řada pro celou aplikaci
 

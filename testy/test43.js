@@ -54,6 +54,7 @@ const PROSTREDI = require('./prostredi');
 
   // --- statistiky: výdej ø zahrnuje cvičení
   await p.click('nav button[data-p="stats"]'); await p.waitForTimeout(700);
+  await p.click('#per7'); await p.waitForTimeout(700);
   const burn = await p.textContent('#stBurn');
   // 7 dní: 6× jen rmr 1800, 1× 1800+200+1142 → ø = (6·1800 + 3142)/7 ≈ 1992
   ck('výdej ø zahrnuje cvičení (1992)', burn.trim() === '1992', burn);

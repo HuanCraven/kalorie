@@ -103,15 +103,22 @@ const PROSTREDI = require('./prostredi');
   ck('zvýrazněné je jen jedno období', (await p.locator('#alcSeg button.on').count()) === 1);
   ck('celkem za období odpovídá jednomu pivu', near(await p.textContent('#alcSumP'), 19.7, 0.5),
     await p.textContent('#alcSumP'));
-  ck('limit se pořád počítá z 30 dní',
-    (await p.textContent('#p-alc')).indexOf('30denního průměru') >= 0);
+  /* Limit je definovaný jako třicetidenní průměr, takže na zvoleném období viset
+     nesmí — ověřuje se tedy přímo, ne oklikou přes nadpis grafu. */
+  const limity = await p.evaluate(async () => {
+    const p90 = (await alcStats()).avg30;
+    setPeriod(7); const p7 = (await alcStats()).avg30;
+    setPeriod(90);
+    return { p90, p7 };
+  });
+  ck('limit se pořád počítá z 30 dní bez ohledu na období',
+     limity.p7 === limity.p90, JSON.stringify(limity));
 
-  /* ---- 4. přepínatelné okno u křivky trendu (v74) ------------------
-     30denní průměr se hýbe pomalu — jeden večer s ním hne o gramy/30, takže
-     křivka umí klesnout i po dni, kdy se pilo. Sedmidenní okno reaguje hned. */
+  /* ---- 4. jedno období ovládá sloupce i křivku (v88) ---------------
+     Dřív měla stránka dva přepínače: jeden na sloupce, druhý na vyhlazení
+     křivky. K tomu třetí na Statistikách. Teď je jeden pro celou aplikaci. */
   await p.evaluate(async () => {
     const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
-    // záznam 120 dní zpět, aby měla z čeho počítat i devadesátidenní křivka
     await dbPut('log', { id: 'stary', date: den(120), productId: 'quick', name: 'Jídlo', unit: 'porce',
       amount: 1, meal: 'obed', kcal: 500, p: 10, c: 50, f: 10, ts: Date.now() });
     for (let i = 0; i < 7; i++)
@@ -121,39 +128,44 @@ const PROSTREDI = require('./prostredi');
   });
   await p.waitForTimeout(800);
 
-  ck('křivka má přepínač okna 7/30/90', (await p.locator('#alcTrendSeg button').count()) === 3);
-  ck('výchozí okno je 30 dní', await p.evaluate(() =>
-    document.querySelector('#alcTrendSeg button[data-t="30"]').classList.contains('on')));
-  ck('nadpis uvádí 30denní průměr', (await p.textContent('#alcTrendHead')).indexOf('30denního') > 0,
+  ck('zvláštní přepínač okna křivky je pryč',
+     (await p.locator('#alcTrendSeg').count()) === 0);
+
+  await p.click('#alcSeg button[data-a="30"]'); await p.waitForTimeout(800);
+  ck('nadpis křivky sleduje společné období',
+     (await p.textContent('#alcTrendHead')).indexOf('30denního') > 0,
      await p.textContent('#alcTrendHead'));
   const t30 = ted(await p.textContent('#alcTrend'));
   ck('30denní průměr sedm večerů rozředí', t30 > 6 && t30 < 9, 'teď ' + t30 + ' g/den');
   ck('a věta pod grafem mluví o třiceti',
      (await p.textContent('#alcTrend')).indexOf('třiceti') > 0);
 
-  await p.click('#alcTrendSeg button[data-t="7"]'); await p.waitForTimeout(700);
-  ck('nadpis se přepne na 7denní', (await p.textContent('#alcTrendHead')).indexOf('7denního') > 0,
-     await p.textContent('#alcTrendHead'));
+  await p.click('#alcSeg button[data-a="7"]'); await p.waitForTimeout(800);
+  ck('přepnutí posune křivku i sloupce naráz',
+     (await p.textContent('#alcTrendHead')).indexOf('7denního') > 0 &&
+     (await p.textContent('#alcDryOf')) === 'z 7',
+     await p.textContent('#alcTrendHead') + ' / ' + await p.textContent('#alcDryOf'));
   const t7 = ted(await p.textContent('#alcTrend'));
   ck('sedmidenní okno ukáže skutečnou úroveň', t7 > 29 && t7 < 34, 'teď ' + t7 + ' g/den');
   ck('a je vyšší než třicetidenní', t7 > t30, t7 + ' vs ' + t30);
   ck('věta pod grafem mluví o sedmi',
      (await p.textContent('#alcTrend')).indexOf('sedmi') > 0);
-  ck('zvýrazněné je jen jedno okno', (await p.locator('#alcTrendSeg button.on').count()) === 1);
-  await p.click('#alcTrendSeg button[data-t="90"]'); await p.waitForTimeout(700);
-  ck('nadpis se přepne na 90denní', (await p.textContent('#alcTrendHead')).indexOf('90denního') > 0,
-     await p.textContent('#alcTrendHead'));
+
+  await p.click('#alcSeg button[data-a="90"]'); await p.waitForTimeout(800);
   const t90 = ted(await p.textContent('#alcTrend'));
   ck('devadesátidenní okno rozředí sedm večerů nejvíc', t90 > 1.5 && t90 < 3.5, 'teď ' + t90 + ' g/den');
   ck('okna jdou za sebou 7 > 30 > 90', t7 > t30 && t30 > t90, [t7, t30, t90].join(' > '));
-  ck('věta pod grafem mluví o devadesáti',
-     (await p.textContent('#alcTrend')).indexOf('devadesáti') > 0);
-  ck('přepnutí okna nesahne na období grafů', (await p.textContent('#alcDryOf')) === 'z 90');
+  ck('zvýrazněné je jen jedno období', (await p.locator('#alcSeg button.on').count()) === 1);
 
-  await p.click('#alcTrendSeg button[data-t="30"]'); await p.waitForTimeout(600);
-  ck('dá se vrátit zpět na 30', (await p.textContent('#alcTrendHead')).indexOf('30denního') > 0);
+  // volba se drží i po přechodu na Statistiky — je to totéž období
+  await p.click('nav button[data-p="stats"]'); await p.waitForTimeout(800);
+  ck('Statistiky převezmou tutéž volbu',
+     await p.evaluate(() => document.getElementById('per90').classList.contains('pri')));
+  await p.click('#per30'); await p.waitForTimeout(800);
+  await p.click('nav button[data-p="alc"]'); await p.waitForTimeout(800);
+  ck('a zpátky taky', await p.evaluate(() =>
+     document.querySelector('#alcSeg button[data-a="30"]').classList.contains('on')));
 
-  console.log(errs.length ? '\nERRORS: ' + errs.join(' | ') : '');
   // „Teď X g/den" z patičky grafu; deklarace se vytáhne nahoru, volá se výš
   function ted(txt) { const c = txt.split('Teď')[1]; return c ? parseFloat(c.trim()) : -1; }
 

@@ -460,9 +460,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="card">
       <div class="lbl-s">Denní průměr</div>
   <div class="seg" id="alcSeg" style="margin-bottom:12px">
-    <button data-a="7" onclick="setAlcPeriod(7)">7 dní</button>
-    <button data-a="30" class="on" onclick="setAlcPeriod(30)">30 dní</button>
-    <button data-a="90" onclick="setAlcPeriod(90)">90 dní</button>
+    <button data-a="7" onclick="setPeriod(7)">7 dní</button>
+    <button data-a="30" class="on" onclick="setPeriod(30)">30 dní</button>
+    <button data-a="90" onclick="setPeriod(90)">90 dní</button>
   </div>
 
   <div class="row" style="gap:10px;margin:0 0 10px">
@@ -481,11 +481,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <div id="alcLimitBar"></div>
   <h3 style="margin-top:16px" id="alcTrendHead">Vývoj 30denního průměru</h3>
-  <div class="seg" id="alcTrendSeg" style="margin-bottom:10px">
-    <button data-t="7" onclick="setAlcOkno(7)">7 dní</button>
-    <button data-t="30" class="on" onclick="setAlcOkno(30)">30 dní</button>
-    <button data-t="90" onclick="setAlcOkno(90)">90 dní</button>
-  </div>
   <div id="alcTrend" style="margin:8px 0 4px"></div>
 
   <details style="margin-top:14px">
@@ -1140,7 +1135,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-87';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-88';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3610,7 +3605,7 @@ const KCAL_PER_KG = 7700;      // energie v 1 kg tělesné tkáně
 const C_DEF = '#2f8fe6';       // deficit / hlavní série  (ověřeno validátorem)
 const C_SUR = '#e0574d';       // přebytek
 const C_GRID = '#39414f', C_INK = '#8b95a7';
-let period = 7, statCache = null, alcCache = null;
+let period = 30, statCache = null, alcCache = null;   // jedno období pro celou aplikaci
 
 async function loadDaily() {
   const d = await dbGet('daily', curDate) || {};
@@ -4082,7 +4077,17 @@ function stTip(i) {
 }
 
 /* --- render --- */
-function setPeriod(p) { period = p; renderStats(); }
+/* Jedno období pro celou aplikaci. Dřív byly tři přepínače na dvou stránkách
+   (statistiky, sloupce alkoholu, vyhlazení křivky), takže „posledních třicet dní"
+   znamenalo pokaždé něco jiného a nastavovalo se třikrát. */
+function setPeriod(p) {
+  period = p;
+  document.querySelectorAll('#alcSeg button').forEach(b => b.classList.toggle('on', +b.dataset.a === p));
+  ['per7', 'per30', 'per90'].forEach(id =>
+    $(id) && $(id).classList.toggle('pri', id === 'per' + p));
+  if ($('p-stats').classList.contains('on')) renderStats();
+  if ($('p-alc').classList.contains('on')) renderAlc();
+}
 
 /* ---------------- karta Zdraví ----------------
    Čísla z hodinek mají cenu jako trend a hlavně ve srovnání s tím, co aplikace
@@ -5576,7 +5581,7 @@ async function alcStats(z) {
     .filter(([k]) => k <= curDate).reduce((a, [, v]) => a + v, 0);
 
   return {
-    days, d7: sum(7), d30: sum(30), dry: days.slice(-alcPeriod).filter(x => x.g === 0).length,
+    days, d7: sum(7), d30: sum(30), dry: days.slice(-period).filter(x => x.g === 0).length,
     avg7: sum(7) / 7, avg30: sum(30) / 30,
     mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
     long,
@@ -5598,27 +5603,16 @@ function alcKlouzavy(long, okno, prvni) {
   }
   return out;
 }
-let alcOkno = 30;
-function setAlcOkno(dny) {
-  alcOkno = dny;
-  document.querySelectorAll('#alcTrendSeg button').forEach(b => b.classList.toggle('on', +b.dataset.t === dny));
-  renderAlc();
-}
-let alcPeriod = 30;
-function setAlcPeriod(dny) {
-  alcPeriod = dny;
-  document.querySelectorAll('#alcSeg button').forEach(b => b.classList.toggle('on', +b.dataset.a === dny));
-  renderAlc();
-}
+
 async function renderAlc() {
   const s = await alcStats();
   $('alc7').textContent = r0(s.d7); $('alc30').textContent = r0(s.d30); $('alcDry').textContent = s.dry;
-  const obd = s.days.slice(-alcPeriod);
+  const obd = s.days.slice(-period);
   const sumObd = obd.reduce((a, x) => a + x.g, 0);
-  $('alcAvgP').textContent = r1(sumObd / alcPeriod);
+  $('alcAvgP').textContent = r1(sumObd / period);
   $('alcSumP').textContent = r0(sumObd);
-  $('alcDryOf').textContent = 'z ' + alcPeriod;
-  $('alcChartHead').textContent = 'Kdy a kolik — ' + alcPeriod + ' dní';
+  $('alcDryOf').textContent = 'z ' + period;
+  $('alcChartHead').textContent = 'Kdy a kolik — ' + period + ' dní';
   $('alcAM').textContent = r1(s.avgM);
   $('alcMName').textContent = s.mName;
   $('alcAAll').textContent = r1(s.avgAll);
@@ -5627,8 +5621,9 @@ async function renderAlc() {
     ' (dny bez alkoholu se do průměru počítají)';
   $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : '<p class="tiny muted" style="margin:0">' +
     'Limit není nastavený (Víc → Alkohol).</p>';
-  $('alcTrendHead').textContent = 'Vývoj ' + alcOkno + 'denního průměru';
-  $('alcTrend').innerHTML = svgAlcTrend(s.long, alcKlouzavy(s.long, alcOkno, s.first), s.lim, alcOkno);
+  $('alcTrendHead').textContent = 'Vývoj ' + period + 'denního průměru';
+  $('alcTrend').innerHTML = svgAlcTrend(s.long, alcKlouzavy(s.long, period, s.first), s.lim, period);
+  document.querySelectorAll('#alcSeg button').forEach(b => b.classList.toggle('on', +b.dataset.a === period));
   $('alcChart').innerHTML = svgAlcBars(obd);
   syncAddDate();
   const allLog = await dbAll('log');
