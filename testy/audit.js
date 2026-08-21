@@ -217,7 +217,7 @@ Celkem 508 kcal.`); await p.waitForTimeout(400);
   ck('graf příjmu má čáru výdeje', await p.locator('#chKcal path').count() >= 1);
   ck('křivka váhy', await p.locator('#chWeight path').count()===1);
   ck('reálný výdej dopočten', (await p.textContent('#stWeightTxt')).includes('Reálný výdej'));
-  ck('postřehy vygenerovány', await p.locator('#stInsights p').count()>=3, (await p.locator('#stInsights p').count())+' vět');
+  ck('postřehy vygenerovány', await p.locator('#stInsights .postreh').count()>=3, (await p.locator('#stInsights .postreh').count())+' vět');
   ck('zdroje kalorií', await p.locator('#stTop .item').count()>=1);
   await p.click('#per90'); await p.waitForTimeout(900);
   ck('90denní pohled funguje', (await p.textContent('#stRange')).includes('90'));

@@ -24,7 +24,7 @@ const PROSTREDI = require('./prostredi');
   await p.click('nav button[data-p="stats"]'); await p.click('#per30'); await p.waitForTimeout(1000);
   console.log('=== PEVNÝ REŽIM ===');
   console.log('makra:', (await p.textContent('#stMacros')).replace(/\s+/g,' ').trim().slice(0,120));
-  console.log('postřeh o příjmu:', (await p.locator('#stInsights p').first().textContent()).replace(/\s+/g,' ').trim());
+  console.log('postřeh o příjmu:', (await p.locator('#stInsights .postreh').first().textContent()).replace(/\s+/g,' ').trim());
 
   await p.click('nav button[data-p="set"]'); await p.click('#modeSeg button[data-m="dyn"]');
   await p.waitForTimeout(700);
@@ -35,8 +35,8 @@ const PROSTREDI = require('./prostredi');
   console.log('  kontrola: kcal 1800+600−400 = 2000 · B 2·84 = 168 · T 0.9·84 = 76 · S (2000−672−684)/4 = '
     + ((2000-4*168-9*76)/4).toFixed(0));
   console.log('makra:', (await p.textContent('#stMacros')).replace(/\s+/g,' ').trim().slice(0,150));
-  console.log('postřeh o příjmu:', (await p.locator('#stInsights p').first().textContent()).replace(/\s+/g,' ').trim());
-  const ins = await p.locator('#stInsights p').allTextContents();
+  console.log('postřeh o příjmu:', (await p.locator('#stInsights .postreh').first().textContent()).replace(/\s+/g,' ').trim());
+  const ins = await p.locator('#stInsights .postreh').allTextContents();
   console.log('postřeh o bílkovinách:', (ins.find(t=>/lkovin/.test(t))||'—').replace(/\s+/g,' ').trim());
   console.log('čára cíle v grafu:', (await p.locator('#chKcal text').allTextContents()).join(' | '));
   const sum = await p.evaluate(()=>summaryText());

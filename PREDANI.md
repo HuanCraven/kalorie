@@ -17,7 +17,26 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-92** (`APP_VERSION` v `index.html`, cache `kaltrack-v92` v `sw.js`).
+Aktuální verze: **2026.08.21-93** (`APP_VERSION` v `index.html`, cache `kaltrack-v93` v `sw.js`).
+
+### Novinky ve v93 — postřehy vedou na kartu, u matoucích čísel je vysvětlení
+
+Postřeh vždycky vychází z nějaké karty, ale dosud nikam nevedl a člověk ji musel
+hledat rolováním. Vysvětlení pojmů bylo jen v dlouhých odstavcích pod kartami,
+které se přečtou jednou a pak přeskakují.
+
+- `insights` vrací místo řetězců dvojice **text + cíl**. Cíl je buď id karty na
+  téže stránce (`kartaPrijem`, `kartaVaha`, `kartaMakra`, `tydenKarta`), nebo
+  `p-alc` a `p-fit` pro skok na jinou stránku.
+- `skocNaKartu` doroluje a kartu na chvíli **zvýrazní obrysem**, aby bylo vidět,
+  kam to skočilo — samotné doskrolování se na malém displeji přehlédne.
+- Postřeh s cílem se vykreslí jako tlačítko se šipkou; bez cíle zůstane text.
+- **Bublinky** (`bublina`) u „výdej ø" a „bilance ø": klepnutím na kolečko s „i"
+  se rozbalí jedna věta. Otevřená je vždy nejvýš jedna.
+- Pobídka „Klepni na graf pro konkrétní den" byla pod třemi křivkami třikrát;
+  nově jen pod první (`caraPrvni`).
+- testy `test70.js` — dvanáct kontrol: cíle postřehů, skok na stránku i na kartu
+  se zvýrazněním, bublinky včetně zavírání.
 
 ### Novinky ve v92 — „Časté" se plní z deníku, ne z databáze potravin
 
@@ -1257,7 +1276,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 69 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 70 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |
