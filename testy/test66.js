@@ -93,6 +93,30 @@ const PROSTREDI = require('./prostredi');
   const t3 = (await p.textContent('#stTyden')).replace(/\s+/g, ' ');
   ck('bez příznaku se osekaný den do víkendu započítá', !/so–ne 3600 kcal/.test(t3), t3.slice(0, 90));
 
+  /* ---- 5. tichá karta u částečných dat (v90) ----------------------
+     Bez jediného zapsaného dne karta mlčí — nemá o čem. S málem dat se ale ukáže
+     a řekne, že čeká; tichá karta u částečných dat je ten stav, kdy člověk hledá
+     chybu v aplikaci. Data si tahle část staví načisto, ať nezkreslí předchozí. */
+  await p.evaluate(async () => {
+    await new Promise(res => { const t = db.transaction('log', 'readwrite'); t.objectStore('log').clear(); t.oncomplete = res; });
+    return renderStats();
+  });
+  await p.waitForTimeout(900);
+  ck('bez zapsaného dne karta zase mlčí',
+     await p.evaluate(() => $('tydenKarta').style.display === 'none'));
+
+  await p.evaluate(async () => {
+    await dbPut('log', { date: curDate, productId: 'quick', name: 'Jídlo', unit: 'porce',
+      amount: 1, meal: 'obed', kcal: 2000, p: 50, c: 100, f: 30, ts: Date.now() });
+    return renderStats();
+  });
+  await p.waitForTimeout(900);
+  ck('s jedním dnem se karta ukáže a řekne, že čeká',
+     await p.evaluate(() => $('tydenKarta').style.display !== 'none'));
+  ck('a hláška je ta společná',
+     (await p.textContent('#stTyden')).indexOf('Naskočí samo') >= 0,
+     await p.textContent('#stTyden'));
+
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
   process.exit(0);

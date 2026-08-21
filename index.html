@@ -1135,7 +1135,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-89';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-90';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3988,8 +3988,7 @@ function svgAlcTrend(long, trend, lim, okno) {
   const pts = [];
   for (let i = 0; i < long.length; i++) if (trend[i] !== null) pts.push({ d: long[i].d, v: trend[i] });
   if (pts.length < 2)
-    return '<p class="tiny muted">Na trend potřebuju aspoň ' + dnu(okno) + ' záznamů — graf naskočí sám, ' +
-      'jakmile je budeš mít.</p>';
+    return maloDat('Vývoj ' + okno + 'denního průměru', okno - pts.length);
   const W = 320, H = 96, L = 26;
   const mx = (Math.max(lim * 1.35 || 0, ...pts.map(p => p.v)) || 10) * 1.1;
   const X = i => L + (i / Math.max(1, pts.length - 1)) * (W - L);
@@ -4116,11 +4115,21 @@ function zdrTip(id, i, klic, jednotka) {
   const v = klic === 'spanek' ? min2cas(d[klic]) : r0(d[klic]);
   el.innerHTML = '<b>' + dayTxt(d.date) + '</b> · ' + v + (jednotka ? ' ' + jednotka : '');
 }
+/* Jedna podoba hlášky „ještě nemám dost dat". Prahy samotné se nesjednocují —
+   víkendová karta opravdu potřebuje jiný počet dnů než křivka —, sjednocuje se
+   způsob, jakým se to řekne, a hlavně to, že se vždycky doplní, kolik dnů chybí.
+   Pravidlo, kdy hlášku vůbec ukázat: není-li k tématu ani jeden údaj, karta se
+   neukáže (nemá o čem mluvit). Je-li něco, ale málo, karta se ukáže i s hláškou —
+   tichá karta u částečných dat je přesně ten stav, kdy člověk hledá chybu. */
+function maloDat(co, chybi) {
+  return '<p class="tiny muted" style="margin:6px 0 0">' + co +
+    (chybi > 0 ? ' — ještě chybí ' + dnu(chybi) : ' — zatím je dnů málo') +
+    '. Naskočí samo, jakmile je budeš mít.</p>';
+}
 function svgCara(body, popis, barva, obracene, klic, jednotka) {
   const W = 320, H = 88;
   const pts = body.map((v, i) => ({ i, v })).filter(p => p.v !== null);
-  if (pts.length < 3) return '<p class="tiny muted" style="margin:6px 0 0">' + popis +
-    ': málo dnů na graf (potřeba aspoň tři).</p>';
+  if (pts.length < 3) return maloDat(popis, 3 - pts.length);
   const id = 'cara' + (++caraPocet);
   const vs = pts.map(p => p.v);
   const lo = Math.min(...vs), hi = Math.max(...vs), rng = Math.max(1, hi - lo) * 1.3;
@@ -4233,7 +4242,7 @@ async function renderStats() {
       + (a.realTdee ? '<br><b style="color:#e8ecf3">Reálný výdej podle váhy: ' + r0(a.realTdee) + ' kcal/den</b>'
         + ' — hodinky + klid dávají ' + r0(a.avgOut) + ' kcal, rozdíl '
         + (a.realTdee - a.avgOut > 0 ? '+' : '') + r0(a.realTdee - a.avgOut) + ' kcal.'
-        : '<br>Pro odhad reálného výdeje potřebuju vážení rozložená aspoň přes 10 dnů.')
+        : '<br>Reálný výdej — ještě chybí vážení rozložená aspoň přes 10 dní.')
     : '';
 
   const eP = a.avgP * 4, eC = a.avgC * 4, eF = a.avgF * 9, eT = eP + eC + eF || 1;
@@ -4293,7 +4302,13 @@ function tydenniVzorec(list) {
 }
 function renderTyden(list) {
   const t = tydenniVzorec(list), karta = $('tydenKarta');
-  if (!t) { karta.style.display = 'none'; return; }
+  if (!t) {
+    // bez jediného zapsaného dne karta mlčí, s částečnými daty řekne, co chybí
+    const kompl = list.filter(d => d.logged).length;
+    karta.style.display = kompl ? '' : 'none';
+    if (kompl) $('stTyden').innerHTML = maloDat('Porovnání všedních dnů s víkendem', 0);
+    return;
+  }
   karta.style.display = '';
   const max = Math.max(t.p.k, t.v.k) || 1;
   const radek = (nm, sk, col) => `

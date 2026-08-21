@@ -17,7 +17,27 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-89** (`APP_VERSION` v `index.html`, cache `kaltrack-v89` v `sw.js`).
+Aktuální verze: **2026.08.21-90** (`APP_VERSION` v `index.html`, cache `kaltrack-v90` v `sw.js`).
+
+### Novinky ve v90 — jedna podoba hlášky „nemám dost dat"
+
+Čtvrtý bod sjednocení. Šest karet mělo šest různých hlášek a některé mlčely úplně;
+žádná neřekla, **kolik dnů chybí**.
+
+- `maloDat(co, chybi)` dává jednu větu: `Klidový tep — ještě chybí 2 dny. Naskočí
+  samo, jakmile je budeš mít.` Používá ji křivka zdraví, křivka alkoholu i
+  víkendová karta; text u reálného výdeje je srovnaný do téhož tvaru.
+- **Prahy se nesjednocovaly** — víkendová karta opravdu potřebuje jiný počet dnů
+  než křivka. Sjednotilo se jejich vyjádření, ne hodnoty (viz analýza).
+- Nové pravidlo, kdy kartu vůbec ukázat: **není-li k tématu ani jeden údaj, karta
+  se neukáže** (nemá o čem mluvit); **je-li něco, ale málo, karta se ukáže
+  i s hláškou.** Víkendová karta dosud mlčela v obou případech. Tichá karta
+  u částečných dat je přesně ten stav, kdy uživatel hledá chybu v aplikaci —
+  potkalo ho to u karty Zdraví, kterou „nikde neviděl", zatímco jen čekala na
+  třetí den.
+- testy `test66.js`: bez zapsaného dne karta mlčí, s jedním se ukáže a použije
+  společnou hlášku. Kontrola si staví data načisto, protože zásah do dřívějších
+  dat v téže sadě zkreslil zbytek — což se při psaní stalo.
 
 ### Novinky ve v89 — do dne se zapisuje jedinou cestou
 
