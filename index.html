@@ -155,6 +155,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
          border:1px solid var(--line);background:var(--card2);color:var(--dim);
          cursor:pointer;white-space:nowrap}
   .kotva:hover,.kotva:focus-visible{color:var(--fg);border-color:var(--dim2)}
+  /* „Časté" po chodech: název chodu vlevo, tlačítka za ním na jednom řádku */
+  .casteChod{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
+  .casteChod > span:first-child{flex:0 0 100%;margin-bottom:-2px}
 </style>
 </head>
 <body>
@@ -1162,7 +1165,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-94';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-95';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1846,35 +1849,49 @@ async function renderDay() {
    ty cesty stačí, tomu karta zůstala navždy prázdná — a slibovala něco, co nikdy
    nepřišlo. Deník naopak ví, co člověk jí doopravdy, ať to zapsal jakkoli. */
 let casteCache = [];
+/* Seskupeno po chodech: k snídani se hodí něco jiného než k večeři a jeden
+   společný seznam by mísil obojí. Chod si tím zároveň přestává hádat podle
+   hodin — položka ví, ke kterému jídlu patří, protože podle něj byla vybrána. */
 async function casteZDeniku(dnu) {
   const od = dstr(new Date(Date.now() - (dnu || 60) * 86400000));
   const vse = (await dbAll('log')).filter(r => r.name && r.date >= od && r.date <= curDate);
   const m = {};
   vse.forEach(r => {
-    const k = norm(r.name) + '|' + (r.unit || 'g');
-    const g = m[k] || (m[k] = { name: r.name, n: 0, kdy: '', vzor: r });
+    const chod = MEALS.some(x => x.k === r.meal) ? r.meal : 'nezar';
+    const k = chod + '|' + norm(r.name) + '|' + (r.unit || 'g');
+    const g = m[k] || (m[k] = { name: r.name, chod: chod, n: 0, kdy: '', vzor: r });
     g.n++;
     const kdy = r.date + ' ' + String(r.ts || 0).padStart(16, '0');
     if (kdy > g.kdy) { g.kdy = kdy; g.vzor = r; }   // předlohou je poslední zápis
   });
   // jednorázovky mezi „časté" nepatří; bez prahu by karta byla jen seznam všeho
-  return Object.values(m).filter(g => g.n >= 2).sort((a, b) => b.n - a.n).slice(0, 8);
+  return Object.values(m).filter(g => g.n >= 2).sort((a, b) => b.n - a.n);
 }
 async function renderCaste() {
   if (!$('favList')) return;
   casteCache = await casteZDeniku(60);
-  $('favList').innerHTML = casteCache.length
-    ? casteCache.map((g, i) => `<button class="btn sm dotyk" onclick="zapisCaste(${i})"
+  // chod podle denní doby jde nahoru — ráno chce člověk snídani, ne večeři
+  const ted = defaultMeal(), poradi = MEALS.map(x => x.k);
+  const od = poradi.indexOf(ted);
+  const chody = poradi.slice(od).concat(poradi.slice(0, od));
+  const bloky = chody.map(k => {
+    const polozky = casteCache.filter(g => g.chod === k).slice(0, 4);
+    if (!polozky.length) return '';
+    return '<div class="casteChod"><span class="tiny muted">' + mealName(k) + '</span>' +
+      polozky.map(g => `<button class="btn sm dotyk" onclick="zapisCaste('${sid(g.chod)}',${casteCache.indexOf(g)})"
         title="${esc(g.name)} — ${g.n}× za 60 dní">${esc(g.name)}
-        <span class="tiny muted">${g.n}×</span></button>`).join('')
+        <span class="tiny muted">${g.n}×</span></button>`).join('') + '</div>';
+  }).filter(Boolean);
+  $('favList').innerHTML = bloky.length ? bloky.join('')
     : '<span class="tiny muted">Až něco zapíšeš podruhé, objeví se to tady.</span>';
 }
 /* Zapíše totéž znovu podle posledního zápisu — včetně gramáže a živin, ať vznikl
-   jakoukoli cestou. Chod se určí podle denní doby, ne podle předlohy. */
-async function zapisCaste(i) {
+   jakoukoli cestou. Chod se bere z položky, ne z hodin: kdo v deset večer dohání
+   oběd, nechce ho mít ve večerní svačině. */
+async function zapisCaste(chod, i) {
   const g = casteCache[i]; if (!g) return;
   const c = Object.assign({}, g.vzor); delete c.id; delete c.uid; delete c.upd;
-  c.date = curDate; c.ts = Date.now(); c.meal = defaultMeal();
+  c.date = curDate; c.ts = Date.now(); c.meal = g.chod === 'nezar' ? defaultMeal() : g.chod;
   await dbPut('log', c);
   toast(g.name + ' zapsáno do ' + mealName(c.meal).toLowerCase());
   renderDay();

@@ -17,7 +17,27 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-94** (`APP_VERSION` v `index.html`, cache `kaltrack-v94` v `sw.js`).
+Aktuální verze: **2026.08.21-95** (`APP_VERSION` v `index.html`, cache `kaltrack-v95` v `sw.js`).
+
+### Novinky ve v95 — „Časté" po chodech
+
+Návrh uživatele: rozdělit časté položky podle jídel. K snídani se hodí něco
+jiného než k večeři a jeden společný seznam obojí mísil.
+
+- `casteZDeniku` seskupuje podle **chodu i názvu**, takže tatáž potravina může být
+  častá u oběda a vůbec se neobjevit u snídaně.
+- Bloky se řadí **od chodu podle denní doby** (`defaultMeal`) — ráno je nahoře
+  snídaně. Uvnitř bloku se řadí podle četnosti, nejvýš čtyři položky.
+- Chod se nově **bere z položky, ne z hodin**. Ve v92 se hádal podle denní doby;
+  jenže kdo v deset večer dohání oběd, nechce ho mít ve večerní svačině — a
+  položka svůj chod zná, byla podle něj vybraná.
+- Zápisy bez chodu (`nezar`) si dál nechají odhad podle hodin.
+- testy `test69.js` rozšířeny: rozdělení po chodech, pojmenování, řazení uvnitř
+  chodu a to, že oběd skončí v obědě bez ohledu na čas.
+
+Při úpravě testu se ukázalo, proč je klikání na „první tlačítko" křehké: pořadí
+bloků závisí na denní době, takže test v podvečer klikal na večeři místo na
+snídani. Nově se hledá podle názvu položky.
 
 ### Novinky ve v94 — lišta kotev na Statistikách
 
