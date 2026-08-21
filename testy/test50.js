@@ -73,6 +73,12 @@ const PROSTREDI = require('./prostredi');
   ck('nepřepíná stránku', await A.evaluate(() => document.getElementById('p-day').classList.contains('on')));
 
   /* ---- 2. sladí a dá zpětnou vazbu -------------------------------- */
+  /* Při startu aplikace běží `if (syCfg.on) syncNow(false)` bez ohledu na brzdu
+     `last`, takže úvodní sladění zapíše taky. Počítadlo se proto čte až po něm —
+     jinak by výsledek závisel na rychlosti stroje: lokálně to doběhne včas,
+     na běžci v CI ne a zápisy vyjdou dva místo jednoho. */
+  await A.evaluate(async () => { try { await syRun; } catch (e) {} });
+  await A.waitForTimeout(300);
   await A.evaluate(async () => { await dbPut('log', { date: '2026-08-04', ts: 1, name: 'Oběd', amount: 300, kcal: 500 }); });
   const putsPred = gh.puts;
   gh.zpozdeni = 400;                       // ať sladění opravdu chvíli trvá

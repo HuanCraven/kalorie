@@ -632,6 +632,15 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
 <!-- ============ STATISTIKY ============ -->
 <section id="p-stats" class="page">
+  <!-- Statistiky končí prohlíženým dnem (statsData staví řadu pozpátku od curDate).
+       Dokud to nebylo vidět, vypadala data zapsaná na pozdější den jako ztracená. -->
+  <div class="row" style="margin-bottom:10px">
+    <button class="btn sm dotyk" onclick="shiftDay(-1)" aria-label="Předchozí den">‹</button>
+    <div class="grow" style="text-align:center"><b id="stDayLabel"></b></div>
+    <button class="btn sm dotyk" id="stDnes" onclick="naDnesek()" style="display:none">dnes</button>
+    <button class="btn sm dotyk" onclick="shiftDay(1)" aria-label="Další den">›</button>
+  </div>
+
   <div class="row" style="margin-bottom:12px">
     <button class="btn grow" id="per7" onclick="setPeriod(7)">7 dní</button>
     <button class="btn grow" id="per30" onclick="setPeriod(30)">30 dní</button>
@@ -1131,7 +1140,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-84';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-85';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1700,6 +1709,17 @@ function shiftDay(d) {
   curDate = dstr(x);
   syncAddDate();
   renderDay();
+  if ($('p-stats').classList.contains('on')) renderStats();
+}
+/* Skok na dnešek. Šipkami po jednom dni se člověk zpátky proklikává dlouho a
+   navíc nepozná, jak daleko zabloudil. */
+function naDnesek() {
+  const dnes = dstr(new Date());
+  if (curDate === dnes) return;
+  curDate = dnes;
+  syncAddDate();
+  renderDay();
+  if ($('p-stats').classList.contains('on')) renderStats();
 }
 async function renderDay() {
   const today = dstr(new Date());
@@ -2714,6 +2734,7 @@ function setAddDate(v) {
   renderDay();
   if ($('p-alc').classList.contains('on')) renderAlc();
   if ($('p-fit').classList.contains('on')) renderFit();
+  if ($('p-stats').classList.contains('on')) renderStats();
 }
 function dayTxt(k) {
   const d = new Date(k + 'T12:00:00');
@@ -4133,8 +4154,12 @@ async function renderStats() {
   statCache = { list, a };
   ['per7', 'per30', 'per90'].forEach(id =>
     $(id).classList.toggle('pri', id === 'per' + period));
+  const dnes = dstr(new Date());
+  $('stDayLabel').textContent = curDate === dnes ? 'Dnes' : dayTxt(curDate);
+  $('stDnes').style.display = curDate === dnes ? 'none' : '';
   $('stRange').textContent = czd(list[0].date) + ' – ' + czd(list[list.length - 1].date) +
-    ' · záznam za ' + a.logged + ' z ' + dnu(a.days);
+    ' · záznam za ' + a.logged + ' z ' + dnu(a.days) +
+    (curDate === dnes ? '' : ' · období končí prohlíženým dnem, pozdější dny se nezapočítávají');
   $('stKcal').textContent = a.logged ? r0(a.avgK) : '—';
   $('stBurn').textContent = a.rmr ? r0(a.avgOut) : '—';
   $('stBal').textContent = (a.rmr && a.logged) ? ((a.avgBal > 0 ? '+' : '') + r0(a.avgBal)) : '—';

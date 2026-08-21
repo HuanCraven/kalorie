@@ -17,7 +17,42 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-84** (`APP_VERSION` v `index.html`, cache `kaltrack-v84` v `sw.js`).
+Aktuální verze: **2026.08.21-85** (`APP_VERSION` v `index.html`, cache `kaltrack-v85` v `sw.js`).
+
+### Novinky ve v85 — den se přepíná přímo na Statistikách
+
+`statsData` staví řadu dnů **pozpátku od `curDate`**, takže statistiky vždycky
+končí prohlíženým dnem. Nikde to ale nebylo vidět a den šel měnit jen šipkami na
+Hlavní — a uživatele to chytilo dvakrát: nejdřív u zbloudilého záznamu na budoucí
+datum, podruhé když zapsal snímek na 20. 8., zatímco aplikace stála na 19. 8.
+a statistiky ho tedy nemohly ukázat.
+
+Uživatel sám navrhl řešení lepší, než bylo to původně zamýšlené varování: dát
+přepínání dnů rovnou na Statistiky.
+
+- Nad přepínačem období je **lišta `‹ den ›`** se stejnou logikou jako na Hlavní.
+  `curDate` je sdílené, takže se obě stránky drží na témž dni.
+- **Tlačítko „dnes"** se ukáže, jen když prohlížený den není dnešek (`naDnesek()`).
+  Šipkami po jednom dni se člověk vracel dlouho a nepoznal, jak daleko zabloudil.
+- `shiftDay` a `setAddDate` nově překreslují i statistiky, když jsou zrovna vidět.
+- Řádek s rozsahem období navíc mimo dnešek dodá, že **období končí prohlíženým
+  dnem a pozdější dny se nezapočítávají**.
+- testy `test68.js` — popisek, skryté a viditelné tlačítko, posun průměru po
+  kroku zpět (2000 → 1000 kcal), návrat jedním klepnutím a sdílený den s Hlavní.
+
+#### Oprava měření v `test50.js`
+
+CI u v84 spadlo, přestože lokální regrese prošla 67/67 — a ne kvůli v84. Padal
+`test50` na tvrzení „data se opravdu nahrála": čekal jeden zápis, dostal dva.
+
+Při startu aplikace běží `if (syCfg.on) syncNow(false)` **bez ohledu na brzdu
+`last`**. Test si počet zápisů přečetl dřív, než úvodní sladění doběhlo. Na
+vývojovém stroji to stihne a vyjde jeden zápis; na pomalejším běžci v CI ne
+a vyjdou dva. Šlo tedy o chybu v měření, ne v aplikaci — ale takovou, kterou
+lokální regrese principiálně najít nemohla, protože je tu rychleji.
+
+Test proto před měřením vyčká, až úvodní sladění doběhne (`await syRun`), takže
+výsledek nezávisí na rychlosti stroje.
 
 ### Novinky ve v84 — model opisuje, přiřazuje kód
 
@@ -1058,7 +1093,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 67 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 68 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |
