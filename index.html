@@ -1136,7 +1136,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-91';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-92';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1813,11 +1813,47 @@ async function renderDay() {
     : (asum.budget > 0 ? 'zbývá ' + r0(asum.budget) + ' g' : 'přes limit o ' + r0(-asum.budget) + ' g');
   $('alcMonth').style.color = (asum.budget !== null && asum.budget <= 0) ? C_SUR : 'var(--dim)';
 
-  const favs = products.slice().sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 8).filter(p => p.uses);
-  $('favList').innerHTML = favs.length ? favs.map(p =>
-    `<button class="btn sm dotyk" onclick="openPortion('${sid(p.id)}')">${esc(p.name)}</button>`).join('')
-    : '<span class="tiny muted">Nejpoužívanější položky se objeví tady.</span>';
+  await renderCaste();
 }
+/* „Časté" se dřív plnilo z `products.uses`, což roste jen u potravin z databáze.
+   Zápis přes fotku, popis nebo rychlý zápis žádnou potravinu nezaloží, takže komu
+   ty cesty stačí, tomu karta zůstala navždy prázdná — a slibovala něco, co nikdy
+   nepřišlo. Deník naopak ví, co člověk jí doopravdy, ať to zapsal jakkoli. */
+let casteCache = [];
+async function casteZDeniku(dnu) {
+  const od = dstr(new Date(Date.now() - (dnu || 60) * 86400000));
+  const vse = (await dbAll('log')).filter(r => r.name && r.date >= od && r.date <= curDate);
+  const m = {};
+  vse.forEach(r => {
+    const k = norm(r.name) + '|' + (r.unit || 'g');
+    const g = m[k] || (m[k] = { name: r.name, n: 0, kdy: '', vzor: r });
+    g.n++;
+    const kdy = r.date + ' ' + String(r.ts || 0).padStart(16, '0');
+    if (kdy > g.kdy) { g.kdy = kdy; g.vzor = r; }   // předlohou je poslední zápis
+  });
+  // jednorázovky mezi „časté" nepatří; bez prahu by karta byla jen seznam všeho
+  return Object.values(m).filter(g => g.n >= 2).sort((a, b) => b.n - a.n).slice(0, 8);
+}
+async function renderCaste() {
+  if (!$('favList')) return;
+  casteCache = await casteZDeniku(60);
+  $('favList').innerHTML = casteCache.length
+    ? casteCache.map((g, i) => `<button class="btn sm dotyk" onclick="zapisCaste(${i})"
+        title="${esc(g.name)} — ${g.n}× za 60 dní">${esc(g.name)}
+        <span class="tiny muted">${g.n}×</span></button>`).join('')
+    : '<span class="tiny muted">Až něco zapíšeš podruhé, objeví se to tady.</span>';
+}
+/* Zapíše totéž znovu podle posledního zápisu — včetně gramáže a živin, ať vznikl
+   jakoukoli cestou. Chod se určí podle denní doby, ne podle předlohy. */
+async function zapisCaste(i) {
+  const g = casteCache[i]; if (!g) return;
+  const c = Object.assign({}, g.vzor); delete c.id; delete c.uid; delete c.upd;
+  c.date = curDate; c.ts = Date.now(); c.meal = defaultMeal();
+  await dbPut('log', c);
+  toast(g.name + ' zapsáno do ' + mealName(c.meal).toLowerCase());
+  renderDay();
+}
+
 /* smazání s možností vrátit — záznam se podrží v paměti po dobu toastu */
 async function delLogUndo(id) {
   const rec = await dbGet('log', id);

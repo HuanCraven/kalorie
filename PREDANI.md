@@ -17,7 +17,27 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-91** (`APP_VERSION` v `index.html`, cache `kaltrack-v91` v `sw.js`).
+Aktuální verze: **2026.08.21-92** (`APP_VERSION` v `index.html`, cache `kaltrack-v92` v `sw.js`).
+
+### Novinky ve v92 — „Časté" se plní z deníku, ne z databáze potravin
+
+Karta se plnila z `products.uses`, což roste jen u potravin z databáze. Zápis přes
+fotku, popis nebo rychlý zápis žádnou potravinu nezaloží — komu tyhle cesty stačí,
+tomu karta zůstala **navždy prázdná** a přitom slibovala, že se tam něco objeví.
+Zrovna to je přitom místo, kde se ušetří nejvíc klikání.
+
+- `casteZDeniku(dnu)` počítá výskyty v `log` za 60 dní, seskupuje podle názvu
+  a jednotky (`norm`, takže na diakritice nezáleží) a bere osm nejčastějších.
+- **Práh dvou výskytů** — jednorázovka mezi „časté" nepatří, bez prahu by karta
+  byla jen seznam všeho, co člověk kdy snědl.
+- Předlohou je **poslední** zápis té položky, takže se zapíše s aktuální gramáží
+  i živinami, ať vznikla jakoukoli cestou. Chod se určí podle denní doby
+  (`defaultMeal`), ne podle předlohy — ovesná kaše se v šest večer nezapíše
+  do snídaně.
+- Kopie dostane vlastní identitu (`delete id/uid/upd`), stejně jako u „⧉ včera".
+- U tlačítka je vidět počet (`5×`), aby bylo zřejmé, proč tam je.
+- testy `test69.js` — deset kontrol včetně toho, že se tam zápis z fotky dostane
+  a jednorázovka ne.
 
 ### Novinky ve v91 — dva texty, které lhaly
 
@@ -1237,7 +1257,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 68 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 69 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |
