@@ -226,10 +226,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <!-- Časté jsou hned pod kruhem: opakovaný zápis je nejčastější úkon dne.
        Dřív byly úplně dole, přes dvě obrazovky scrollování. -->
-  <div class="card" id="favCard">
-    <h3>Časté</h3>
-    <div id="favList" class="row wrap2"></div>
-  </div>
 
   <div class="card">
     <h3>Záznam dne</h3>
@@ -286,9 +282,21 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
        ruční zápis až pod výsledky (sahá se po něm, když hledání selže)
        a recept se přesunul do Jídel — je to správa databáze, ne zápis dne. -->
   <div class="seg" id="addSeg">
-    <button data-s="find" class="on" onclick="setAdd('find')">Hledat</button>
+    <button data-s="caste" class="on" onclick="setAdd('caste')">Časté</button>
+    <button data-s="find" onclick="setAdd('find')">Hledat</button>
     <button data-s="photo" onclick="setAdd('photo')">Popsat</button>
     <button data-s="lab" onclick="setAdd('lab')">Vyfotit</button>
+  </div>
+
+  <!-- Co člověk jí opakovaně. Bylo na Hlavní, jenže po rozdělení na chody zabralo
+       půl obrazovky — a přehled dne má být přehled, ne nástroj na zapisování. -->
+  <div class="pane on" id="s-caste">
+    <div class="card">
+      <h3>Časté</h3>
+      <div id="favList"></div>
+      <p class="tiny muted" style="margin:10px 0 0">Klepnutím zapíšeš totéž znovu —
+        se stejnou gramáží a do chodu, ke kterému to patří.</p>
+    </div>
   </div>
 
   <!-- Zavedení nové potraviny z fotky. Panel je jen rozcestník: fotku převezme
@@ -336,7 +344,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   </div>
 
-  <div class="pane on" id="s-find">
+  <div class="pane" id="s-find">
   <div class="card">
     <h3>Hledat podle názvu</h3>
     <div class="row">
@@ -1165,7 +1173,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-95';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-96';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1626,6 +1634,7 @@ function go(p) {
   $('p-' + p).classList.add('on');
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   if (p !== 'scan') stopCam();
+  if (p === 'scan') renderCaste();        // výchozí podzáložka Zadat
   if (p === 'db') renderDbMode();
   if (p === 'stats') renderStats();
   if (p === 'alc') renderAlc();
@@ -1644,6 +1653,7 @@ function setAdd(k) {
   document.querySelectorAll('#addSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === zvyraz));
   if (k !== 'code') stopCam();
   if (k === 'code') renderRecent();
+  if (k === 'caste') renderCaste();
   if (k === 'find') { onNameInput(); setTimeout(() => $('nameQ').focus(), 100); }
 }
 
@@ -1842,7 +1852,7 @@ async function renderDay() {
     : (asum.budget > 0 ? 'zbývá ' + r0(asum.budget) + ' g' : 'přes limit o ' + r0(-asum.budget) + ' g');
   $('alcMonth').style.color = (asum.budget !== null && asum.budget <= 0) ? C_SUR : 'var(--dim)';
 
-  await renderCaste();
+
 }
 /* „Časté" se dřív plnilo z `products.uses`, což roste jen u potravin z databáze.
    Zápis přes fotku, popis nebo rychlý zápis žádnou potravinu nezaloží, takže komu

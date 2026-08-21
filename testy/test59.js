@@ -19,12 +19,20 @@ const PROSTREDI = require('./prostredi');
   const panely = await p.$$eval('#addSeg button', bs => bs.map(b => b.textContent.trim()));
   // Smyslem v59 nebyl počet panelů, ale to, že Kód, Ručně a Recept přestaly být
   // samostatné volby — Kód a Ručně jsou odbočky z Hledat, Recept je v Jídlech.
-  // (v61 přibyl panel Vyfotit, což je samostatný způsob zápisu, a proto sem patří.)
-  ck('Zadat začíná Hledat a Popsat', panely[0] === 'Hledat' && panely[1] === 'Popsat', panely.join(' | '));
+  // (v61 přibyl panel Vyfotit, což je samostatný způsob zápisu, a proto sem patří.
+  //  v96 přibyly Časté a jsou první — nejrychlejší cesta má být na ráně.)
+  ck('Zadat nabízí Časté, Hledat i Popsat',
+     panely[0] === 'Časté' && panely.indexOf('Hledat') > 0 && panely.indexOf('Popsat') > 0,
+     panely.join(' | '));
   ck('Kód, Ručně ani Recept nejsou samostatné panely',
      !panely.some(t => ['Kód', 'Ručně', 'Recept'].indexOf(t) >= 0), panely.join(' | '));
 
   await p.click('nav button[data-p="scan"]');
+  await p.waitForTimeout(300);
+  ck('Zadat se otevírá rovnou na Častých',
+     await p.evaluate(() => document.getElementById('s-caste').classList.contains('on')));
+  await p.evaluate(() => setAdd('find'));      // dál se testuje hledání
+  await p.waitForTimeout(300);
   ck('ikona čtečky je v poli hledání', await p.isVisible('#nameScan'));
   ck('ruční zápis je dostupný z hledání',
      await p.isVisible('#s-find >> text=Nenašel jsem to'));
@@ -89,16 +97,18 @@ const PROSTREDI = require('./prostredi');
   await p.waitForTimeout(200);
   ck('přepnutím zpět se hledání vrátí', await p.isVisible('#dbHledatKarta'));
 
-  /* ---- 6. Časté jsou na Hlavní nad Záznamem dne -------------------- */
+  /* ---- 6. Časté jsou na ráně, jen jinde než dřív (v96) -------------
+     Původně se hlídalo, že jsou na Hlavní nad Záznamem dne. Po rozdělení na chody
+     tam zabíraly půl obrazovky, takže se přestěhovaly na Zadat. Smysl tvrzení
+     zůstává: musí být na ráně, ne přes dvě obrazovky rolování. */
   await p.evaluate(() => { go('day'); return renderDay(); });
   await p.waitForTimeout(400);
-  const pozice = await p.evaluate(() => {
-    const fav = document.getElementById('favCard');
-    const log = document.getElementById('logList').closest('.card');
-    return { fav: Math.round(fav.getBoundingClientRect().top), log: Math.round(log.getBoundingClientRect().top) };
-  });
-  ck('Časté jsou nad Záznamem dne', pozice.fav < pozice.log, JSON.stringify(pozice));
-  ck('a vejdou se na první obrazovku', pozice.fav < 812, 'top=' + pozice.fav);
+  ck('na Hlavní už Časté nejsou', await p.evaluate(() => !document.getElementById('favCard')));
+  await p.evaluate(() => { go('scan'); setAdd('caste'); });
+  await p.waitForTimeout(400);
+  const top = await p.evaluate(() =>
+    Math.round(document.getElementById('favList').getBoundingClientRect().top));
+  ck('a vejdou se na první obrazovku', top < 812, 'top=' + top);
 
   /* ---- 7. dotykové cíle ------------------------------------------- */
   const podMiru = await p.evaluate(() => [...document.querySelectorAll('#p-day button')]

@@ -17,7 +17,25 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-95** (`APP_VERSION` v `index.html`, cache `kaltrack-v95` v `sw.js`).
+Aktuální verze: **2026.08.21-96** (`APP_VERSION` v `index.html`, cache `kaltrack-v96` v `sw.js`).
+
+### Novinky ve v96 — Časté se přestěhovaly na Zadat
+
+Po rozdělení na chody zabíralo Časté na Hlavní půl obrazovky. Uživatel navrhl
+přesun na Zadat a vlastní podzáložku — správně: **Hlavní je přehled dne, Zadat je
+nástroj na zapisování**, a časté položky jsou nástroj.
+
+- Nová podzáložka `caste` v `#addSeg`, panel `s-caste`, a je **první i výchozí**.
+  Většina toho, co člověk jí, se opakuje, takže nejrychlejší cesta má být první.
+- Vedlejší zisk: dřív se na Zadat rovnou otevíralo hledání a **vyskočila
+  klávesnice**. Teď naskočí seznam a klávesnice zůstane schovaná, dokud ji člověk
+  nechce.
+- `go('scan')` seznam překreslí, aby byl naplněný i bez klepnutí na záložku.
+- **Zkratka z ikony (`?jdi=scan`) zůstává na Hledat.** Nabízelo se srovnat ji
+  s novou výchozí podzáložkou, ale uživatel se rozhodl nechat ji být a napřed si
+  osahat, jak mu to sedí. `test57` to hlídá.
+- testy `test69.js`: karta zmizela z Hlavní, je na Zadat, dá se přepínat a
+  otevření stránky ji naplní.
 
 ### Novinky ve v95 — „Časté" po chodech
 

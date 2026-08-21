@@ -37,7 +37,7 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   /* ---- 1. panel je dostupný vedle Hledat a Popsat ------------------ */
   await p.click('nav button[data-p="scan"]');
   const panely = await p.$$eval('#addSeg button', bs => bs.map(b => b.textContent.trim()));
-  ck('Zadat má tři panely včetně Vyfotit', panely.join('|') === 'Hledat|Popsat|Vyfotit', panely.join('|'));
+  ck('Zadat má panely včetně Vyfotit', panely.join('|') === 'Časté|Hledat|Popsat|Vyfotit', panely.join('|'));
   await p.click('#addSeg button[data-s="lab"]');
   await p.waitForTimeout(200);
   ck('panel Vyfotit se otevře', await p.isVisible('#s-lab'));

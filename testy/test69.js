@@ -17,7 +17,7 @@ const PROSTREDI = require('./prostredi');
   await p.waitForFunction(() => typeof db !== 'undefined' && db, null, { timeout: 15000 });
 
   /* ---- 1. prázdný deník to řekne bez slibů ------------------------ */
-  await p.evaluate(() => renderDay());
+  await p.evaluate(() => { go('scan'); return renderCaste(); });
   await p.waitForTimeout(600);
   ck('bez opakovaného zápisu karta nic neslibuje',
      (await p.textContent('#favList')).indexOf('podruh\u00e9') >= 0,
@@ -39,7 +39,7 @@ const PROSTREDI = require('./prostredi');
     // jednorázovka se mezi časté dostat nesmí
     await dbPut('log', { date: den(1), productId: 'quick', name: 'Svatební dort', unit: 'porce',
       amount: 1, meal: 'svacina', kcal: 600, p: 5, c: 80, f: 30, ts: 3000 });
-    return renderDay();
+    go('scan'); return renderCaste();
   });
   await p.waitForTimeout(700);
   const txt = () => p.textContent('#favList');
@@ -93,7 +93,7 @@ const PROSTREDI = require('./prostredi');
     for (let i = 1; i <= 4; i++)
       await dbPut('log', { date: den(i), productId: 'quick', name: 'Svíčková', unit: 'porce',
         amount: 1, meal: 'obed', kcal: 700, p: 30, c: 60, f: 30, ts: 5000 + i });
-    return renderDay();
+    go('scan'); return renderCaste();
   });
   await p.waitForTimeout(700);
   await p.evaluate(() => {
@@ -105,6 +105,27 @@ const PROSTREDI = require('./prostredi');
     (await dbByIdx('log', 'date', curDate)).filter(r => r.name === 'Svíčková')[0]);
   ck('oběd se zapíše do oběda bez ohledu na hodiny', svickova && svickova.meal === 'obed',
      JSON.stringify(svickova));
+
+  /* ---- 5. místo na stránce Zadat (v96) -----------------------------
+     Po rozdělení na chody zabralo Časté na Hlavní půl obrazovky. Přehled dne má
+     být přehled; nástroj na zapisování patří k zapisování. */
+  ck('na Hlavní už karta Časté není',
+     await p.evaluate(() => !document.getElementById('favCard')));
+  ck('a je na Zadat jako podzáložka',
+     await p.evaluate(() => !!document.querySelector('#addSeg button[data-s="caste"]')));
+  await p.evaluate(() => { go('scan'); setAdd('find'); });
+  await p.waitForTimeout(400);
+  ck('dá se z ní přepnout na hledání',
+     await p.evaluate(() => document.getElementById('s-find').classList.contains('on')));
+  await p.evaluate(() => setAdd('caste'));
+  await p.waitForTimeout(500);
+  ck('a zpátky, i s obsahem',
+     (await p.textContent('#favList')).indexOf('Ovesná kaše') >= 0);
+  ck('otevření stránky Zadat seznam naplní', await p.evaluate(async () => {
+    document.getElementById('favList').innerHTML = '';
+    go('scan'); await new Promise(r => setTimeout(r, 400));
+    return document.getElementById('favList').textContent.indexOf('Ovesná kaše') >= 0;
+  }));
 
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
