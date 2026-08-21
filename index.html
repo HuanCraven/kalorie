@@ -601,8 +601,9 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <div class="card grow" style="margin:0;background:var(--card2);text-align:center;padding:10px">
         <div class="tiny muted">30 dní</div><b class="mono" id="fit30" style="font-size:19px">0</b><div class="tiny muted">kcal</div></div>
     </div>
-    <p class="tiny muted" style="margin:0">Spálené kalorie se přičítají ke klidovému výdeji a ke
-      kaloriím z hodinek — pozor na dvojí započtení, když ti trénink změří i hodinky.</p>
+    <p class="tiny muted" style="margin:0">Spálené kalorie se přičítají ke klidovému výdeji —
+      ale jen ve dnech, kde níže nevyplníš celkový výdej z hodinek. Ten už pohyb i cvičení
+      obsahuje a nahrazuje celý výpočet.</p>
   </div>
 
   <div class="card">
@@ -1135,7 +1136,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-90';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.08.21-91';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -3896,6 +3897,7 @@ function agg(list, w0) {
     maxK: Math.max(...(kcals.length ? kcals : [0])), sdK: sd,
     avgP: avg(lg, d => d.p), avgC: avg(lg, d => d.c), avgF: avg(lg, d => d.f),
     avgBurn: withBurn.length ? avg(withBurn, d => d.burn) : 0, burnDays: withBurn.length,
+    totalDnu: list.filter(d => d.total !== null).length,
     avgOut: outDays.length ? outDays.reduce((a, x) => a + x, 0) / outDays.length : 0,
     avgBal: balDays.filter(x => x !== null).length
       ? balDays.filter(x => x !== null).reduce((a, x) => a + x, 0) / balDays.filter(x => x !== null).length : 0,
@@ -4378,7 +4380,11 @@ function insights(list, a) {
     out.push((podil < 5 ? ok : wr) + 'Alkohol: <b>' + r0(a.alc) + ' g</b> za období (' + a.alcDays +
       ' z ' + dnu(a.days) + '), to je ' + pctTxt(podil) + ' přijaté energie.');
   }
-  if (a.burnDays === 0 && a.rmr)
+  /* Jen když nechodí ani aktivní kalorie, ani celkový výdej ze snímku. Ten má
+     pohyb v sobě, takže bilance je i bez `burn` úplná — hlásit v takovém případě
+     „počítá jen s klidovým výdejem" byla nepravda, a u kohokoli, kdo nahrává
+     celkový výdej z hodinek, nepravda každodenní. */
+  if (a.burnDays === 0 && a.totalDnu === 0 && a.rmr)
     out.push(wr + 'Aktivní kalorie z hodinek nezadáváš — bilance počítá jen s klidovým výdejem.');
   return out;
 }

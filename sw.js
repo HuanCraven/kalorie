@@ -1,4 +1,4 @@
-const CACHE = 'kaltrack-v90';
+const CACHE = 'kaltrack-v91';
 const SHELL = ['./', './index.html', './manifest.json', './zxing.js', './zaklad.js', './jidla.js'];
 
 self.addEventListener('install', e => {

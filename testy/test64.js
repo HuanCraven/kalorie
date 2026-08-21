@@ -358,6 +358,36 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   ck('vyplněné pole má přednost před opisem',
      (await p.evaluate(() => fitDenNavrh.tep)) === 51);
 
+  /* ---- postřeh o aktivních kaloriích nesmí lhát (v91) --------------
+     Svítil vždycky, když nebyly vyplněné aktivní kcal — i ve dnech, kde výdej
+     chodí ze snímku jako celkový. Ten pohyb v sobě má, takže bilance je úplná
+     a hlásit „počítá jen s klidovým výdejem" byla nepravda. */
+  const postrehy = await p.evaluate(async () => {
+    await new Promise(res => { const t = db.transaction(['daily', 'log', 'workout'], 'readwrite');
+      t.objectStore('daily').clear(); t.objectStore('log').clear();
+      t.objectStore('workout').clear(); t.oncomplete = res; });
+    goals.rmr = 1800; goals.dyn = false; await dbPut('meta', { k: 'goals', v: goals });
+    const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
+    for (let i = 0; i < 10; i++)
+      await dbPut('log', { date: den(i), productId: 'quick', name: 'Jídlo', unit: 'porce',
+        amount: 1, meal: 'obed', kcal: 2000, p: 50, c: 100, f: 30, ts: Date.now() });
+    go('stats'); setPeriod(30); await renderStats();
+    const bezVydeje = $('stInsights').textContent;
+    for (let i = 0; i < 10; i++) await zapisDen(den(i), 'hodinky', { total: 2600 });
+    await renderStats();
+    return { bezVydeje, sCelkovym: $('stInsights').textContent };
+  });
+  ck('bez jakéhokoli výdeje se na aktivní kalorie upozorní',
+     postrehy.bezVydeje.indexOf('Aktivní kalorie z hodinek nezad') >= 0, postrehy.bezVydeje.slice(0, 300));
+  ck('s celkovým výdejem ze snímku už ta hláška nesvítí',
+     postrehy.sCelkovym.indexOf('Aktivní kalorie z hodinek nezad') < 0,
+     postrehy.sCelkovym.slice(0, 200));
+
+  // a text na Pohybu už si neprotiřečí sám se sebou
+  const pohyb = await p.evaluate(() => document.getElementById('p-fit').innerText);
+  ck('Pohyb neslibuje přičítání i tam, kde se nepřičítá',
+     pohyb.indexOf('jen ve dnech, kde níže nevyplníš') > 0);
+
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
   process.exit(0);
