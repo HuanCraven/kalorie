@@ -17,7 +17,26 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-90** (`APP_VERSION` v `index.html`, cache `kaltrack-v90` v `sw.js`).
+Aktuální verze: **2026.08.21-91** (`APP_VERSION` v `index.html`, cache `kaltrack-v91` v `sw.js`).
+
+### Novinky ve v91 — dva texty, které lhaly
+
+Našlo se při procházení aplikace s realistickými daty za 40 dní — návazná
+prohlídka rozhraní po sjednocení.
+
+- **Postřeh o aktivních kaloriích** svítil, kdykoli byl `burnDays === 0`. Jenže
+  kdo místo aktivních kalorií nahrává **celkový** výdej ze snímku, má bilanci
+  úplnou — celkový výdej pohyb obsahuje. U takového uživatele se hláška ukazovala
+  každý den a pokaždé byla nepravdivá. Nově je podmíněná i `totalDnu === 0`.
+- **Text na Pohybu** tvrdil, že se spálené kalorie přičítají ke klidovému výdeji
+  i ke kaloriím z hodinek — a o kus níž stálo, že celkový výdej celý výpočet
+  nahrazuje. Platí to druhé (`vydejDne`). Text přepsaný tak, aby byl pravdivý
+  v obou případech, místo aby se podmiňoval.
+- testy `test64.js` na obojí.
+
+Při psaní testu se stalo poučné: příprava dat nesmazala `workout` z dřívější
+části sady, takže `burnDays` nebyl nula a postřeh správně nesvítil. Logika byla
+v pořádku, slepé místo měla jen u celkového výdeje.
 
 ### Novinky ve v90 — jedna podoba hlášky „nemám dost dat"
 
