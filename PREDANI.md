@@ -17,7 +17,27 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-85** (`APP_VERSION` v `index.html`, cache `kaltrack-v85` v `sw.js`).
+Aktuální verze: **2026.08.21-86** (`APP_VERSION` v `index.html`, cache `kaltrack-v86` v `sw.js`).
+
+### Novinky ve v86 — do křivek zdraví jde klepnout
+
+Dlaždice karty Zdraví ukazují **průměr za období**, takže se uživateli tep ze dvou
+dnů (53 a 47) zobrazil jako 50. Ptal se, jestli půjde vidět jednotlivé dny.
+Křivky pod dlaždicemi je kreslí, ale číslo z nich nešlo dostat — a graf příjmu
+přitom klepnutí na sloupec zná už dávno (`stTip`).
+
+- `svgCara` nově dostává `klic` a `jednotka` a pod každou křivku přidá vlastní
+  řádek na detail (`cara1`, `cara2`, …; id se generuje, protože křivky jsou na
+  stránce tři).
+- Nad body leží **průhledné dotykové cíle** široké podle rozestupu dnů, nejméně
+  8 px — na mobilu se do samotného dvoupixelového bodu netrefíš.
+- `zdrTip(id, i, klic, jednotka)` vypíše `dayTxt(datum)` a hodnotu; u spánku ji
+  převede zpátky na čas přes `min2cas`.
+- testy `test64.js` — pobídka pod grafem, vlastní řádek na detail a to, že
+  klepnutí do grafu ukáže den i hodnotu.
+
+**Pozn.:** křivka potřebuje aspoň **tři** dny s daty, jinak se místo ní ukáže
+hláška. Se dvěma zapsanými dny tedy uživatel zatím vidí jen ji.
 
 ### Novinky ve v85 — den se přepíná přímo na Statistikách
 

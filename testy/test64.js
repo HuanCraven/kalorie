@@ -256,6 +256,20 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   ck('a tep s alkoholem vychází vyšší', vz.indexOf('60') >= 0 && vz.indexOf('52') >= 0, vz.slice(0, 120));
   ck('graf tepu se vykreslí', (await p.locator('#chTep svg').count()) >= 1);
 
+  /* v86: klepnutím na graf se ukáže konkrétní den. Průměr za období neřekne,
+     jestli je hodnota stálá, nebo skáče — a jednotlivé dny nešly nijak zjistit. */
+  ck('pod grafem je pobídka ke klepnutí',
+     (await p.textContent('#chTep')).indexOf('Klepni na graf') >= 0);
+  const tipId = await p.evaluate(() => {
+    const el = document.querySelector('#chTep div[id^="cara"]'); return el ? el.id : '';
+  });
+  ck('graf má vlastní řádek na detail', tipId.indexOf('cara') === 0, tipId);
+  await p.evaluate(() => document.querySelector('#chTep rect[onclick]').dispatchEvent(
+    new MouseEvent('click', { bubbles: true })));
+  await p.waitForTimeout(300);
+  const detail = await p.evaluate(id => document.getElementById(id).textContent, tipId);
+  ck('klepnutí ukáže den i hodnotu', /\d+\.\s*\d+\..*tep\/min/.test(detail), detail);
+
   /* ---- 13. bez dat se karta neukazuje ------------------------------ */
   await p.evaluate(async () => {
     await new Promise(res => { const t = db.transaction('daily', 'readwrite'); t.objectStore('daily').clear(); t.oncomplete = res; });
