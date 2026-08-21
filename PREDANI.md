@@ -17,7 +17,22 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-93** (`APP_VERSION` v `index.html`, cache `kaltrack-v93` v `sw.js`).
+Aktuální verze: **2026.08.21-94** (`APP_VERSION` v `index.html`, cache `kaltrack-v94` v `sw.js`).
+
+### Novinky ve v94 — lišta kotev na Statistikách
+
+Poslední bod z prohlídky rozhraní. Statistiky mají devět karet pod sebou; od
+výběru dne po zdroje kalorií je to dlouhé rolování a zpátky nahoru ještě delší.
+
+- `.kotvy` je **lepivá lišta** (`position: sticky`) s kolečky názvů karet. Klepnutí
+  vede přes `skocNaKartu`, takže se cíl i zvýrazní — stejné chování jako u proklikú
+  z postřehů.
+- **Skryté karty kotvu nemají.** `renderKotvy` se volá až na konci `renderStats`,
+  kdy je jasné, které karty jsou vidět; lišta tedy neslibuje Zdraví ani víkendovou
+  kartu, dokud na ně nejsou data.
+- Vodorovně rolovatelná, aby se na úzkém displeji vešla do jednoho řádku.
+- testy `test70.js` rozšířeny o čtyři kontroly včetně toho, že kotva Zdraví
+  přibude, jakmile zdravotní data dorazí.
 
 ### Novinky ve v93 — postřehy vedou na kartu, u matoucích čísel je vysvětlení
 

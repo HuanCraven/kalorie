@@ -72,6 +72,35 @@ const PROSTREDI = require('./prostredi');
   ck('a klepnutí na tentýž otazník zavře i ten',
      (await p.locator('#p-stats .bub:not([hidden])').count()) === 0);
 
+  /* ---- 4. lišta kotev (v94) ----------------------------------------
+     Devět karet pod sebou; od výběru dne po zdroje kalorií je to dlouhé rolování
+     a zpátky nahoru ještě delší. Lišta drží u horního kraje a doskáče na kartu. */
+  ck('nad obdobím je lišta kotev', (await p.locator('#stKotvy .kotva').count()) >= 4,
+     'kotev: ' + await p.locator('#stKotvy .kotva').count());
+  ck('lišta drží u horního kraje',
+     await p.evaluate(() => getComputedStyle(document.getElementById('stKotvy')).position === 'sticky'));
+
+  const jmena = await p.locator('#stKotvy .kotva').allTextContents();
+  ck('kotvy pojmenovávají karty, které na stránce jsou',
+     jmena.indexOf('Příjem') >= 0 && jmena.indexOf('Makra') >= 0, JSON.stringify(jmena));
+  ck('skrytá karta Zdraví kotvu nemá, dokud nejsou data',
+     jmena.indexOf('Zdraví') < 0, JSON.stringify(jmena));
+
+  await p.click('#stKotvy .kotva >> nth=0'); await p.waitForTimeout(500);
+  ck('klepnutí na kotvu kartu zvýrazní',
+     await p.evaluate(() => document.getElementById('kartaPrijem').style.outline !== ''));
+
+  // jakmile zdravotní data jsou, kotva se objeví
+  await p.evaluate(async () => {
+    const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
+    for (let i = 0; i < 5; i++) await zapisDen(den(i), 'hodinky', { tep: 50 + i, hrv: 40 + i, spanek: 400 });
+    return renderStats();
+  });
+  await p.waitForTimeout(900);
+  ck('se zdravotními daty kotva Zdraví přibude',
+     (await p.locator('#stKotvy .kotva').allTextContents()).indexOf('Zdraví') >= 0,
+     JSON.stringify(await p.locator('#stKotvy .kotva').allTextContents()));
+
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
   process.exit(0);
