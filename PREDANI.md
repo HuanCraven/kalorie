@@ -17,7 +17,34 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-99** (`APP_VERSION` v `index.html`, cache `kaltrack-v99` v `sw.js`).
+Aktuální verze: **2026.08.21-100** (`APP_VERSION` v `index.html`, cache `kaltrack-v100` v `sw.js`).
+
+### Novinky ve v100 — výběr více položek, kopie na jiný den, chod u rozboru
+
+Tři přání uživatele naráz. Dvě z nich jsou dvě akce nad toutéž věcí, takže mají
+jeden mechanismus.
+
+- **Zaškrtávátka v řádcích Záznamu dne jsou vidět pořád.** Uživatel navrhl vynechat
+  přepínač „Vybrat" — bez něj je na první pohled jasné, že se dá vybírat, a ušetří
+  to jedno klepnutí. Lišta s akcemi naskočí, teprve když je něco vybrané.
+- **Přesunout do…** změní chod všem označeným naráz. Dřív se muselo po jednom přes
+  úpravu záznamu.
+- **Kopírovat na…** vytvoří kopie na zvolený den a originály nechá být. Dosud šlo
+  jídlo jen přesunout, protože úprava mění datum. Kopie zahazuje `id`, `uid`
+  a `upd` — jinak by sloučení na druhém zařízení považovalo obojí za tentýž řádek
+  a jedna by zmizela. Test to hlídá zvlášť.
+- **Výběr chodu v kartě s návrhem** (`aiMeal`). Položky z rozboru padaly natvrdo do
+  `defaultMeal()`, tedy podle hodin; kdo dopisuje oběd večer, měl ho ve večerní
+  svačině. Platí pro obojí — po položkách i jako jedno jídlo.
+- testy `test71.js`.
+
+Při psaní se ukázalo, že plnění výběru chodu bylo pověšené na **zobrazení** karty
+místo na její **vykreslení** — fungovalo jen z běžné cesty. Přesunuto do `renderAI`.
+
+**Ponecháno záměrně:** tlačítko „⧉ včera" v záhlaví chodu. Uživatel zvažoval jeho
+zrušení kvůli místu, ale sedí jinde než zaškrtávátka (záhlaví proti řádkům) a dělá
+opačnou věc — táhne včerejší chod SEM jedním klepnutím, kdežto kopie posílá vybrané
+ODSUD jinam. Přes kopii by táž věc stála pět kroků.
 
 ### Novinky ve v99 — cesty k nové potravině a poctivější názvy
 
@@ -1400,7 +1427,7 @@ Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 | `build/extra.js` | suroviny, které nejsou v `zaklad.js` | ano |
 | `build/build-jidla.js` | generátor `jidla.js` | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v `manifest.json` | zřídka |
-| `testy/` | 70 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 71 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures | zřídka |
 | `README.md` | uživatelská dokumentace (nasazení i všechny funkce) | ano |
 | `PROJEKT-INSTRUKCE.md` | text do Project instructions pro Claude projekt | zřídka |
