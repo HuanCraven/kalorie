@@ -21,17 +21,15 @@ const PROSTREDI = require('./prostredi');
   // samostatné volby — Kód a Ručně jsou odbočky z Hledat, Recept je v Jídlech.
   // (v61 přibyl panel Vyfotit, což je samostatný způsob zápisu, a proto sem patří.
   //  v96 přibyly Časté a jsou první — nejrychlejší cesta má být na ráně.)
-  ck('Zadat nabízí Časté, Hledat i Popsat',
-     panely.join('|') === 'Časté|Hledat|Popsat', panely.join(' | '));
+  ck('Zadat nabízí Hledat i Popsat',
+     panely.join('|') === 'Hledat|Popsat', panely.join(' | '));
   ck('Kód, Ručně ani Recept nejsou samostatné panely',
      !panely.some(t => ['Kód', 'Ručně', 'Recept'].indexOf(t) >= 0), panely.join(' | '));
 
   await p.click('nav button[data-p="scan"]');
   await p.waitForTimeout(300);
-  ck('Zadat se otevírá rovnou na Častých',
-     await p.evaluate(() => document.getElementById('s-caste').classList.contains('on')));
-  await p.evaluate(() => setAdd('find'));      // dál se testuje hledání
-  await p.waitForTimeout(300);
+  ck('Zadat se otevírá rovnou na Hledat',
+     await p.evaluate(() => document.getElementById('s-find').classList.contains('on')));
   ck('ikona čtečky je v poli hledání', await p.isVisible('#nameScan'));
   ck('ruční zápis je dostupný z hledání',
      await p.isVisible('#s-find >> text=Nenašel jsem to'));
@@ -48,31 +46,44 @@ const PROSTREDI = require('./prostredi');
   ck('zpět na hledání funguje', await p.isVisible('#s-find'));
 
   /* ---- 3. hledání nabízí, i když se nic nenapsalo ------------------- */
+  /* Od v103 se nabídka bere z DENÍKU a řídí se chodem, ne z products.uses —
+     to rostlo jen u potravin z databáze, takže zápis přes fotku či popis se do
+     nabídky nikdy nedostal. Jedno ťuknutí rovnou zapíše. */
   await p.evaluate(async () => {
-    await dbPut('products', { id: 'p-a', name: 'Tvaroh měkký', unit: 'g', kcal: 75, p: 12, c: 4, f: 0.5, uses: 9, lastUsed: Date.now(), lastAmount: 200 });
-    await dbPut('products', { id: 'p-b', name: 'Rohlík', unit: 'g', kcal: 290, p: 9, c: 55, f: 3, uses: 4, lastUsed: Date.now() - 1000 });
-    await dbPut('products', { id: 'p-c', name: 'Nikdy nepoužité', unit: 'g', kcal: 100, p: 1, c: 1, f: 1 });
-    products = await dbAll('products');
+    const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
+    for (let i = 1; i <= 4; i++)
+      await dbPut('log', { date: den(i), productId: 'foto', name: 'Tvaroh měkký', unit: 'g',
+        amount: 200, meal: 'snidane', kcal: 150, p: 24, c: 8, f: 1, ts: 100 + i });
+    for (let i = 1; i <= 2; i++)
+      await dbPut('log', { date: den(i), productId: 'quick', name: 'Rohlík', unit: 'g',
+        amount: 60, meal: 'snidane', kcal: 174, p: 5, c: 33, f: 2, ts: 200 + i });
+    await dbPut('log', { date: den(1), productId: 'quick', name: 'Jen k večeři', unit: 'g',
+      amount: 100, meal: 'vecere', kcal: 100, p: 1, c: 1, f: 1, ts: 300 });
     setAdd('find');
+    document.getElementById('rychleMeal').value = 'snidane';
+    return renderRychle();
   });
-  await p.waitForTimeout(300);
+  await p.waitForTimeout(400);
   const nabidka = await p.evaluate(() => ({
     polozek: document.querySelectorAll('#nameRes .item').length,
     text: document.getElementById('nameRes').textContent
   }));
   ck('prázdné hledání nabídne, co se jí nejčastěji', nabidka.polozek >= 2, 'položek: ' + nabidka.polozek);
   ck('a je označené jako Nejčastější', nabidka.text.indexOf('Nejčastější') >= 0, nabidka.text.slice(0, 50));
-  ck('nepoužitá potravina se do nabídky nedostane', nabidka.text.indexOf('Nikdy nepoužité') < 0);
+  ck('jídlo z jiného chodu se do nabídky nedostane',
+     nabidka.text.indexOf('Jen k večeři') < 0, nabidka.text.slice(0, 80));
 
-  // z nabídky jde rovnou zapsat — dva ťuky, bez psaní
+  /* Ťuknutí otevře okno porce, ne rovnou zápis: gramáž se u téhož jídla mění
+     často, takže ušetřené ťuknutí by vzalo možnost, která je potřeba víc. */
   await p.click('#nameRes .item >> nth=0');
-  await p.waitForTimeout(300);
+  await p.waitForTimeout(500);
   ck('ťuknutí na nabídku otevře okno porce', await p.isVisible('#modPortion'));
-
-  /* ---- 4. gramáže podle toho, co se u té potraviny zapisuje --------- */
+  ck('s předvyplněnou gramáží podle posledního zápisu (200 g)',
+     (await p.inputValue('#poAmt')) === '200', await p.inputValue('#poAmt'));
+  ck('a s chodem podle nabídky', (await p.inputValue('#poMeal')) === 'snidane',
+     await p.inputValue('#poMeal'));
   const knofliky = await p.evaluate(() => ['poQ1', 'poQ2', 'poQ3'].map(i => document.getElementById(i).textContent));
-  ck('rychlé gramáže vychází z poslední porce (200 g)',
-     knofliky.join('/') === '100/200/400', knofliky.join('/'));
+  ck('rychlé gramáže vychází z poslední porce', knofliky.join('/') === '100/200/400', knofliky.join('/'));
   await p.evaluate(() => closeMod('modPortion'));
 
   await p.evaluate(async () => {
@@ -96,18 +107,18 @@ const PROSTREDI = require('./prostredi');
   await p.waitForTimeout(200);
   ck('přepnutím zpět se hledání vrátí', await p.isVisible('#dbHledatKarta'));
 
-  /* ---- 6. Časté jsou na ráně, jen jinde než dřív (v96) -------------
-     Původně se hlídalo, že jsou na Hlavní nad Záznamem dne. Po rozdělení na chody
-     tam zabíraly půl obrazovky, takže se přestěhovaly na Zadat. Smysl tvrzení
-     zůstává: musí být na ráně, ne přes dvě obrazovky rolování. */
+  /* ---- 6. nabídka častých je na ráně (v96 → v103) -------------------
+     Původně se hlídalo, že je na Hlavní nad Záznamem dne; pak se stěhovala na
+     Zadat jako vlastní záložka a ta se v provozu neosvědčila. Skončila v prázdném
+     poli hledání. Smysl tvrzení se nemění: musí být na ráně, bez rolování. */
   await p.evaluate(() => { go('day'); return renderDay(); });
   await p.waitForTimeout(400);
   ck('na Hlavní už Časté nejsou', await p.evaluate(() => !document.getElementById('favCard')));
-  await p.evaluate(() => { go('scan'); setAdd('caste'); });
-  await p.waitForTimeout(400);
+  await p.evaluate(() => { go('scan'); setAdd('find'); });
+  await p.waitForTimeout(500);
   const top = await p.evaluate(() =>
-    Math.round(document.getElementById('favList').getBoundingClientRect().top));
-  ck('a vejdou se na první obrazovku', top < 812, 'top=' + top);
+    Math.round(document.getElementById('nameRes').getBoundingClientRect().top));
+  ck('a nabídka se vejde na první obrazovku', top < 812, 'top=' + top);
 
   /* ---- 7. dotykové cíle ------------------------------------------- */
   const podMiru = await p.evaluate(() => [...document.querySelectorAll('#p-day button')]

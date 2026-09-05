@@ -308,20 +308,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
        ruční zápis až pod výsledky (sahá se po něm, když hledání selže)
        a recept se přesunul do Jídel — je to správa databáze, ne zápis dne. -->
   <div class="seg" id="addSeg">
-    <button data-s="caste" class="on" onclick="setAdd('caste')">Časté</button>
-    <button data-s="find" onclick="setAdd('find')">Hledat</button>
+    <button data-s="find" class="on" onclick="setAdd('find')">Hledat</button>
     <button data-s="photo" onclick="setAdd('photo')">Popsat</button>
-  </div>
-
-  <!-- Co člověk jí opakovaně. Bylo na Hlavní, jenže po rozdělení na chody zabralo
-       půl obrazovky — a přehled dne má být přehled, ne nástroj na zapisování. -->
-  <div class="pane on" id="s-caste">
-    <div class="card">
-      <h3>Časté</h3>
-      <div id="favList"></div>
-      <p class="tiny muted" style="margin:10px 0 0">Klepnutím zapíšeš totéž znovu —
-        se stejnou gramáží a do chodu, ke kterému to patří.</p>
-    </div>
   </div>
 
   <!-- Zavedení nové potraviny z fotky. Panel je jen rozcestník: fotku převezme
@@ -359,7 +347,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   </div>
 
-  <div class="pane" id="s-find">
+  <div class="pane on" id="s-find">
   <div class="card">
     <h3>Hledat podle názvu</h3>
     <div class="row">
@@ -379,6 +367,13 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <label class="row" style="margin:10px 0 0;gap:8px;align-items:center">
       <input type="checkbox" id="czOnly" style="width:auto" checked>
       <span class="tiny muted">jen české (když nic nenajde, ukážu všechny)</span></label>
+    <!-- Prázdné pole hledání nabízí, co k tomuhle jídlu chodí nejčastěji. Dřív to
+         bralo z `products.uses`, jenže to roste jen u potravin z databáze — zápis
+         přes fotku nebo popis se tam nikdy nedostal. Bere se tedy z deníku. -->
+    <div class="row" style="margin-top:10px;gap:8px;align-items:center" id="rychleLista">
+      <span class="tiny muted">Nabídnout k</span>
+      <select id="rychleMeal" class="grow" onchange="renderRychle()"></select>
+    </div>
     <div id="nameRes" style="margin-top:8px"></div>
   </div>
 
@@ -748,11 +743,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div class="card" id="kartaPostrehy">
     <h3>Postřehy</h3>
     <div id="stInsights"></div>
-  </div>
-
-  <div class="card" id="kartaZdroje">
-    <h3>Největší zdroje kalorií</h3>
-    <div id="stTop"></div>
   </div>
 
   <div class="card">
@@ -1223,7 +1213,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.08.21-102';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.09.05-103';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1684,7 +1674,7 @@ function go(p) {
   $('p-' + p).classList.add('on');
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   if (p !== 'scan') stopCam();
-  if (p === 'scan') renderCaste();        // výchozí podzáložka Zadat
+  if (p === 'scan' && $('s-find').classList.contains('on')) onNameInput();
   if (p === 'db') renderDbMode();
   if (p === 'stats') renderStats();
   if (p === 'alc') renderAlc();
@@ -1703,7 +1693,6 @@ function setAdd(k) {
   document.querySelectorAll('#addSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === zvyraz));
   if (k !== 'code') stopCam();
   if (k === 'code') renderRecent();
-  if (k === 'caste') renderCaste();
   if (k === 'find') { onNameInput(); setTimeout(() => $('nameQ').focus(), 100); }
 }
 
@@ -1918,54 +1907,25 @@ async function renderDay() {
    Zápis přes fotku, popis nebo rychlý zápis žádnou potravinu nezaloží, takže komu
    ty cesty stačí, tomu karta zůstala navždy prázdná — a slibovala něco, co nikdy
    nepřišlo. Deník naopak ví, co člověk jí doopravdy, ať to zapsal jakkoli. */
-let casteCache = [];
 /* Seskupeno po chodech: k snídani se hodí něco jiného než k večeři a jeden
    společný seznam by mísil obojí. Chod si tím zároveň přestává hádat podle
    hodin — položka ví, ke kterému jídlu patří, protože podle něj byla vybrána. */
-async function casteZDeniku(dnu) {
+async function casteZDeniku(dnu, bezPrahu) {
   const od = dstr(new Date(Date.now() - (dnu || 60) * 86400000));
   const vse = (await dbAll('log')).filter(r => r.name && r.date >= od && r.date <= curDate);
   const m = {};
   vse.forEach(r => {
     const chod = MEALS.some(x => x.k === r.meal) ? r.meal : 'nezar';
     const k = chod + '|' + norm(r.name) + '|' + (r.unit || 'g');
-    const g = m[k] || (m[k] = { name: r.name, chod: chod, n: 0, kdy: '', vzor: r });
+    const g = m[k] || (m[k] = { klic: k, name: r.name, chod: chod, n: 0, kdy: '', vzor: r });
     g.n++;
     const kdy = r.date + ' ' + String(r.ts || 0).padStart(16, '0');
     if (kdy > g.kdy) { g.kdy = kdy; g.vzor = r; }   // předlohou je poslední zápis
   });
   // jednorázovky mezi „časté" nepatří; bez prahu by karta byla jen seznam všeho
-  return Object.values(m).filter(g => g.n >= 2).sort((a, b) => b.n - a.n);
+  const vsechny = Object.values(m).sort((a, b) => (b.n - a.n) || b.kdy.localeCompare(a.kdy));
+  return bezPrahu ? vsechny : vsechny.filter(g => g.n >= 2);
 }
-async function renderCaste() {
-  if (!$('favList')) return;
-  casteCache = await casteZDeniku(60);
-  /* Pevné pořadí podle času jídel: snídaně, svačina, oběd… Dřív se blok podle
-     denní doby vytahoval nahoru, jenže pak se seznam během dne hýbal pod rukama
-     a člověk hledal, kam se mu co posunulo. */
-  const bloky = MEALS.map(x => x.k).map(k => {
-    const polozky = casteCache.filter(g => g.chod === k).slice(0, 4);
-    if (!polozky.length) return '';
-    return '<div class="casteChod"><span class="tiny muted">' + mealName(k) + '</span>' +
-      polozky.map(g => `<button class="btn sm dotyk" onclick="zapisCaste('${sid(g.chod)}',${casteCache.indexOf(g)})"
-        title="${esc(g.name)} — ${g.n}× za 60 dní">${esc(g.name)}
-        <span class="tiny muted">${g.n}×</span></button>`).join('') + '</div>';
-  }).filter(Boolean);
-  $('favList').innerHTML = bloky.length ? bloky.join('')
-    : '<span class="tiny muted">Až něco zapíšeš podruhé, objeví se to tady.</span>';
-}
-/* Zapíše totéž znovu podle posledního zápisu — včetně gramáže a živin, ať vznikl
-   jakoukoli cestou. Chod se bere z položky, ne z hodin: kdo v deset večer dohání
-   oběd, nechce ho mít ve večerní svačině. */
-async function zapisCaste(chod, i) {
-  const g = casteCache[i]; if (!g) return;
-  const c = Object.assign({}, g.vzor); delete c.id; delete c.uid; delete c.upd;
-  c.date = curDate; c.ts = Date.now(); c.meal = g.chod === 'nezar' ? defaultMeal() : g.chod;
-  await dbPut('log', c);
-  toast(g.name + ' zapsáno do ' + mealName(c.meal).toLowerCase());
-  renderDay();
-}
-
 /* Výběr více položek naráz. Zaškrtávátka jsou vidět pořád, ne až po zapnutí
    režimu — jinak by se muselo přidat další tlačítko a člověk by netušil, že se
    dá vybírat. Lišta s akcemi naskočí, teprve když je něco vybrané. */
@@ -2283,27 +2243,78 @@ function onNameInput() {
   clearTimeout(sugT);
   $('nameClr').style.display = q ? '' : 'none';
   if (q.length < 2) { renderRychle(); return; }
+  if ($('rychleLista')) $('rychleLista').style.display = 'none';
   renderLocalMatches(q);
 }
 
 /* Prázdné pole hledání bylo promarněná obrazovka: kdo si zapisuje pořád totéž,
-   musel to pokaždé vypsat. Místo prázdna nabídneme, co se používá nejčastěji
-   a co bylo naposledy — zápis běžného jídla je pak dva ťuky bez psaní. */
-function renderRychle() {
-  const box = $('nameRes');
-  const casto = products.filter(p => p.uses).sort((a, b) => (b.uses || 0) - (a.uses || 0)).slice(0, 6);
-  const videno = new Set(casto.map(p => p.id));
-  const nedavno = products.filter(p => p.lastUsed && !videno.has(p.id))
-    .sort((a, b) => b.lastUsed - a.lastUsed).slice(0, 4);
+   musel to pokaždé vypsat. Nabídka se řídí CHODEM, ne jen četností — k snídani
+   chodí něco jiného než k večeři a společný seznam obojí mísil. Samostatná záložka
+   „Časté" se v provozu neosvědčila (v103); tohle je totéž tam, kde to člověk hledá. */
+let rychleCache = [];
+async function renderRychle() {
+  const box = $('nameRes'); if (!box) return;
+  const sel = $('rychleMeal');
+  if (sel && !sel.options.length) {
+    sel.innerHTML = MEALS.map(m => `<option value="${m.k}">${m.n}</option>`).join('');
+    sel.value = pendingMeal || defaultMeal();
+  }
+  const chod = (sel && sel.value) || defaultMeal();
+  if ($('rychleLista')) $('rychleLista').style.display = '';
+  const vse = await casteZDeniku(60, true);
+  // mezitím se mohlo začít psát — pozdní odpověď nesmí přepsat výsledky hledání
+  if ((($('nameQ') || {}).value || '').trim().length >= 2) return;
+  const meho = vse.filter(g => g.chod === chod);
+  rychleCache = meho.slice(0, 10);
+  const casto = rychleCache.filter(g => g.n >= 2).slice(0, 6);
+  const videno = new Set(casto.map(g => g.klic));
+  const nedavno = rychleCache.filter(g => !videno.has(g.klic)).slice(0, 4);
   if (!casto.length && !nedavno.length) {
     box.innerHTML = '<p class="tiny muted" style="margin:8px 0 0">Napiš aspoň dvě písmena. ' +
-      'Až budeš mít něco zapsaného, nabídnu tady, co jíš nejčastěji.</p>';
+      'Až sem něco zapíšeš, nabídnu ti to příště rovnou.</p>';
     return;
   }
+  const radek = g => `<div class="item" onclick="zapisRychle(${rychleCache.indexOf(g)})" style="cursor:pointer">
+    <div class="grow"><div class="nm">${esc(g.name)}</div>
+      <div class="sub">${r1(g.vzor.amount)} ${esc(g.vzor.unit || 'g')}${
+        g.n >= 2 ? ' · ' + g.n + '×' : ''}</div></div>
+    <div class="kc">${r0(g.vzor.kcal)}<span class="tiny muted"> kcal</span></div></div>`;
   const skupina = (nadpis, pole) => pole.length
-    ? `<p class="tiny muted" style="margin:10px 0 4px">${nadpis}</p>` + pole.map(p => resCard(p, true)).join('')
+    ? `<p class="tiny muted" style="margin:10px 0 4px">${nadpis}</p>` + pole.map(radek).join('')
     : '';
   box.innerHTML = skupina('Nejčastější', casto) + skupina('Naposledy', nedavno);
+}
+/* Ťuknutí otevře okno porce s předvyplněnou gramáží podle posledního zápisu.
+   Gramáž se u téhož jídla mění často, takže rovnou zapsat by ušetřilo jedno ťuknutí
+   a vzalo možnost, kterou uživatel potřebuje víc. Živiny se dopočítají na 100 g
+   z předlohy — u zápisu bez potraviny v databázi (fotka, popis) jinde nejsou. */
+function zapisRychle(i) {
+  const g = rychleCache[i]; if (!g) return;
+  const r = g.vzor;
+  const skutecna = neniPotravina(r.productId) ? null : products.find(x => x.id === r.productId);
+  const na100 = k => r.amount ? (r[k] || 0) / r.amount * 100 : 0;
+  editLogId = null;
+  curProduct = skutecna || {
+    id: r.productId, name: r.name, unit: r.unit || 'g', serving: null,
+    kcal: na100('kcal'), p: na100('p'), c: na100('c'), f: na100('f'),
+    fib: na100('fib'), salt: na100('salt'), abv: r.abv || 0
+  };
+  $('poAdd').textContent = 'Přidat';
+  $('poDel').style.display = 'none';
+  $('poName').textContent = curProduct.name;
+  $('poSub').textContent = (curProduct.brand ? curProduct.brand + ' · ' : '') +
+    r0(curProduct.kcal) + ' kcal / 100 ' + curProduct.unit;
+  $('poUnit').textContent = curProduct.unit;
+  servingAmt = curProduct.serving || 100;
+  $('poServ').style.display = curProduct.serving ? '' : 'none';
+  if (curProduct.serving) $('poServ').textContent = 'porce ' + r0(curProduct.serving);
+  $('poAmt').value = r1(r.amount);          // naposledy zapsaná gramáž, ale jde přepsat
+  rychleGramaze({ lastAmount: r.amount });
+  fillMealSelect();
+  $('poMeal').value = ($('rychleMeal') && $('rychleMeal').value) || r.meal || defaultMeal();
+  $('poDate').value = curDate;
+  calcPortion();
+  $('modPortion').classList.add('on');
 }
 /* fokus jen když maže uživatel tlačítkem ✕; po zápisu porce se pole čistí
    potichu, aby se pod prstem nevyskočila klávesnice a stránka neposkočila */
@@ -3109,6 +3120,9 @@ async function addPortion() {
   }
   pendingMeal = null;
   closeMod('modPortion');
+  /* Nabídka pod prázdným hledáním se srovná na chod, do kterého se právě zapsalo —
+     kdo řekl „tohle jde do večeře", chce vidět večeři, ne to, co ukazují hodiny. */
+  if ($('rychleMeal') && MEALS.some(m => m.k === rec.meal)) $('rychleMeal').value = rec.meal;
   clearNameQ(false);        // další hledání má začínat prázdné, ne s minulým dotazem
   const dd = new Date(rec.date + 'T12:00:00');
   toast('Přidáno do: ' + mealName(rec.meal) +
@@ -4338,7 +4352,7 @@ function skocNaKartu(cil) {
 /* Skryté karty se v liště neobjeví — neslibovala by, co na stránce není. */
 const ST_KOTVY = [['kartaPrijem', 'Příjem'], ['tydenKarta', 'Víkend'],
   ['kartaVaha', 'Váha'], ['kartaMakra', 'Makra'], ['zdraviKarta', 'Zdraví'],
-  ['kartaPostrehy', 'Postřehy'], ['kartaZdroje', 'Zdroje']];
+  ['kartaPostrehy', 'Postřehy']];
 function renderKotvy() {
   const box = $('stKotvy'); if (!box) return;
   box.innerHTML = ST_KOTVY
@@ -4530,21 +4544,6 @@ async function renderStats() {
       '<span class="sip">›</span></button>'
     : '<div class="postreh">' + o.t + '</div>').join('')
     || '<p class="tiny muted">Zatím málo dat na postřehy.</p>';
-
-  /* Kolikrát a kolik. Samotné „celkem X kcal“ neřekne, jestli je to jedna velká
-     výjimka, nebo každodenní zvyk — a to jsou dvě úplně jiná řešení. */
-  const tot = {};
-  list.forEach(d => d.items.forEach(it => {
-    const t = tot[it.name] || (tot[it.name] = { k: 0, n: 0 });
-    t.k += it.kcal; t.n++;
-  }));
-  const top = Object.entries(tot).sort((x, y) => y[1].k - x[1].k).slice(0, 8);
-  const sumAll = Object.values(tot).reduce((x, y) => x + y.k, 0) || 1;
-  $('stTop').innerHTML = top.length ? top.map(([nm, t]) => `
-    <div class="item"><div class="grow"><div class="nm">${esc(nm)}</div>
-      <div class="sub">${t.n}× · ø ${r0(t.k / t.n)} kcal · ${pctTxt(t.k / sumAll * 100)} celkového příjmu</div></div>
-    <div class="kc">${r0(t.k)}<span class="tiny muted"> kcal</span></div></div>`).join('')
-    : '<p class="tiny muted">Zatím žádná data.</p>';
 
   renderKotvy();          // až nakonec: teprve teď je jasné, které karty jsou vidět
 }

@@ -59,7 +59,6 @@ const PROSTREDI = require('./prostredi');
   console.log('9. makra:', (await p.textContent('#stMacros')).replace(/\s+/g,' ').trim().slice(0,150));
   const ins = await p.locator('#stInsights p').allTextContents();
   console.log('10. postřehy ('+ins.length+'):'); ins.forEach(t=>console.log('    • '+t.replace(/\s+/g,' ')));
-  console.log('11. top zdroje =', await p.locator('#stTop .item').count());
 
   await p.click('#chKcal rect >> nth=5'); await p.waitForTimeout(200);
   console.log('12. detail sloupce:', await p.textContent('#stTipTxt'));

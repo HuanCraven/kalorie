@@ -38,7 +38,7 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   await p.click('nav button[data-p="scan"]');
   const panely = await p.$$eval('#addSeg button', bs => bs.map(b => b.textContent.trim()));
   // v97: zakládání potraviny z obalu se přesunulo do Jídel — nezapisuje do dne
-  ck('Zadat má jen cesty zápisu dne', panely.join('|') === 'Časté|Hledat|Popsat', panely.join('|'));
+  ck('Zadat má jen cesty zápisu dne', panely.join('|') === 'Hledat|Popsat', panely.join('|'));
   const jidla = await p.$$eval('#dbSeg button', bs => bs.map(b => b.textContent.trim()));
   ck('a zakládání potraviny je v Jídlech', jidla.indexOf('Přidat') >= 0, jidla.join('|'));
   await p.click('nav button[data-p="db"]');

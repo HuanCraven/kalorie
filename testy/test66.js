@@ -58,11 +58,6 @@ const PROSTREDI = require('./prostredi');
   const ins = (await p.textContent('#stInsights')).replace(/\s+/g, ' ');
   ck('postřeh o kolísání jmenuje víkend', /kol\u00edsá[\s\S]*víkend/.test(ins), ins.slice(0, 160));
 
-  /* ---- 6. zdroje kalorií ukážou četnost ---------------------------- */
-  const top = (await p.textContent('#stTop')).replace(/\s+/g, ' ');
-  ck('u zdroje je počet opakování', /Jídlo 30×/.test(top), top.slice(0, 120));
-  ck('a průměr na jedno zapsání', top.indexOf('ø') >= 0, top.slice(0, 120));
-
   /* ---- 7. nekompletní víkendový den do příjmu nejde, alkohol ano --- */
   const vikIdx = await p.evaluate(async () => {
     const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };

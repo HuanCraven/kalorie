@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.08.21-102** (`APP_VERSION` v `index.html`, cache `kaltrack-v102` v `sw.js`).
+Aktuální verze: **2026.09.05-103** (`APP_VERSION` v `index.html`, cache `kaltrack-v103` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -46,6 +46,50 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v103 — po dvou týdnech provozu: co se osvědčilo a co ne
+
+Zpětná vazba z používání, ne z návrhu. Dvě věci šly pryč, jedna se přestěhovala
+tam, kde se hledá.
+
+**Záložka „Časté" na Zadat zrušena.** V provozu se neosvědčila jako samostatné
+místo — uživatel ji nepoužíval. Její funkci převzalo **prázdné pole Hledat**, kam
+se stejně sahá jako první. Zadat má zase dvě záložky (Hledat, Popsat) a otevírá se
+na Hledat.
+
+- Nabídka pod prázdným polem se **řídí chodem** — nad výsledky je výběr „Nabídnout
+  k", předvyplněný podle denní doby. K snídani chodí něco jiného než k obědu.
+- Bere se **z deníku** (`casteZDeniku`), ne z `products.uses`. To rostlo jen
+  u potravin z databáze, takže zápis přes fotku nebo popis se do staré nabídky
+  nikdy nedostal — proto bývalo prázdné hledání skoro k ničemu.
+- Dělí se na **Nejčastější** (dvakrát a víc) a **Naposledy** (zbytek), aby se dalo
+  sáhnout i po včerejší jednorázovce.
+- **Ťuknutí otevře okno porce**, ne rovnou zápis. Nejdřív jsem zvolil rovnou zápis
+  jako u zrušené karty Časté; uživatel upozornil, že gramáž u téhož jídla mění
+  velmi často, takže ušetřené ťuknutí by vzalo možnost, kterou potřebuje víc.
+  Gramáž se předvyplní podle posledního zápisu, chod podle nabídky.
+- U položek bez potraviny v databázi (fotka, popis) se hodnoty **na 100 g dopočítají
+  z předlohy v deníku** — jinde nejsou a okno porce by u nich ukázalo nuly.
+- Po zápisu porce se nabídka srovná na chod, do kterého se právě zapsalo.
+
+**Karta „Největší zdroje kalorií" ve Statistikách zrušena.** Uživatel z ní neměl
+nic a zabírala místo. Pryč karta, výpočet i kotva v liště.
+
+**Osvědčilo se** naopak přidávání potravin do databáze (v98–v99) — popis vedle
+fotky, cesta rovnou do formuláře a galerie.
+
+#### Chyby nalezené při tom
+
+- **Závod při psaní.** `renderRychle` je asynchronní; než doběhla, mohlo se začít
+  psát a pozdní odpověď přepsala výsledky hledání. Nově se před zápisem do stránky
+  ověří, že je pole pořád prázdné. V provozu by to znamenalo mizející výsledky.
+- Odstraněním záložky přestalo cokoli nabídku vykreslovat při otevření Zadat —
+  dělalo to volání smazané `renderCaste`.
+- Klíč položky nese oddělovač `|`, který `sid()` vyhazuje; ťuknutí pak nic nenašlo.
+  Předává se pořadí v seznamu.
+
+Regrese v tomto sezení nejdřív padala na chybějících fixtures — Windows si za dva
+týdny uklidil `%TEMP%`. Řeší `python testy/make-fixtures.py`.
 
 ### Novinky ve v102 — úklid zbytků po v67 a dokumentace
 

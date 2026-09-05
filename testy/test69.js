@@ -1,6 +1,8 @@
-/* Test v92 — karta „Časté" se plní z deníku, ne z databáze potravin.
-   Dřív rostla z products.uses, což zápisy přes fotku, popis ani rychlý zápis
-   nezvyšují — komu ty cesty stačí, tomu karta zůstala navždy prázdná. */
+/* Test v103 — nabídka v prázdném poli hledání podle chodu.
+   Samostatná záložka „Časté" se v provozu neosvědčila a zrušila se; její funkci
+   převzalo prázdné pole Hledat, kde ji člověk hledá. Nabídka se řídí chodem —
+   k snídani chodí něco jiného než k obědu — a bere se z deníku, ne z
+   products.uses, které u zápisu přes fotku nebo popis vůbec neroste. */
 const { chromium } = require('playwright');
 const PROSTREDI = require('./prostredi');
 
@@ -16,116 +18,98 @@ const PROSTREDI = require('./prostredi');
   await p.goto('http://127.0.0.1:8811/index.html');
   await p.waitForFunction(() => typeof db !== 'undefined' && db, null, { timeout: 15000 });
 
-  /* ---- 1. prázdný deník to řekne bez slibů ------------------------ */
-  await p.evaluate(() => { go('scan'); return renderCaste(); });
-  await p.waitForTimeout(600);
-  ck('bez opakovaného zápisu karta nic neslibuje',
-     (await p.textContent('#favList')).indexOf('podruh\u00e9') >= 0,
-     await p.textContent('#favList'));
+  const txt = () => p.textContent('#nameRes');
 
-  /* ---- 2. plní se ze zápisů bez potraviny v databázi -------------- */
+  /* ---- 1. zrušená záložka a výchozí panel -------------------------- */
+  await p.click('nav button[data-p="scan"]');
+  await p.waitForTimeout(500);
+  const panely = await p.$$eval('#addSeg button', bs => bs.map(b => b.textContent.trim()));
+  ck('záložka Časté je pryč', panely.indexOf('Časté') < 0, panely.join('|'));
+  ck('Zadat se otevírá na Hledat',
+     await p.evaluate(() => document.getElementById('s-find').classList.contains('on')));
+
+  /* ---- 2. prázdný deník nic neslibuje ------------------------------ */
+  ck('bez zápisů to řekne', (await txt()).indexOf('Napiš aspoň dvě písmena') >= 0, await txt());
+
+  /* ---- 3. nabídka se řídí chodem ----------------------------------- */
   await p.evaluate(async () => {
     const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
-    // samé zástupné productId — přesně ty cesty, které dřív kartu neplnily
+    // samé zástupné productId — cesty, které products.uses nikdy nezvýšily
     for (let i = 1; i <= 5; i++)
-      await dbPut('log', { date: den(i), productId: 'foto', name: 'Ovesná kaše', unit: 'porce',
-        amount: 1, meal: 'snidane', kcal: 420, p: 18, c: 60, f: 10, ts: 1000 + i });
-    for (let i = 1; i <= 3; i++)
-      await dbPut('log', { date: den(i), productId: 'popis', name: 'Losos pečený', unit: 'g',
-        amount: 180, meal: 'vecere', kcal: 410, p: 40, c: 0, f: 26, ts: 2000 + i });
-    for (let i = 1; i <= 3; i++)
-      await dbPut('log', { date: den(i), productId: 'quick', name: 'Jogurt', unit: 'g',
-        amount: 150, meal: 'snidane', kcal: 90, p: 9, c: 6, f: 3, ts: 4000 + i });
-    // jednorázovka se mezi časté dostat nesmí
-    await dbPut('log', { date: den(1), productId: 'quick', name: 'Svatební dort', unit: 'porce',
-      amount: 1, meal: 'svacina', kcal: 600, p: 5, c: 80, f: 30, ts: 3000 });
-    go('scan'); return renderCaste();
+      await dbPut('log', { date: den(i), productId: 'foto', name: 'Ovesná kaše', unit: 'g',
+        amount: 250, meal: 'snidane', kcal: 420, p: 18, c: 60, f: 10, ts: 100 + i });
+    for (let i = 1; i <= 4; i++)
+      await dbPut('log', { date: den(i), productId: 'popis', name: 'Svíčková', unit: 'porce',
+        amount: 1, meal: 'obed', kcal: 700, p: 30, c: 60, f: 30, ts: 200 + i });
+    // jednorázovka: mezi Nejčastější nepatří, ale jako Naposledy ano
+    await dbPut('log', { date: den(1), productId: 'quick', name: 'Croissant', unit: 'porce',
+      amount: 1, meal: 'snidane', kcal: 300, p: 5, c: 35, f: 15, ts: 300 });
+    return renderRychle();
   });
-  await p.waitForTimeout(700);
-  const txt = () => p.textContent('#favList');
-  ck('zápis z fotky se mezi časté dostane', (await txt()).indexOf('Ovesná kaše') >= 0, await txt());
-  ck('a zápis z popisu taky', (await txt()).indexOf('Losos pečený') >= 0);
-  ck('jednorázovka ne', (await txt()).indexOf('Svatební dort') < 0, await txt());
-  ck('u položky je vidět, kolikrát to bylo', (await txt()).indexOf('5×') >= 0, await txt());
-  ck('uvnitř chodu se řadí od nejčastějšího', await p.evaluate(() => {
-    const sk = [...document.querySelectorAll('#favList .casteChod')]
-      .find(x => x.textContent.indexOf('Snídaně') >= 0);
-    return !!sk && sk.textContent.indexOf('Ovesná kaše') < sk.textContent.indexOf('Jogurt');
-  }));
+  await p.waitForTimeout(600);
 
-  /* v95: rozděleno po chodech — k snídani se hodí něco jiného než k večeři. */
-  ck('položky jsou rozdělené po chodech',
-     (await p.locator('#favList .casteChod').count()) >= 2,
-     'skupin: ' + await p.locator('#favList .casteChod').count());
-  ck('a chody jsou pojmenované',
-     (await txt()).indexOf('Snídaně') >= 0 && (await txt()).indexOf('Večeře') >= 0, await txt());
-  ck('ovesná kaše je u snídaně, ne u večeře', await p.evaluate(() => {
-    const sk = [...document.querySelectorAll('#favList .casteChod')]
-      .find(x => x.textContent.indexOf('Snídaně') >= 0);
-    return !!sk && sk.textContent.indexOf('Ovesná kaše') >= 0;
-  }));
+  await p.selectOption('#rychleMeal', 'snidane');
+  await p.waitForTimeout(500);
+  const sn = await txt();
+  ck('u snídaně nabídne snídani', sn.indexOf('Ovesná kaše') >= 0, sn.replace(/\s+/g, ' ').slice(0, 110));
+  ck('a ne oběd', sn.indexOf('Svíčková') < 0, sn.replace(/\s+/g, ' ').slice(0, 110));
+  ck('zápis z fotky se do nabídky dostane', sn.indexOf('250 g') >= 0, sn.replace(/\s+/g, ' ').slice(0, 110));
+  ck('u častých je vidět počet', sn.indexOf('5×') >= 0, sn.replace(/\s+/g, ' ').slice(0, 110));
+  ck('jednorázovka je pod Naposledy, ne mezi častými',
+     sn.indexOf('Naposledy') >= 0 && sn.indexOf('Naposledy') < sn.indexOf('Croissant'),
+     sn.replace(/\s+/g, ' ').slice(0, 160));
 
-  /* ---- 3. klepnutím se zapíše totéž znovu ------------------------- */
+  await p.selectOption('#rychleMeal', 'obed');
+  await p.waitForTimeout(500);
+  const ob = await txt();
+  ck('u oběda nabídne oběd', ob.indexOf('Svíčková') >= 0, ob.replace(/\s+/g, ' ').slice(0, 110));
+  ck('a ne snídani', ob.indexOf('Ovesná kaše') < 0, ob.replace(/\s+/g, ' ').slice(0, 110));
+
+  /* ---- 4. z nabídky přes okno porce, aby šla změnit gramáž ---------- */
   const pred = await p.evaluate(async () => (await dbByIdx('log', 'date', curDate)).length);
-  await p.evaluate(() => [...document.querySelectorAll('#favList button')]
-    .find(x => x.textContent.indexOf('Ovesná kaše') >= 0).click());
+  await p.click('#nameRes .item >> nth=0');
+  await p.waitForTimeout(600);
+  ck('ťuknutí otevře okno porce', await p.isVisible('#modPortion'));
+  ck('gramáž je předvyplněná podle posledního zápisu',
+     (await p.inputValue('#poAmt')) === '1', await p.inputValue('#poAmt'));
+  ck('chod odpovídá nabídce, ne hodinám', (await p.inputValue('#poMeal')) === 'obed',
+     await p.inputValue('#poMeal'));
+
+  // gramáž jde přepsat a zápis to respektuje
+  await p.fill('#poAmt', '2');
+  await p.evaluate(() => addPortion());
   await p.waitForTimeout(700);
   const novy = await p.evaluate(async () => {
-    const r = (await dbByIdx('log', 'date', curDate));
-    return { pocet: r.length, posl: r[r.length - 1] };
+    const r = await dbByIdx('log', 'date', curDate);
+    return { pocet: r.length, posl: r.filter(x => x.name === 'Svíčková')[0] };
   });
-  ck('klepnutí přidá záznam na dnešek', novy.pocet === pred + 1, pred + ' → ' + novy.pocet);
-  ck('se stejnou gramáží i živinami',
-     novy.posl.name === 'Ovesná kaše' && novy.posl.amount === 1 && novy.posl.kcal === 420 &&
-     novy.posl.p === 18, JSON.stringify(novy.posl));
-  ck('a jako nový záznam, ne kopie starého id',
-     novy.posl.id !== undefined && novy.posl.date === await p.evaluate(() => curDate));
+  ck('zápis vznikne na dnešku', novy.pocet === pred + 1, pred + ' → ' + novy.pocet);
+  ck('se změněnou gramáží', novy.posl && novy.posl.amount === 2, JSON.stringify(novy.posl));
+  ck('a s přepočtenými kaloriemi', novy.posl && Math.round(novy.posl.kcal) === 1400,
+     novy.posl && novy.posl.kcal);
+  ck('do zvoleného chodu', novy.posl && novy.posl.meal === 'obed', novy.posl && novy.posl.meal);
 
-  /* ---- 4. chod se bere z položky, ne z hodin (v95) -----------------
-     Dřív se hádal podle denní doby. Jenže kdo v deset večer dohání oběd, nechce
-     ho mít ve večerní svačině — a položka svůj chod zná, byla podle něj vybrána. */
-  ck('zápis jde do chodu, ke kterému položka patří', novy.posl.meal === 'snidane',
-     novy.posl.name + ' do ' + novy.posl.meal);
-
-  // oběd zapsaný večer musí skončit v obědě, ne v tom, co zrovna ukazují hodiny
-  await p.evaluate(async () => {
-    const den = i => { const x = new Date(curDate + 'T12:00:00'); x.setDate(x.getDate() - i); return dstr(x); };
-    for (let i = 1; i <= 4; i++)
-      await dbPut('log', { date: den(i), productId: 'quick', name: 'Svíčková', unit: 'porce',
-        amount: 1, meal: 'obed', kcal: 700, p: 30, c: 60, f: 30, ts: 5000 + i });
-    go('scan'); return renderCaste();
-  });
-  await p.waitForTimeout(700);
-  await p.evaluate(() => {
-    const b = [...document.querySelectorAll('#favList button')].find(x => x.textContent.indexOf('Svíčková') >= 0);
-    b.click();
-  });
-  await p.waitForTimeout(700);
-  const svickova = await p.evaluate(async () =>
-    (await dbByIdx('log', 'date', curDate)).filter(r => r.name === 'Svíčková')[0]);
-  ck('oběd se zapíše do oběda bez ohledu na hodiny', svickova && svickova.meal === 'obed',
-     JSON.stringify(svickova));
-
-  /* ---- 5. místo na stránce Zadat (v96) -----------------------------
-     Po rozdělení na chody zabralo Časté na Hlavní půl obrazovky. Přehled dne má
-     být přehled; nástroj na zapisování patří k zapisování. */
-  ck('na Hlavní už karta Časté není',
-     await p.evaluate(() => !document.getElementById('favCard')));
-  ck('a je na Zadat jako podzáložka',
-     await p.evaluate(() => !!document.querySelector('#addSeg button[data-s="caste"]')));
-  await p.evaluate(() => { go('scan'); setAdd('find'); });
-  await p.waitForTimeout(400);
-  ck('dá se z ní přepnout na hledání',
-     await p.evaluate(() => document.getElementById('s-find').classList.contains('on')));
-  await p.evaluate(() => setAdd('caste'));
+  /* ---- 5. při psaní nabídka ustoupí hledání ------------------------ */
+  await p.click('nav button[data-p="scan"]');
   await p.waitForTimeout(500);
-  ck('a zpátky, i s obsahem',
-     (await p.textContent('#favList')).indexOf('Ovesná kaše') >= 0);
-  ck('otevření stránky Zadat seznam naplní', await p.evaluate(async () => {
-    document.getElementById('favList').innerHTML = '';
-    go('scan'); await new Promise(r => setTimeout(r, 400));
-    return document.getElementById('favList').textContent.indexOf('Ovesná kaše') >= 0;
-  }));
+  await p.fill('#nameQ', 'sví');
+  await p.waitForTimeout(600);
+  ck('výběr chodu se při psaní schová',
+     await p.evaluate(() => document.getElementById('rychleLista').style.display === 'none'));
+  await p.fill('#nameQ', '');
+  await p.evaluate(() => onNameInput());
+  await p.waitForTimeout(600);
+  ck('a po vymazání se vrátí i s nabídkou',
+     await p.evaluate(() => document.getElementById('rychleLista').style.display !== 'none') &&
+     (await txt()).indexOf('Svíčková') >= 0);
+
+  /* ---- 6. zrušená karta zdrojů kalorií ----------------------------- */
+  await p.click('nav button[data-p="stats"]');
+  await p.waitForTimeout(800);
+  ck('karta Největší zdroje kalorií je pryč',
+     await p.evaluate(() => !document.getElementById('kartaZdroje')));
+  ck('a nemá kotvu ani v liště',
+     (await p.locator('#stKotvy .kotva').allTextContents()).indexOf('Zdroje') < 0);
 
   console.log(fail ? 'NEPROŠLO: ' + fail : 'vše prošlo');
   await browser.close();
