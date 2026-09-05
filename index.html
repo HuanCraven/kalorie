@@ -1213,7 +1213,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.09.05-103';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.09.05-104';   // zvyš při každé změně index.html
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1765,13 +1765,25 @@ function vydejDne(dd, wk) {
   return { out: rmr + (typeof dd.burn === 'number' ? dd.burn : 0) + (wk || 0), celkovy: false };
 }
 
+/* Cíl tuků = větší z fyziologického minima (g na kilo) a podílu na energii.
+   Samotné g/kg s výdejem nerostlo, takže při cíli 2700 kcal vycházelo 26 %
+   energie z tuků a při 3500 už jen 20 % — cíl byl tím přísnější, čím víc se
+   člověk hýbal, což je naopak. Podíl drží tuky uprostřed běžně uváděného
+   rozpětí 20–35 % energie.
+
+   Celkové kalorie se tím NEMĚNÍ: energie je pořád výdej minus deficit. Mění se
+   jen dělení mezi tuky a sacharidy, protože sacharidy dopočítávají zbytek. */
+const FAT_PCT = 0.30;
+function cilTuku(w, kcal) {
+  return r0(Math.max((goals.fKg || 0.9) * w, kcal * FAT_PCT / 9));
+}
 async function dayTargets(date, vydej) {
   if (!goals.dyn || !goals.rmr) return fixTargets();
   const w = await lastWeight(date) || n(($('cW') || {}).value) || 0;
   if (!w || !(vydej > 0)) return fixTargets();
   const out = vydej;
   const kcal = Math.max(800, r0(out - (goals.def || 0)));
-  const p = r0((goals.pKg || 2.0) * w), f = r0((goals.fKg || 0.9) * w);
+  const p = r0((goals.pKg || 2.0) * w), f = cilTuku(w, kcal);
   const c = Math.max(0, r0((kcal - 4 * p - 9 * f) / 4));
   return { kcal, p, c, f, dyn: true, w, out, burn: Math.max(0, out - (goals.rmr || 0)) };
 }
@@ -3995,9 +4007,12 @@ async function dynUi() {
     ? '<span style="color:var(--warn)">Nejdřív nastav klidový výdej, jinak nejde cíl spočítat.</span>'
     : !w
       ? '<span style="color:var(--warn)">Zadej svoji váhu na hlavní stránce — z ní se počítají bílkoviny a tuky.</span>'
-      : 'Při váze ' + r1(w) + ' kg vychází ' + r0((goals.pKg || 2.0) * w) + ' g bílkovin a ' +
-        r0((goals.fKg || 0.9) * w) + ' g tuků denně. Sacharidy dopočítá aplikace podle toho, ' +
-        'kolik ten den spálíš. Pevné cíle výše se v tomhle režimu nepoužijí.';
+      : 'Při váze ' + r1(w) + ' kg vychází ' + r0((goals.pKg || 2.0) * w) + ' g bílkovin denně. ' +
+        'Tuky se berou jako větší z ' + r1(goals.fKg || 0.9) + ' g/kg (minimum, tedy ' +
+        r0((goals.fKg || 0.9) * w) + ' g) a ' + r0(FAT_PCT * 100) + ' % energie toho dne — ' +
+        'jinak by cíl byl tím přísnější, čím víc se hýbeš. Sacharidy dopočítá aplikace podle ' +
+        'toho, kolik ten den spálíš; celkové kalorie to nemění. Pevné cíle výše se v tomhle ' +
+        'režimu nepoužijí.';
 }
 
 function calcRmr() {
@@ -4101,7 +4116,7 @@ function agg(list, w0) {
     if (d.weight !== null) wRun = d.weight;
     if (!goals.dyn || !wRun || !(vyd(d) > 0)) return { kcal: goals.kcal, p: goals.p, c: goals.c, f: goals.f };
     const kcal = Math.max(800, r0(vyd(d) - (goals.def || 0)));
-    const P = r0((goals.pKg || 2) * wRun), F = r0((goals.fKg || 0.9) * wRun);
+    const P = r0((goals.pKg || 2) * wRun), F = cilTuku(wRun, kcal);
     return { kcal, p: P, f: F, c: Math.max(0, r0((kcal - 4 * P - 9 * F) / 4)) };
   });
   const lg = list.filter(d => d.logged);

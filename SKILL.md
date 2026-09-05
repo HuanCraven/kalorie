@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 71 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 72 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -57,7 +57,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   71 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   72 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -105,8 +105,12 @@ Kdo to poruší, rozdrobí ji zpátky.
 - **Výdej dne** počítá `vydejDne(dd, wk)`: je-li zadaný **celkový výdej z hodinek**
   (`daily.total`), platí on a **nic se k němu nepřičítá** — má v sobě klid i pohyb.
   Jinak klidový výdej + aktivní kcal + zapsaná cvičení.
-- **Dynamické cíle**: bílkoviny 2,0 g/kg a tuky 0,9 g/kg podle hmotnosti;
-  energie = výdej dne − deficit; sacharidy dopočítávají zbytek.
+- **Dynamické cíle**: energie = výdej dne − deficit, bílkoviny 2,0 g/kg podle
+  hmotnosti, sacharidy dopočítávají zbytek. **Tuky umí jen `cilTuku(w, kcal)`**
+  (v104): větší z fyziologického minima `fKg × váha` (0,9 g/kg) a **30 % energie**.
+  Samotné g/kg s výdejem nerostlo, takže cíl byl tím přísnější, čím víc se člověk
+  hýbal. Volá se z `dayTargets` i z `agg` — nepočítej tuky nikde potřetí, obrazovky
+  by se rozešly. Změna dělí energii jinak, celkové kalorie nemění.
 - **Alkohol**: gramy čistého etanolu = `ml × %obj. × 0,789`; kcal = `g × 7,1 + sacharidy × 4`.
   **Limit je klouzavý 30denní průměr**, ne týdenní součet.
 - **Reálný výdej** se dopočítává ze změny váhy (7700 kcal/kg) při vážení rozložených

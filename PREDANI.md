@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.09.05-103** (`APP_VERSION` v `index.html`, cache `kaltrack-v103` v `sw.js`).
+Aktuální verze: **2026.09.05-104** (`APP_VERSION` v `index.html`, cache `kaltrack-v104` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -46,6 +46,56 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v104 — cíl tuků roste s výdejem
+
+Uživatel dlouhodobě dostával od rozboru výtku za překročené tuky a ptal se, jestli
+je ten limit opravdu tak přísný. Byl — a navíc obráceně, než měl být.
+
+**Co bylo špatně.** Cíl tuků se počítal jako `fKg × váha` (0,9 g/kg), tedy bez
+ohledu na energii. Cíl kalorií ale s výdejem roste. Při 85 kg to znamenalo:
+
+| cíl kcal | tuky | podíl energie |
+|---|---|---|
+| 2200 | 77 g | 32 % |
+| 2700 | 77 g | 26 % |
+| 3200 | 77 g | 22 % |
+
+Čím víc se člověk hýbal, tím přísnější cíl dostal. To je naopak, než jak se
+doporučení píšou — podíl tuků na energii se s výdejem nemá zmenšovat.
+
+**Co se změnilo.** Jediná funkce `cilTuku(w, kcal)` vrací **větší** z fyziologického
+minima a podílu na energii:
+
+```js
+const FAT_PCT = 0.30;
+function cilTuku(w, kcal) {
+  return r0(Math.max((goals.fKg || 0.9) * w, kcal * FAT_PCT / 9));
+}
+```
+
+Volá se na obou místech, kde se cíle počítají — `dayTargets` (Hlavní) a `agg`
+(Statistiky). Dřív tam byl dvakrát opsaný stejný výraz; teď je pravidlo na jednom
+místě, takže se obě obrazovky nemůžou rozejít.
+
+- **30 % leží uprostřed běžně uváděného rozpětí 20–35 % energie z tuků.** Není to
+  úleva, spíš návrat z dolního okraje doprostřed. Uživatel si to výslovně přál
+  ohlídat: „Zase si nechci ulevovat, pokud by to nebylo v souladu s výživovými
+  doporučeními."
+- **Celkové kalorie se nemění.** Energie je pořád výdej minus deficit. Mění se jen
+  dělení mezi tuky a sacharidy, protože sacharidy dopočítávají zbytek.
+- **Minimum má přednost.** Při nízkém výdeji (2000 kcal) zůstane 0,9 g/kg, tedy
+  77 g = 41 % energie. Pod fyziologické minimum se nejde, i kdyby procento vyšlo
+  níž; stlačí se sacharidy.
+
+Nápověda v Nastavení text vysvětluje včetně toho, že se kalorie nemění — jinak by
+změna vypadala jako povolení jíst víc.
+
+**Testy.** Nová sada `test72.js` (11 tvrzení) ověřuje 30 % při vysokém výdeji, práh
+0,9 g/kg při nízkém, že energie zůstala `výdej − deficit`, že se Hlavní a Statistiky
+shodnou, a že to nápověda vysvětluje. Padl přitom starý `test51.js`, který měl
+zapsanou původní poučku „0,9 g/kg ze 69 kg = 62 g" — přepsán na nové pravidlo
+(2600 kcal → 87 g) i s vysvětlením, proč tam teď vyhrává podíl.
 
 ### Novinky ve v103 — po dvou týdnech provozu: co se osvědčilo a co ne
 

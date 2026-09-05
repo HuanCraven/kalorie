@@ -37,7 +37,10 @@ const PROSTREDI = require('./prostredi');
   await p.waitForTimeout(500);
   const cile = await p.evaluate(() => ({ p: document.getElementById('pTxt').textContent, f: document.getElementById('fTxt').textContent }));
   ck('bílkoviny 2,0 g/kg ze 69 kg = 138 g', cile.p.indexOf('138') > 0, cile.p);
-  ck('tuky 0,9 g/kg ze 69 kg = 62 g', cile.f.indexOf('62') > 0, cile.f);
+  /* Tuky od v104 nejsou jen g na kilo: bere se vetsi z fyziologickeho minima
+     (0,9 g/kg = 62 g) a 30 % energie. Vydej je tu 1800 + 800 = 2600 kcal,
+     takze vyhrava podil: 2600 x 0,30 / 9 = 87 g. */
+  ck('tuky = 30 % z 2600 kcal = 87 g, ne 62 g z vahy', cile.f.indexOf('87') > 0, cile.f);
 
   /* ---- 4. nesmyslná váha se neuloží -------------------------------- */
   await p.click('nav button[data-p="day"]'); await p.waitForTimeout(300);
