@@ -913,7 +913,7 @@ body.verejna [data-osobni]{display:none!important}
         <div class="fld"><label>Denní deficit (kcal)</label>
           <input id="gDef" type="number" inputmode="numeric" placeholder="400" oninput="gSave()"></div>
         <div class="fld"><label>Bílkoviny (g/kg)</label>
-          <input id="gPKg" type="number" inputmode="decimal" step="0.1" placeholder="2.0" oninput="gSave()"></div>
+          <input id="gPKg" type="number" inputmode="decimal" step="0.1" placeholder="1.5" oninput="gSave()"></div>
       </div>
       <div class="fld"><label>Tuky (g/kg)</label>
         <input id="gFKg" type="number" inputmode="decimal" step="0.1" placeholder="0.9" oninput="gSave()"></div>
@@ -932,6 +932,24 @@ body.verejna [data-osobni]{display:none!important}
     <div class="fld"><label>Bazální metabolismus (kcal/den)</label>
       <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750" oninput="gSave()"></div>
     <button class="btn sm full" style="margin:-4px 0 10px" onclick="uvodOtevri(2)">Spočítat z výšky a váhy</button>
+    <div class="grid2">
+      <div class="fld"><label>Běžný pohyb mimo cvičení</label>
+        <select id="gPal" onchange="gSave()">
+          <option value="1">nepočítat, beru jen zapsané</option>
+          <option value="1.2">sedavá práce, málo chůze</option>
+          <option value="1.375">trochu chůze, lehká práce</option>
+          <option value="1.55">na nohou většinu dne</option>
+          <option value="1.725">fyzická práce</option>
+        </select></div>
+      <div class="fld"><label>Pohlaví</label>
+        <select id="gPohlavi" onchange="gSave()">
+          <option value="m">muž</option>
+          <option value="z">žena</option>
+        </select></div>
+    </div>
+    <p class="tiny muted" style="margin:-4px 0 10px">Násobitel zvedá klidový výdej o běžný denní pohyb
+      (chůze, schody, práce) ve dnech, kde nemáš celkový výdej z hodinek. Cvičení se přičítá zvlášť.
+      Pohlaví rozhoduje jen o tom, pod jaký cíl aplikace nikdy nespadne.</p>
     <p class="tiny" id="gRmrWarn" style="margin:-4px 0 0;color:var(--warn);display:none"></p>
     <details>
       <summary class="tiny muted" style="cursor:pointer">Neznám ho — spočítat</summary>
@@ -1128,8 +1146,9 @@ body.verejna [data-osobni]{display:none!important}
       celý den ležel. Počítá se z výšky, váhy, věku a pohlaví. Najdeš ho v Nastavení → Já.</p>
     <p class="tiny muted" style="margin:0 0 8px"><b>Energie</b> = výdej dne minus deficit. Deficit
       400 kcal denně znamená úbytek zhruba půl kila za týden.</p>
-    <p class="tiny muted" style="margin:0 0 8px"><b>Bílkoviny</b> 2 g na kilo — víc, než se běžně
-      uvádí, protože při hubnutí chrání svaly.</p>
+    <p class="tiny muted" style="margin:0 0 8px"><b>Bílkoviny</b> 1,5 g na kilo. Referenční příjem
+      pro dospělé je 0,83 g/kg; při hubnutí se uvádí 1,2–1,6 g/kg, protože bílkoviny chrání svalovou
+      hmotu. Nikdy nepřesáhnou 35 % energie.</p>
     <p class="tiny muted" style="margin:0"><b>Tuky</b> jsou větší z 0,9 g na kilo a 30 % energie.
       Sacharidy dopočítávají zbytek. Všechna čísla si můžeš v Nastavení přepsat.</p>
   </div>
@@ -1348,6 +1367,15 @@ body.verejna [data-osobni]{display:none!important}
         <div class="fld"><label>Váha (kg)</label>
           <input id="uvVaha" type="number" inputmode="decimal" placeholder="85" oninput="uvodPocitej()"></div>
       </div>
+      <div class="fld"><label>Běžný pohyb mimo cvičení</label>
+        <select id="uvPal" onchange="uvodPocitej()">
+          <option value="1.2">sedavá práce, málo chůze</option>
+          <option value="1.375" selected>trochu chůze, lehká práce</option>
+          <option value="1.55">na nohou většinu dne</option>
+          <option value="1.725">fyzická práce</option>
+        </select></div>
+      <p class="tiny muted" style="margin:-4px 0 10px">Cvičení sem nepatří — to se zapisuje zvlášť
+        na záložce Pohyb a přičte se navrch.</p>
       <p class="tiny" id="uvRmrTxt" style="margin:0 0 12px;color:var(--acc)"></p>
       <button class="btn pri full" id="uvBtn2" onclick="uvodKrok(3)" disabled>Pokračovat</button>
       <button class="btn full" style="margin-top:8px" onclick="uvodKonec()">Přeskočit</button>
@@ -1355,14 +1383,16 @@ body.verejna [data-osobni]{display:none!important}
 
     <div id="uv3" style="display:none">
       <h2>Co s tím chceš dělat</h2>
-      <p class="tiny muted" style="margin:0 0 12px">Podle toho se nastaví denní cíl. Změnit se to dá
-        kdykoli v Nastavení.</p>
-      <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(400)">Hubnout
-        <span class="tiny muted"> · asi půl kila týdně</span></button>
-      <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(200)">Hubnout pomalu
-        <span class="tiny muted"> · asi čtvrt kila týdně</span></button>
+      <p class="tiny muted" style="margin:0 0 12px">Kilo tuku je zhruba 7700 kcal, takže půl kila
+        týdně znamená ubrat 550 kcal denně. Změnit se to dá kdykoli v Nastavení.</p>
+      <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(550)">Hubnout
+        <span class="tiny muted"> · půl kila týdně</span></button>
+      <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(275)">Hubnout pomalu
+        <span class="tiny muted"> · čtvrt kila týdně</span></button>
       <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(0)">Držet váhu</button>
-      <button class="btn full" onclick="uvodCil(-300)">Nabírat</button>
+      <button class="btn full" onclick="uvodCil(-275)">Nabírat
+        <span class="tiny muted"> · čtvrt kila týdně</span></button>
+      <p class="tiny muted" id="uvCilPozn" style="margin:10px 0 0"></p>
     </div>
 
     <div id="uv4" style="display:none">
@@ -1384,7 +1414,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.09.06-107';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.09.06-108';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -1748,6 +1778,10 @@ function offCachePut(k, v) {
   const g = await dbGet('meta', 'goals');
   const hadDay = !!(g && g.v && Object.prototype.hasOwnProperty.call(g.v, 'alcDay'));
   if (g && g.v) goals = Object.assign(goals, g.v);
+  /* Výchozí bílkoviny klesly z 2,0 na 1,5 g/kg. Kdo má aplikaci nastavenou
+     a hodnotu nikde uloženou, tomu se 2,0 zapíše natvrdo — jinak by mu cíl
+     spadl, aniž by o to kdy požádal. */
+  if (g && g.v && goals.rmr && !('pKg' in g.v)) goals.pKg = 2.0;
   // starší verze měly týdenní limit — převeď ho na denní průměr
   if (!hadDay && goals.alc) goals.alcDay = r1(goals.alc / 7);
   delete goals.alc;                      // starý týdenní limit už se nepoužívá
@@ -1927,19 +1961,27 @@ function uvodKrok(k) {
   if (k === 4) {
     const def = goals.def || 0;
     const smer = def > 0 ? 'hubnutí' : def < 0 ? 'nabírání' : 'držení váhy';
-    $('uvShrnuti').textContent = 'Klidový výdej ' + uvodData.rmr + ' kcal, cíl na ' + smer +
-      '. Denní cíl se dopočítá podle toho, kolik se ten den pohneš.';
+    const t = cileZVydeje(uvodData.kg, zakladniVydej());
+    $('uvShrnuti').innerHTML = 'Výdej asi <b>' + zakladniVydej() + ' kcal</b> za den, cíl na ' + smer +
+      ' vychází na <b>' + t.kcal + ' kcal</b>. Když se pohneš víc, cíl povyroste.' +
+      (t.omezeno ? '<br><br>Zvolené tempo by cíl stlačilo níž, než je zdravé, tak jsem ho zdola omezil. '
+                 + 'Hubnutí bude pomalejší — a s pohybem půjde rychleji.' : '');
   }
 }
 function uvodPocitej() {
-  const kg = n($("uvVaha").value), cm = n($("uvVyska").value), vek = n($("uvVek").value);
-  const r = rmrMifflin($('uvPohlavi').value, kg, cm, vek);
-  uvodData = { rmr: r, kg: kg };
-  $('uvRmrTxt').textContent = r ? 'Klidový výdej vychází na ' + r + ' kcal za den.' : '';
+  const kg = n($('uvVaha').value), cm = n($('uvVyska').value), vek = n($('uvVek').value);
+  const pohlavi = $('uvPohlavi').value, pal = n($('uvPal').value) || 1;
+  const r = rmrMifflin(pohlavi, kg, cm, vek);
+  uvodData = { rmr: r, kg: kg, pal: pal, pohlavi: pohlavi };
+  $('uvRmrTxt').textContent = r
+    ? 'Klidový výdej ' + r + ' kcal, s běžným pohybem asi ' + r0(r * pal) + ' kcal za den.'
+    : '';
   $('uvBtn2').disabled = !(r && kg);
 }
 async function uvodCil(def) {
   goals.rmr = uvodData.rmr;
+  goals.pal = uvodData.pal || 1;
+  goals.pohlavi = uvodData.pohlavi || 'm';   // rozhoduje o nejnižším přípustném cíli
   goals.def = def;
   goals.dyn = true;                       // cíl ať se řídí tím, kolik se ten den pohnu
   await dbPut('meta', { k: 'goals', v: goals });
@@ -2035,12 +2077,19 @@ function fixTargets() { return { kcal: goals.kcal, p: goals.p, c: goals.c, f: go
    je nadřazený: už v sobě má klidový výdej i všechen pohyb, takže se k němu nic
    nepřičítá — jinak by se klid a cvičení počítaly dvakrát. Bez něj se skládá
    po částech: klidový výdej + aktivní kcal z hodinek + zapsaná cvičení. */
+/* Klidový výdej krát běžný denní pohyb mimo cvičení (chůze, schody, práce).
+   Bez toho je výdej roven čistě klidovému metabolismu a u člověka, který si
+   pohyb nezapisuje, je podstřelený o pětinu až polovinu — a z něj se počítá cíl.
+   Násobitel se ptá průvodce; komu se aplikace nastavila dřív, ten má 1 a nic se
+   mu nemění, dokud si ho sám nezvolí v Nastavení. */
+function zakladniVydej() { return r0((goals.rmr || 0) * (goals.pal || 1)); }
+
 function vydejDne(dd, wk) {
   dd = dd || {};
   if (typeof dd.total === 'number' && dd.total > 0) return { out: dd.total, celkovy: true };
-  const rmr = goals.rmr || 0;
-  if (!rmr) return { out: null, celkovy: false };
-  return { out: rmr + (typeof dd.burn === 'number' ? dd.burn : 0) + (wk || 0), celkovy: false };
+  const zaklad = zakladniVydej();
+  if (!zaklad) return { out: null, celkovy: false };
+  return { out: zaklad + (typeof dd.burn === 'number' ? dd.burn : 0) + (wk || 0), celkovy: false };
 }
 
 /* Cíl tuků = větší z fyziologického minima (g na kilo) a podílu na energii.
@@ -2055,15 +2104,63 @@ const FAT_PCT = 0.30;
 function cilTuku(w, kcal) {
   return r0(Math.max((goals.fKg || 0.9) * w, kcal * FAT_PCT / 9));
 }
+
+/* ---------------- cíle dne z výdeje a váhy ----------------
+   JEDINÉ místo, kde se cíle počítají. Volá se z dayTargets (Hlavní) i z agg
+   (Statistiky); dřív tam stál dvakrát opsaný výraz a obrazovky se mohly rozejít.
+
+   Zábradlí vznikla poté, co jsem aplikaci prošel očima někoho, kdo necvičí.
+   Model byl postavený na aktivním člověku a u sedavého se rozpadl: sedavá žena
+   65 kg dostala cíl 945 kcal, bílkoviny 55 % energie a SACHARIDY 0 g. Bílkoviny
+   a tuky samy spotřebovaly celý rozpočet.
+
+     · deficit nejvýš čtvrtina výdeje — jinak jde cíl do hladovění
+     · pod 1500 kcal (muž) a 1200 kcal (žena) se nejde vůbec
+     · bílkoviny nejvýš 35 % energie, i kdyby g/kg říkalo víc
+     · sacharidům musí zbýt aspoň 15 %; když se to nevejde, bílkoviny a tuky
+       se úměrně zmenší, aby si zachovaly poměr
+
+   Na aktivního člověka žádné z nich nedosáhne: při výdeji 3000 a deficitu 300
+   vyjdou přesně stejná čísla jako předtím. */
+/* Výchozí bílkoviny. Dřív tu stálo 2,0 g/kg — Huanova hodnota, sportovec
+   v deficitu. U sedavého člověka to narazilo na strop 35 % energie a číslo se
+   pak opřelo o strop, ne o doporučení: sedavá žena 65 kg dostala 1,63 g/kg.
+   Strop má být záchranná síť, ne cíl.
+
+   1,5 g/kg leží v pásmu 1,2–1,6 g/kg, které se uvádí pro hubnutí (chrání
+   svalovou hmotu). Referenční příjem pro dospělé je 0,83 g/kg; víc je tu
+   schválně, protože aplikace počítá s tím, že se hubne. Kdo chce jinak, přepíše
+   si to v Nastavení. */
+const BILK_KG_DEF = 1.5;
+const ENERGIE_MIN = { m: 1500, z: 1200 };
+const DEFICIT_MAX = 0.25;
+const BILK_MAX = 0.35;
+const SACH_MIN = 0.15;
+
+function cileZVydeje(w, vydej) {
+  const podlaha = ENERGIE_MIN[goals.pohlavi === 'z' ? 'z' : 'm'];
+  const prani = goals.def || 0;
+  // nabírání (záporný deficit) se nestropuje — omezuje se jen ubírání
+  const def = prani > 0 ? Math.min(prani, vydej * DEFICIT_MAX) : prani;
+  let kcal = r0(vydej - def);
+  const omezeno = def < prani || kcal < podlaha;
+  kcal = Math.max(kcal, podlaha);
+  let p = r0(Math.min((goals.pKg || BILK_KG_DEF) * w, kcal * BILK_MAX / 4));
+  let f = cilTuku(w, kcal);
+  const strop = kcal * (1 - SACH_MIN);
+  const soucet = 4 * p + 9 * f;
+  if (soucet > strop) { const k = strop / soucet; p = r0(p * k); f = r0(f * k); }
+  const c = Math.max(0, r0((kcal - 4 * p - 9 * f) / 4));
+  return { kcal, p, c, f, omezeno };
+}
 async function dayTargets(date, vydej) {
   if (!goals.dyn || !goals.rmr) return fixTargets();
   const w = await lastWeight(date) || n(($('cW') || {}).value) || 0;
   if (!w || !(vydej > 0)) return fixTargets();
   const out = vydej;
-  const kcal = Math.max(800, r0(out - (goals.def || 0)));
-  const p = r0((goals.pKg || 2.0) * w), f = cilTuku(w, kcal);
-  const c = Math.max(0, r0((kcal - 4 * p - 9 * f) / 4));
-  return { kcal, p, c, f, dyn: true, w, out, burn: Math.max(0, out - (goals.rmr || 0)) };
+  const t = cileZVydeje(w, out);
+  return { kcal: t.kcal, p: t.p, c: t.c, f: t.f, omezeno: t.omezeno,
+           dyn: true, w, out, burn: Math.max(0, out - zakladniVydej()) };
 }
 
 /* ---------------- day view ---------------- */
@@ -2109,8 +2206,11 @@ async function renderDay() {
   }
   if (TG.dyn) {
     $('dynLine').style.display = '';
-    $('dynLine').innerHTML = 'Cíl dnes <b style="color:var(--fg)">' + TG.kcal + ' kcal</b> = klid ' +
-      r0(goals.rmr) + ' + pohyb ' + r0(TG.burn) + (goals.def ? ' − deficit ' + r0(goals.def) : '') +
+    const zakl = zakladniVydej();
+    const jmenoZ = (goals.pal || 1) > 1 ? 'základ ' : 'klid ';
+    $('dynLine').innerHTML = 'Cíl dnes <b style="color:var(--fg)">' + TG.kcal + ' kcal</b> = ' + jmenoZ +
+      zakl + ' + pohyb ' + r0(TG.burn) + (goals.def ? ' − deficit ' + r0(goals.def) : '') +
+      (TG.omezeno ? ' · <b style="color:var(--warn)">cíl je zdola omezený, aby nešel do hladovění</b>' : '') +
       (typeof dd0.burn === 'number' ? '' : ' · aktivní kalorie zatím nezadané');
   } else $('dynLine').style.display = 'none';
   const frac = Math.min(1, TG.kcal ? t.k / TG.kcal : 0);
@@ -3543,8 +3643,10 @@ function fillGoals() {
   $('gF').value = goals.f; $('gAlcDay').value = goals.alcDay || 0;
   $('gRmr').value = goals.rmr || '';
   $('gDef').value = goals.def || 0;
-  $('gPKg').value = goals.pKg || 2.0;
+  $('gPKg').value = goals.pKg || BILK_KG_DEF;
   $('gFKg').value = goals.fKg || 0.9;
+  if ($('gPal')) $('gPal').value = String(goals.pal || 1);
+  if ($('gPohlavi')) $('gPohlavi').value = goals.pohlavi || 'm';
   dynUi();
   $('gFib').value = goals.fib || 30; $('gSalt').value = goals.salt || 5;
   if ($('gProfil')) $('gProfil').value = goals.profil || '';
@@ -3560,8 +3662,11 @@ async function saveGoals() {
     rmr: n($('gRmr').value) || 0,
     dyn: !!goals.dyn,
     def: $('gDef') ? n($('gDef').value) : (goals.def || 0),
-    pKg: ($('gPKg') && n($('gPKg').value)) || 2.0,
+    pKg: ($('gPKg') && n($('gPKg').value)) || goals.pKg || BILK_KG_DEF,
     fKg: ($('gFKg') && n($('gFKg').value)) || 0.9,
+    // goals se tu staví od nuly — co se nevyjmenuje, to zmizí
+    pal: ($('gPal') && n($('gPal').value)) || goals.pal || 1,
+    pohlavi: ($('gPohlavi') && $('gPohlavi').value) || goals.pohlavi || 'm',
     fib: n($('gFib').value) || 30, salt: n($('gSalt').value) || 5,
     profil: $('gProfil') ? $('gProfil').value.trim() : (goals.profil || '')
   };
@@ -4338,7 +4443,7 @@ async function renderBalance(intake, wk) {
   const v = vydejDne(d, wk), out = v.out, bal = intake - out;
   $('balExp').textContent = v.celkovy
     ? 'Výdej celkem ' + r0(out) + ' kcal (z hodinek)'
-    : 'Výdej ' + r0(rmr) + ' + ' + r0(burn) + (wk ? ' + cvičení ' + r0(wk) : '') + ' = ' + r0(out) + ' kcal';
+    : 'Výdej ' + zakladniVydej() + ' + ' + r0(burn) + (wk ? ' + cvičení ' + r0(wk) : '') + ' = ' + r0(out) + ' kcal';
   $('balVal').textContent = (bal > 0 ? '+' : '') + r0(bal) + ' kcal';
   $('balVal').style.color = bal > 0 ? C_SUR : C_DEF;
   const zaklad = v.celkovy
@@ -4408,7 +4513,7 @@ async function statsData(days) {
   return denniRada(days, curDate, await zdrojDnu());
 }
 function agg(list, w0) {
-  const rmr = goals.rmr || 0;
+  const rmr = zakladniVydej();
   // cíle pro každý den zvlášť — v dynamickém režimu se liší podle zátěže a váhy
   let wRun = w0 || 0;
   // celkový výdej ze snímku je nadřazený, jinak klid + pohyb (viz vydejDne)
@@ -4416,9 +4521,8 @@ function agg(list, w0) {
   const tg = list.map(d => {
     if (d.weight !== null) wRun = d.weight;
     if (!goals.dyn || !wRun || !(vyd(d) > 0)) return { kcal: goals.kcal, p: goals.p, c: goals.c, f: goals.f };
-    const kcal = Math.max(800, r0(vyd(d) - (goals.def || 0)));
-    const P = r0((goals.pKg || 2) * wRun), F = cilTuku(wRun, kcal);
-    return { kcal, p: P, f: F, c: Math.max(0, r0((kcal - 4 * P - 9 * F) / 4)) };
+    const t = cileZVydeje(wRun, vyd(d));
+    return { kcal: t.kcal, p: t.p, f: t.f, c: t.c };
   });
   const lg = list.filter(d => d.logged);
   const avg = (arr, f) => arr.length ? arr.reduce((a, x) => a + f(x), 0) / arr.length : 0;
@@ -4475,7 +4579,7 @@ function agg(list, w0) {
    samostatný graf bilance. Bez zadaného klidového výdeje se vrátíme k čáře cíle. */
 function svgBars(list, a) {
   const W = 320, H = 110, pad = 4;
-  const rmr = goals.rmr || 0;
+  const rmr = zakladniVydej();
   const vydej = list.map(d => (d.total !== null ? d.total : (rmr ? rmr + (d.burn || 0) : null)));
   const cil = a.tK || goals.kcal;
   const top = Math.max(cil || 0, a.maxK, ...vydej.filter(v => v !== null)) * 1.12 || 100;

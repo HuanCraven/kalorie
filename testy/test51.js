@@ -36,7 +36,10 @@ const PROSTREDI = require('./prostredi');
   await p.evaluate(async () => { await setMode(true); });
   await p.waitForTimeout(500);
   const cile = await p.evaluate(() => ({ p: document.getElementById('pTxt').textContent, f: document.getElementById('fTxt').textContent }));
-  ck('bílkoviny 2,0 g/kg ze 69 kg = 138 g', cile.p.indexOf('138') > 0, cile.p);
+  /* Od v108 jsou výchozí bílkoviny 1,5 g/kg — 2,0 byla Huanova sportovní hodnota
+     a u sedavého člověka narážela na strop 35 % energie. Tenhle test staví
+     aplikaci od nuly, takže dostane výchozí hodnotu: 1,5 x 69 = 104 g. */
+  ck('bílkoviny 1,5 g/kg ze 69 kg = 104 g', cile.p.indexOf('104') > 0, cile.p);
   /* Tuky od v104 nejsou jen g na kilo: bere se vetsi z fyziologickeho minima
      (0,9 g/kg = 62 g) a 30 % energie. Vydej je tu 1800 + 800 = 2600 kcal,
      takze vyhrava podil: 2600 x 0,30 / 9 = 87 g. */
@@ -48,7 +51,7 @@ const PROSTREDI = require('./prostredi');
   const poNesmyslu = await p.evaluate(async () => await dbGet('daily', curDate));
   ck('váha 1800 kg se neuloží', poNesmyslu.weight === 69, 'uloženo: ' + poNesmyslu.weight);
   ck('a políčko se vrátí na původní hodnotu', (await p.inputValue('#dWeight')) === '69', await p.inputValue('#dWeight'));
-  ck('cíle zůstaly rozumné', (await p.textContent('#pTxt')).indexOf('138') > 0, await p.textContent('#pTxt'));
+  ck('cíle zůstaly rozumné', (await p.textContent('#pTxt')).indexOf('104') > 0, await p.textContent('#pTxt'));
   await p.fill('#dWeight', '3'); await p.locator('#dWeight').blur(); await p.waitForTimeout(600);
   ck('ani tři kila neprojdou', (await p.evaluate(async () => (await dbGet('daily', curDate)).weight)) === 69);
   await p.fill('#dWeight', '69.5'); await p.locator('#dWeight').blur(); await p.waitForTimeout(600);

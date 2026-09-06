@@ -63,13 +63,15 @@ const PROSTREDI = require('./prostredi');
 
   const g = await p.evaluate(() => ({ rmr: goals.rmr, def: goals.def, dyn: goals.dyn }));
   ck('klidový výdej se uložil', g.rmr === 1768, String(g.rmr));
-  ck('deficit podle zvoleného cíle', g.def === 400, String(g.def));
+  // cíl se od v108 zadává v kilech za týden: půl kila = 7700/2/7 = 550 kcal denně
+  ck('deficit podle zvoleného tempa', g.def === 550, String(g.def));
   ck('a cíl se řídí denním výdejem', g.dyn === true, String(g.dyn));
   const w = await p.evaluate(async () => (await dbGet('daily', curDate)).weight);
   ck('váha se zapsala na dnešek', w === 85, String(w));
 
   const sh = await p.textContent('#uvShrnuti');
-  ck('shrnutí říká, co se nastavilo', sh.indexOf('1768') >= 0 && sh.indexOf('hubnutí') >= 0, sh);
+  ck('shrnutí říká výdej i výsledný cíl',
+     /Výdej asi \d+ kcal/.test(sh) && sh.indexOf('hubnutí') >= 0 && /vychází na \d+ kcal/.test(sh), sh);
 
   await p.click('#uv4 button'); await p.waitForTimeout(400);
   ck('po dokončení se okno zavře', !(await p.isVisible('#modUvod')));

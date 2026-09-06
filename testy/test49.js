@@ -110,6 +110,12 @@ const PROSTREDI = require('./prostredi');
   await B.evaluate(async () => { await syPassOff(); await dbPut('log', { date: '2026-08-04', ts: 9, name: 'Po vypnutí', amount: 1, kcal: 1 }); await syncNow(true); });
   ck('po vypnutí se ukládá zase nezašifrovaně', obalka().enc === 0);
   ck('klíč zmizel i z databáze', await B.evaluate(async () => !(await dbGet('meta', 'crypt')) && !syKey));
+  /* Stav sdíleného souboru si tady schováme. Krok 7 totiž nastaví na dalším
+     zařízení heslo, čímž se soubor znovu zašifruje — a to běží na pozadí, mimo
+     dosah await. Zařízení spárované v kroku 8 pak občas stáhlo obálku, kterou
+     nemá čím otevřít (QR heslo schválně nenese), a test padal zhruba ve třech
+     z pěti běhů. Do párování proto vstupujeme s tímhle známým stavem. */
+  const cistyStav = { file: gh.file, sha: gh.sha };
 
   /* ---- 7. odpojení zařízení zahodí heslo -------------------------- */
   const C = await novy();
@@ -120,6 +126,8 @@ const PROSTREDI = require('./prostredi');
     await C.evaluate(async () => !syKey && !(await dbGet('meta', 'crypt'))));
 
   /* ---- 8. párování přes QR ---------------------------------------- */
+  gh.file = cistyStav.file; gh.sha = cistyStav.sha;
+  ck('do párování se jde s nezašifrovaným souborem', obalka().enc === 0);
   const D = await novy();
   const qr = await D.evaluate(() => syQrData());
   const qrO = JSON.parse(qr);
