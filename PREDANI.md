@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.09.05-104** (`APP_VERSION` v `index.html`, cache `kaltrack-v104` v `sw.js`).
+Aktuální verze: **2026.09.06-108** (`APP_VERSION` v `index.html`, cache `kaltrack-v108` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -46,6 +46,113 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v105–v108 — sesterská veřejná aplikace
+
+Huan chtěl aplikaci dát kamarádům. Ukázalo se, že nejde o update, ale o druhou
+podobu programu — a při procházce jejíma očima vyšlo najevo, že model cílů je
+postavený na něm a u nesportovce se rozpadá.
+
+#### v105 — přepínač `VEREJNA`
+
+**Jeden zdroj kódu, dvě podoby.** Dvě kopie po 6600 řádcích by se do půl roku
+rozešly a každá oprava by se dělala dvakrát. Přepínač překlápí `build/verejna.py`,
+ne člověk; v `index.html` musí zůstat `false` a test to hlídá.
+
+Schovává se **přes třídu `verejna` na `<body>` a CSS**, ne JavaScriptem —
+vykreslovací funkce si `display` přepisují samy a schované karty by se vracely.
+Značky jsou `data-osobni` (zmizí veřejně) a `data-verejne` (zmizí osobně).
+
+- **Mizí**: panel Popsat, etiketa z fotky, fotka obalu, snímek hodinek, karta
+  Zdraví, rozbor od Clauda, celá záložka Propojení (klíč i synchronizace).
+- **Zůstává**: hledání, čárové kódy, ruční zápis jídla i aktivity, alkohol,
+  statistiky, záloha do souboru.
+- Místo dvou smazaných částí nastupuje veřejná varianta, ať nezůstane prázdno:
+  „Rozbor od Claude" → **„Souhrn období"** se zkopírováním do schránky,
+  „Vyplnit sám, bez fotky" → **„Vyplnit hodnoty z obalu"** jako hlavní cesta.
+
+`build/verejna.py` **odmítne kopírovat, když v souborech najde tvar `sk-ant-`**.
+Statický web nic neskryje; ať to hlídá stroj, ne pozornost.
+
+**Proč veřejná verze nemá AI:** sdílet klíč přímo nejde — co je v souboru, má
+návštěvník k dispozici. Šlo by to jen přes prostředníka, který klíč drží u sebe,
+jenže tím se z offline aplikace stane provozovaná služba: platíš cizí fotky, tečou
+ti přes infrastrukturu a bez přístupových kódů platíš i cizím lidem. Zamítnuto.
+
+#### v106 — průvodce prvním spuštěním a nápověda
+
+Nový člověk dostal prázdnou aplikaci, klidový výdej 0 a hlášku „Nejdřív nastav
+klidový výdej" — a nikde se nedozvěděl, jaké číslo tam patří.
+
+Průvodce se ptá na pohlaví, věk, výšku, váhu a běžný pohyb a počítá klidový výdej
+podle **Mifflina–St Jeora**. Ukazuje se **jen ve veřejné verzi** — Huan má
+nastaveno a testům by okno překrývalo obrazovku.
+
+**Nápověda** je čtvrtá záložka v Nastavení. Zálohování je hned nahoře, protože je
+to jediná věc, kde můžou přijít o všechno. Uvádí **Open Food Facts a licenci ODbL
+1.0** a přiznává, že hotová jídla jsou počítaná ze surovin. Poslední oddíl říká,
+že to není lékařská rada.
+
+> Pozn. k licencím: „neprodáváme to" nerozhoduje. ODbL redistribuci dovoluje
+> i komerčně, chce ale uvedení zdroje a stejnou licenci u odvozené databáze.
+
+#### v107 — katalog ve vlastním souboru, záloha přes sdílecí nabídku
+
+`katalog.json` vedle aplikace (generuje `build/katalog.py`) se načítá ve třech
+stupních: **soubor ze sítě → poslední uložený → vestavěné `zaklad.js` a `jidla.js`**.
+Prázdný nebo useknutý soubor se zahodí. Katalog tak jde vylepšovat, aniž by se
+sáhlo na kód zamrzlé veřejné verze.
+
+Záloha jde do **sdílecí nabídky telefonu**, ať skončí na Disku a ne ve složce
+Stažené, odkud si ji nikdo na nový telefon nepřenese. Kde to prohlížeč neumí,
+spadne se na stažení; zavření nabídky není chyba.
+
+#### v108 — zábradlí u cílů
+
+Průchodem aplikací očima nesportovce vyšlo najevo, že **model cílů je postavený
+na Huanovi**. Sedavá žena 65 kg dostala cíl **945 kcal, bílkoviny 55 % energie
+a sacharidy 0 g** — bílkoviny a tuky samy spotřebovaly celý rozpočet.
+
+Celý výpočet je nově v jediné funkci **`cileZVydeje(w, vydej)`**, kterou volá
+Hlavní i Statistiky; dřív tam stál dvakrát opsaný výraz.
+
+| zábradlí | hodnota |
+|---|---|
+| deficit nejvýš | čtvrtina výdeje |
+| cíl nespadne pod | 1500 kcal (muž) · 1200 kcal (žena) |
+| bílkoviny nejvýš | 35 % energie |
+| sacharidům zbyde aspoň | 15 % energie |
+
+Nevejde-li se to, bílkoviny a tuky se **úměrně zmenší**, aby si zachovaly poměr.
+
+**Výchozí bílkoviny 2,0 → 1,5 g/kg.** Dvojka byla Huanova sportovní hodnota;
+u sedavého člověka narazila na strop 35 % a číslo se pak opíralo o strop, ne
+o doporučení. Referenční příjem je 0,83 g/kg, při hubnutí se uvádí 1,2–1,6.
+Kdo má aplikaci nastavenou a hodnotu nikde uloženou, tomu se při načtení **2,0
+zapíše natvrdo** — jinak by mu cíl spadl, aniž by o to požádal.
+
+**Běžný pohyb mimo cvičení** (`goals.pal`) násobí klidový výdej. Výchozí 1 =
+žádná změna pro stávající. Bez něj je výdej roven čistě klidovému metabolismu
+a u člověka, který si pohyb nezapisuje, je podstřelený o pětinu až polovinu.
+Celkový výdej z hodinek má pořád přednost. Cíl se zadává **v kilech za týden**.
+
+Na aktivního člověka nedosáhne nic z toho: při výdeji 3000 a deficitu 300 vyjdou
+stejná čísla jako předtím. Jediná výjimka je strop bílkovin — ten zabere, když
+denní cíl klesne pod zhruba 1940 kcal.
+
+#### Chyby nalezené při tom
+
+- **`saveGoals` staví `goals` od nuly**, takže nová pole `pal` a `pohlavi` by se
+  při každém uložení nastavení ztratila. Stejná past jako kdysi u `saveDaily`
+  a zdravotních údajů. Test to hlídá.
+- **`test49.js` byl vrtkavý** — padal ve třech z pěti běhů. Krok se šifrováním
+  nastaví na jednom zařízení heslo, čímž se sdílený soubor **na pozadí znovu
+  zašifruje**; spárované zařízení pak podle načasování stáhlo obálku, kterou
+  nemá čím otevřít (QR heslo schválně nenese). Do párování se nově vstupuje se
+  známým stavem souboru. Nejspíš to dřímalo dlouho a probudilo to načítání
+  `katalog.json`, které posunulo start o jedno síťové kolo.
+- Abort požadavku **offline nesimuluje** — service worker ho zachytí a vrátí svou
+  kopii. Test katalogu proto service worker vypíná.
 
 ### Novinky ve v104 — cíl tuků roste s výdejem
 

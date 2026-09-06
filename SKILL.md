@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 72 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 76 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -57,7 +57,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   72 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   76 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -100,17 +100,47 @@ Kdo to poruší, rozdrobí ji zpátky.
   vyjádření ano. Není-li k tématu ani jeden údaj, karta se neukáže; je-li něco, ale
   málo, karta se ukáže s hláškou.
 
+## Dvě podoby aplikace (od v105)
+
+Jeden zdroj kódu, dvě podoby. **`const VEREJNA` musí v `index.html` zůstat
+`false`** — překlápí ho `build/verejna.py` při stavbě veřejné verze pro
+rozdávání. Kdyby se překlopil ve zdroji, Huan přijde o fotky jídla i o
+synchronizaci a nedozví se proč; test to hlídá.
+
+- Schovává se **přes třídu `verejna` na `<body>` a CSS**, nikdy JavaScriptem —
+  vykreslovací funkce si `display` přepisují samy a schované karty by se vracely.
+  Značky: `data-osobni` (zmizí veřejně), `data-verejne` (zmizí osobně).
+- Veřejná verze nemá nic, co stojí na klíči ke Claude API, na snímcích z hodinek
+  ani na synchronizaci. **Klíč do ní nepatří a nikdy patřit nebude** — co je ve
+  statickém souboru, má návštěvník k dispozici.
+- Průvodce prvním spuštěním (`uvodMozna`) se pouští **jen ve veřejné verzi**.
+  Jinak by testům překrýval obrazovku.
+- Katalog jídel: `katalog.json` (z `build/katalog.py`) → poslední uložený →
+  vestavěné `zaklad.js` a `jidla.js`. Nikdy nespoléhej jen na jeden stupeň.
+- Data o čárových kódech jsou z **Open Food Facts pod ODbL 1.0** — uvedení zdroje
+  je povinnost, ne zdvořilost, a je splněná v Nastavení → Nápověda.
+
 ## Doménová logika (neměnit bez rozmyslu)
 
 - **Výdej dne** počítá `vydejDne(dd, wk)`: je-li zadaný **celkový výdej z hodinek**
   (`daily.total`), platí on a **nic se k němu nepřičítá** — má v sobě klid i pohyb.
   Jinak klidový výdej + aktivní kcal + zapsaná cvičení.
-- **Dynamické cíle**: energie = výdej dne − deficit, bílkoviny 2,0 g/kg podle
-  hmotnosti, sacharidy dopočítávají zbytek. **Tuky umí jen `cilTuku(w, kcal)`**
-  (v104): větší z fyziologického minima `fKg × váha` (0,9 g/kg) a **30 % energie**.
-  Samotné g/kg s výdejem nerostlo, takže cíl byl tím přísnější, čím víc se člověk
-  hýbal. Volá se z `dayTargets` i z `agg` — nepočítej tuky nikde potřetí, obrazovky
-  by se rozešly. Změna dělí energii jinak, celkové kalorie nemění.
+- **Dynamické cíle umí jediná funkce `cileZVydeje(w, vydej)`** (v108). Volá se
+  z `dayTargets` (Hlavní) i z `agg` (Statistiky) — nepočítej cíle nikde potřetí,
+  obrazovky by se rozešly. Energie = výdej dne − deficit, sacharidy dopočítávají
+  zbytek, tuky jsou větší z `fKg × váha` (0,9 g/kg) a **30 % energie** (`cilTuku`).
+- **Zábradlí v `cileZVydeje` nejsou kosmetika.** Bez nich model počítal pro
+  aktivního muže a u sedavé ženy dal cíl 945 kcal a **sacharidy 0 g**: deficit
+  nejvýš čtvrtina výdeje, cíl ne pod 1500 kcal (muž) / 1200 (žena), bílkoviny
+  nejvýš 35 % energie, sacharidům zbyde aspoň 15 % — jinak se bílkoviny a tuky
+  úměrně zmenší. Na aktivního člověka nedosáhne žádné.
+- **Výchozí bílkoviny `BILK_KG_DEF` = 1,5 g/kg.** Nezvyšuj je zpátky na 2,0: to
+  byla Huanova sportovní hodnota a u sedavého člověka se opřela o strop 35 %,
+  takže cíl neurčovalo doporučení, ale strop. Referenční příjem je 0,83 g/kg,
+  při hubnutí se uvádí 1,2–1,6. Kdo má aplikaci nastavenou a hodnotu neuloženou,
+  tomu se v `init` zapíše 2,0 natvrdo.
+- **`zakladniVydej()` = klidový výdej × `goals.pal`** (běžný pohyb mimo cvičení).
+  Výchozí 1 nemění nic. Celkový výdej z hodinek má pořád přednost před vším.
 - **Alkohol**: gramy čistého etanolu = `ml × %obj. × 0,789`; kcal = `g × 7,1 + sacharidy × 4`.
   **Limit je klouzavý 30denní průměr**, ne týdenní součet.
 - **Reálný výdej** se dopočítává ze změny váhy (7700 kcal/kg) při vážení rozložených
