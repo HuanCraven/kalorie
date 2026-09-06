@@ -120,6 +120,20 @@ synchronizaci a nedozví se proč; test to hlídá.
 - Data o čárových kódech jsou z **Open Food Facts pod ODbL 1.0** — uvedení zdroje
   je povinnost, ne zdvořilost, a je splněná v Nastavení → Nápověda.
 
+### Jak se vydává veřejná verze
+
+Repozitář **`HuanCraven/kalorie-lite`**, adresa **https://huancraven.github.io/kalorie-lite/**,
+pracovní kopie vedle projektu ve složce `kalorie-lite/`.
+
+```
+python build/verejna.py ../kalorie-lite
+cd ../kalorie-lite && git add -A && git commit -m "Kalorie <verze>" && git push
+```
+
+Vydává se **vědomě, ne při každém pushi** — kamarádi jedou na zamrzlém snímku
+a push do `HuanCraven/kalorie` se jich nedotkne. `README.md` v tom repozitáři
+je psaný pro ně, ne pro vývoj; stavěcí skript ho nepřepisuje.
+
 ## Doménová logika (neměnit bez rozmyslu)
 
 - **Výdej dne** počítá `vydejDne(dd, wk)`: je-li zadaný **celkový výdej z hodinek**

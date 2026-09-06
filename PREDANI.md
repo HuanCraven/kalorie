@@ -107,6 +107,19 @@ Záloha jde do **sdílecí nabídky telefonu**, ať skončí na Disku a ne ve sl
 Stažené, odkud si ji nikdo na nový telefon nepřenese. Kde to prohlížeč neumí,
 spadne se na stažení; zavření nabídky není chyba.
 
+#### Vydání veřejné verze
+
+`HuanCraven/kalorie-lite` → **https://huancraven.github.io/kalorie-lite/**, první
+vydání 2026.09.06-109. Pracovní kopie je ve složce `kalorie-lite/` vedle projektu.
+
+```
+python build/verejna.py ../kalorie-lite
+cd ../kalorie-lite && git add -A && git commit -m "Kalorie <verze>" && git push
+```
+
+Klonovaný repozitář zdědil prázdnou identitu, takže má nastavené
+`user.name`/`user.email` lokálně — bez toho commit neprojde.
+
 #### v109 — první dojem z prázdné aplikace
 
 Drobnosti z téže procházky. Každá zvlášť kosmetika, dohromady dělaly z první
