@@ -189,9 +189,9 @@ body.verejna [data-osobni]{display:none!important}
   </div>
   <div class="card" id="persWarn" style="display:none;border-color:#4a3a20;background:#241f14">
     <div class="row" style="justify-content:space-between;gap:10px">
-      <span class="tiny">Prohlížeč nepovolil trvalé úložiště — při nedostatku místa může data smazat.
+      <span class="tiny grow">Prohlížeč nepovolil trvalé úložiště — při nedostatku místa může data smazat.
         Zálohuj častěji.</span>
-      <button class="btn sm pri dotyk" onclick="exportData()">Zálohovat</button>
+      <button class="btn sm pri dotyk" style="flex:0 0 auto" onclick="exportData()">Zálohovat</button>
     </div>
   </div>
   <div class="card" id="obCard" style="display:none">
@@ -201,9 +201,9 @@ body.verejna [data-osobni]{display:none!important}
     </div>
     <p class="tiny muted" style="margin:0 0 10px">Tři kroky a aplikace začne dávat smysl.
       Kartu kdykoli zavřeš křížkem.</p>
-    <button class="btn full" style="margin-bottom:8px" onclick="go('set')">1 · Nastavit denní cíle a klidový výdej</button>
-    <button class="btn full" style="margin-bottom:8px" onclick="go('scan');setAdd('code')">2 · Naskenovat první potravinu</button>
-    <button class="btn full" onclick="go('scan')">3 · Nebo najít jídlo podle názvu</button>
+    <button class="btn full" id="obKrok1" style="margin-bottom:8px" onclick="go('set')">1 · Nastavit denní cíle a klidový výdej</button>
+    <button class="btn full" id="obKrok2" style="margin-bottom:8px" onclick="go('scan');setAdd('code')">2 · Naskenovat první potravinu</button>
+    <button class="btn full" id="obKrok3" onclick="go('scan')">3 · Nebo najít jídlo podle názvu</button>
   </div>
   <div class="row" style="margin-bottom:10px">
     <button class="btn sm dotyk" id="dayPrev" onclick="shiftDay(-1)" aria-label="Předchozí den">‹</button>
@@ -612,7 +612,7 @@ body.verejna [data-osobni]{display:none!important}
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" data-osobni>
     <h3>Chůze s batohem</h3>
     <div class="grid2">
       <div class="fld"><label>Rychlost (km/h)</label>
@@ -1414,7 +1414,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.09.06-108';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.09.06-109';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -1731,6 +1731,12 @@ async function obCheck() {
   const done = await dbGet('meta', 'obDone');
   const logs = await dbAll('log');
   $('obCard').style.display = (!done && !logs.length && !products.length) ? '' : 'none';
+  /* Karta nabízela „1 · Nastavit denní cíle" i tomu, kdo to právě prošel
+     s průvodcem. Hotový krok zmizí a zbylé se přečíslují. */
+  const maCil = !!goals.rmr;
+  if ($('obKrok1')) $('obKrok1').style.display = maCil ? 'none' : '';
+  if ($('obKrok2')) $('obKrok2').textContent = (maCil ? '1' : '2') + ' · Naskenovat první potravinu';
+  if ($('obKrok3')) $('obKrok3').textContent = (maCil ? '2' : '3') + ' · Nebo najít jídlo podle názvu';
 }
 
 /* ---------------- boot ---------------- */
@@ -1835,7 +1841,10 @@ function offCachePut(k, v) {
       persisted = await navigator.storage.persisted();
     } catch (e) { persisted = null; }
     info();
-    if ($('persWarn')) $('persWarn').style.display = persisted === false ? '' : 'none';
+    /* Až když je o co přijít. Na prázdné aplikaci to bylo první, co člověk viděl —
+       výhrůžka ztrátou dat, která ještě nemá. */
+    const maData = (await dbAll('log')).length > 0;
+    if ($('persWarn')) $('persWarn').style.display = (persisted === false && maData) ? '' : 'none';
   }
 })();
 
@@ -2189,6 +2198,11 @@ async function renderDay() {
     (DAYS[d.getDay()] + ' ' + d.getDate() + '. ' + (d.getMonth() + 1) + '.');
 
   const rows = await dbByIdx('log', 'date', curDate);
+  /* Na první den v aplikaci svítilo pět tlačítek „⧉ včera", která neměla co
+     zkopírovat. Ukazují se jen u chodů, kde včera něco bylo. */
+  const vcera = new Date(curDate + 'T12:00:00');
+  vcera.setDate(vcera.getDate() - 1);
+  const vceraChody = new Set((await dbByIdx('log', 'date', dstr(vcera))).map(r => r.meal));
   const t = rows.reduce((a, r) => ({
     k: a.k + r.kcal, p: a.p + r.p, c: a.c + r.c, f: a.f + r.f,
     fib: a.fib + (r.fib || 0), salt: a.salt + (r.salt || 0)
@@ -2262,8 +2276,8 @@ async function renderDay() {
             <span class="tiny muted mono">${g.rows.length
               ? r0(kc) + ' kcal' + (sbaleno.has(g.m.k) ? ' · ' + g.rows.length : '') : '—'}</span>
             ${g.m.k === 'nezar' ? '' : `
-              <button class="btn sm dotyk" onclick="copyMeal('${g.m.k}')"
-                aria-label="Zkopírovat ${g.m.n} ze včerejška">⧉ včera</button>
+              ${vceraChody.has(g.m.k) ? `<button class="btn sm dotyk" onclick="copyMeal('${g.m.k}')"
+                aria-label="Zkopírovat ${g.m.n} ze včerejška">⧉ včera</button>` : ''}
               <button class="btn sm pri dotyk" onclick="addToMeal('${g.m.k}')"
                 aria-label="Přidat do ${g.m.n}">+</button>`}
           </span>
@@ -4444,8 +4458,16 @@ async function renderBalance(intake, wk) {
   $('balExp').textContent = v.celkovy
     ? 'Výdej celkem ' + r0(out) + ' kcal (z hodinek)'
     : 'Výdej ' + zakladniVydej() + ' + ' + r0(burn) + (wk ? ' + cvičení ' + r0(wk) : '') + ' = ' + r0(out) + ' kcal';
-  $('balVal').textContent = (bal > 0 ? '+' : '') + r0(bal) + ' kcal';
-  $('balVal').style.color = bal > 0 ? C_SUR : C_DEF;
+  /* Bez jediného zápisu je bilance rovna celému výdeji a na prázdném dni z toho
+     bylo velké červené číslo, které vypadalo jako chyba. Dokud se nic nezapsalo,
+     není co porovnávat. */
+  if (!intake) {
+    $('balVal').textContent = '—';
+    $('balVal').style.color = 'var(--muted)';
+  } else {
+    $('balVal').textContent = (bal > 0 ? '+' : '') + r0(bal) + ' kcal';
+    $('balVal').style.color = bal > 0 ? C_SUR : C_DEF;
+  }
   const zaklad = v.celkovy
     ? 'Celkový výdej z hodinek má v sobě klidový výdej i cvičení, proto se nic nepřičítá.'
     : ((typeof d.burn === 'number') ? '' : 'Aktivní kalorie z hodinek zatím nezadané — počítá se s 0.');

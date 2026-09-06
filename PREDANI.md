@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.09.06-108** (`APP_VERSION` v `index.html`, cache `kaltrack-v108` v `sw.js`).
+Aktuální verze: **2026.09.06-109** (`APP_VERSION` v `index.html`, cache `kaltrack-v109` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -106,6 +106,30 @@ sáhlo na kód zamrzlé veřejné verze.
 Záloha jde do **sdílecí nabídky telefonu**, ať skončí na Disku a ne ve složce
 Stažené, odkud si ji nikdo na nový telefon nepřenese. Kde to prohlížeč neumí,
 spadne se na stažení; zavření nabídky není chyba.
+
+#### v109 — první dojem z prázdné aplikace
+
+Drobnosti z téže procházky. Každá zvlášť kosmetika, dohromady dělaly z první
+obrazovky nepořádek.
+
+- **Karta „Začni tady"** nabízela „1 · Nastavit denní cíle" i tomu, kdo to právě
+  prošel s průvodcem. Hotový krok zmizí, zbylé se přečíslují.
+- **Varování o úložišti** se ukáže, až když je v deníku co ztratit. Na prázdné
+  aplikaci to bylo první, co člověk viděl — výhrůžka ztrátou dat, která nemá.
+  Tlačítko „Zálohovat" se navíc ořezávalo (chybělo `flex:0 0 auto`).
+- **Bilance na dni bez zápisu** ukazuje `—` místo velkého červeného `−1729 kcal`,
+  což vypadalo jako chyba. Není co porovnávat, dokud se nic nezapsalo.
+- **Tlačítka „⧉ včera"** jen u chodů, kde včera něco bylo. První den jich svítilo
+  pět a žádné nemělo co zkopírovat.
+- **„Chůze s batohem"** (Pandolfova rovnice, hmotnost batohu, terén) je
+  `data-osobni` — pro Huana užitečné, pro kamaráda záhada.
+
+Ikona čárového kódu zůstala: na snímku v nízkém rozlišení vypadala jako dvě
+čárky, ve skutečnosti je to poctivý SVG kód.
+
+**`audit.js` na tom padl právem.** Zapisoval včerejší jídlo rovnou do databáze
+a hned klikal na „včera", bez překreslení. Dokud tlačítko viselo vždycky,
+nevadilo to; teď se řídí daty. V provozu `renderDay` volají běžné cesty samy.
 
 #### v108 — zábradlí u cílů
 

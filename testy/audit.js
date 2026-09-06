@@ -144,6 +144,11 @@ Celkem 508 kcal.`); await p.waitForTimeout(400);
   sec('8 · Kopie jídla ze včerejška');
   await p.evaluate(async (d)=>{ await dbPut('log',{date:d,productId:'x',name:'Ovesná kaše',unit:'g',meal:'snidane',
       amount:250,kcal:320,p:11,c:52,f:6,fib:7,salt:0.1,ts:Date.now()}); }, dd(-1));
+  /* Od v109 se tlačítko "vcera" ukazuje jen u chodů, kde včera opravdu něco bylo —
+     na prvním dni v aplikaci jich svítilo pět a žádné nemělo co zkopírovat.
+     Zápis šel rovnou do databáze, takže se obrazovka musí překreslit; v provozu
+     to obstarají běžné cesty, které renderDay volají samy. */
+  await p.evaluate(() => renderDay()); await p.waitForTimeout(500);
   const k8 = Number(await p.textContent('#kcalNow'));
   await p.click('#logList div:nth-child(1) .mealhead .btn:not(.pri)'); await p.waitForTimeout(700);
   ck('⧉ zkopírovalo snídani (+320 kcal)', near(await p.textContent('#kcalNow'), k8+320, 2),

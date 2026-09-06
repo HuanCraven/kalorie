@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 76 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 77 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -57,7 +57,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   76 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   77 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
