@@ -22,7 +22,8 @@ import sys
 
 # Soubory, které aplikace k běhu potřebuje. Zdroje, testy a dokumentace
 # se nekopírují — kamarádům jsou k ničemu a jen by mátly.
-SOUBORY = ['index.html', 'sw.js', 'manifest.json', 'zxing.js', 'zaklad.js', 'jidla.js']
+SOUBORY = ['index.html', 'sw.js', 'manifest.json', 'zxing.js', 'zaklad.js', 'jidla.js',
+           'katalog.json']
 
 KOREN = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

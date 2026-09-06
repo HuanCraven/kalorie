@@ -1384,7 +1384,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.09.06-106';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.09.06-107';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -1759,6 +1759,7 @@ function offCachePut(k, v) {
   try { const en = await dbGet('meta', 'extNazvy'); extNazvy = (en && en.v) || {}; } catch (e) { extNazvy = {}; }
   try { const ek = await dbGet('meta', 'extKdy'); extKdy = (ek && ek.v) || {}; } catch (e) { extKdy = {}; }
   fillGoals();
+  await nactiKatalog();                    // musí být před vykreslením kategorií
   renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
   // po prvním úspěšném zpracování fotky se návody sbalí — tlačítka zůstávají
   await nactiSbaleno();
@@ -1847,6 +1848,7 @@ function info() {
   const bd = ('BarcodeDetector' in window) ? 'nativní BarcodeDetector' : 'ZXing (záložní)';
   $('verNow').textContent = APP_VERSION;
   $('infoTxt').innerHTML = 'Verze: ' + APP_VERSION + '<br>Skener: ' + bd + '<br>Produktů v databázi: ' + products.length +
+    '<br>Katalog: ' + katalogStav +
     '<br>Hotových jídel: ' + (window.JIDLA ? JIDLA.length : 0) +
     '<br>Základních potravin: ' + (window.ZAKLAD ? ZAKLAD.length : 0) +
     (extFoods.length ? '<br>Externí databáze: ' + extFoods.length + ' potravin' : '') +
@@ -1870,6 +1872,40 @@ function go(p) {
   window.scrollTo(0, 0);
 }
 function closeMod(id) { $(id).classList.remove('on'); }
+
+/* ---------------- katalog jídel ----------------
+   Veřejná verze je zamrzlá, ale katalog se zlepšovat má. Leží proto ve vlastním
+   souboru vedle aplikace: přidat potravinu jde, aniž by se sáhlo na kód.
+
+   Tři stupně, aby to nešlo rozbít:
+     1. `katalog.json` ze sítě (service worker jede síť napřed, takže je čerstvý)
+     2. poslední stažený, uložený u sebe — když je člověk offline
+     3. vestavěné zaklad.js a jidla.js — první spuštění bez sítě
+   Čte se přes `window.ZAKLAD` a `window.JIDLA` až v okamžiku potřeby, takže
+   stačí ta pole přepsat a zbytek aplikace nic nepozná. */
+let katalogStav = 'vestavěný';
+async function nactiKatalog() {
+  try {
+    const r = await fetch('katalog.json', { cache: 'no-cache' });
+    if (r.ok) {
+      const k = await r.json();
+      // prázdný nebo useknutý soubor je horší než žádný — vestavěné je pořád lepší
+      if (k && Array.isArray(k.zaklad) && k.zaklad.length && Array.isArray(k.jidla) && k.jidla.length) {
+        window.ZAKLAD = k.zaklad; window.JIDLA = k.jidla;
+        katalogStav = 'stažený ' + (k.verze || '?');
+        await dbPut('meta', { k: 'katalog', v: k });
+        return;
+      }
+    }
+  } catch (e) { /* offline nebo soubor chybí — jde se níž */ }
+  try {
+    const m = await dbGet('meta', 'katalog');
+    if (m && m.v && Array.isArray(m.v.zaklad) && m.v.zaklad.length) {
+      window.ZAKLAD = m.v.zaklad; window.JIDLA = m.v.jidla;
+      katalogStav = 'uložený ' + (m.v.verze || '?');
+    }
+  } catch (e) { /* zbydou vestavěné */ }
+}
 
 /* ---------------- průvodce prvním spuštěním ----------------
    Klidový výdej podle Mifflina–St Jeora. Je to dnes nejběžnější rovnice a od
@@ -3566,9 +3602,32 @@ async function exportData() {
     products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily'),
     workout: await dbAll('workout'), tomb: await dbAll('tomb')
   };
-  dl('kalorie-zaloha-' + dstr(new Date()) + '.json', JSON.stringify(data, null, 1));
+  const jmeno = 'kalorie-zaloha-' + dstr(new Date()) + '.json';
+  const text = JSON.stringify(data, null, 1);
+  await zalohuVen(jmeno, text);
   await dbPut('meta', { k: 'lastBackup', v: Date.now() });
   checkBackup();
+}
+
+/* Stažený soubor skončí ve složce Stažené, odkud si ho nikdo nepřenese na nový
+   telefon — a přesně tam data jednou budou chybět. Sdílecí nabídka telefonu
+   dovolí uložit zálohu rovnou na Disk nebo poslat e-mailem. Když ji prohlížeč
+   neumí (počítač, starší Android), spadne se zpátky na stažení. */
+async function zalohuVen(jmeno, text) {
+  try {
+    if (navigator.canShare) {
+      const soubor = new File([text], jmeno, { type: 'application/json' });
+      if (navigator.canShare({ files: [soubor] })) {
+        await navigator.share({ files: [soubor], title: 'Záloha Kalorie' });
+        toast('Záloha odeslána');
+        return;
+      }
+    }
+  } catch (e) {
+    // zrušené sdílení není chyba; stáhnout se dá pořád
+    if (e && e.name === 'AbortError') { toast('Zrušeno'); return; }
+  }
+  dl(jmeno, text);
   toast('Záloha stažena');
 }
 async function exportCsv() {
