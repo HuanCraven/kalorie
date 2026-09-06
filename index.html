@@ -167,6 +167,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
            padding:2px 0;cursor:pointer;color:inherit;font:inherit}
   .chodBtn .sip{color:var(--dim);font-size:14px;line-height:1;width:10px}
   .chodBtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+/* Veřejná verze: co stojí na klíči ke Claude API, na snímcích z hodinek nebo
+   na synchronizaci, se schová přes CSS. Ne přes JS — vykreslovací funkce si
+   display přepisují samy a schované karty by se vracely zpátky. */
+[data-verejne]{display:none!important}
+body.verejna [data-verejne]{display:revert!important}
+body.verejna [data-osobni]{display:none!important}
 </style>
 </head>
 <body>
@@ -307,7 +313,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <!-- Jen dvě cesty, jak jídlo zapsat. Čtečka kódů je ikona v poli hledání,
        ruční zápis až pod výsledky (sahá se po něm, když hledání selže)
        a recept se přesunul do Jídel — je to správa databáze, ne zápis dne. -->
-  <div class="seg" id="addSeg">
+  <div class="seg" id="addSeg" data-osobni>
     <button data-s="find" class="on" onclick="setAdd('find')">Hledat</button>
     <button data-s="photo" onclick="setAdd('photo')">Popsat</button>
   </div>
@@ -386,7 +392,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   </div>
 
-  <div class="pane" id="s-photo">
+  <div class="pane" id="s-photo" data-osobni>
   <div class="card">
     <h3>Napiš, co jsi jedl</h3>
     <div class="fld" style="margin-bottom:6px">
@@ -407,12 +413,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <p class="tiny muted" style="margin:0">Fotka pomůže tam, kde neznáš gramáž — talíř vyfoť shora
       nebo pod úhlem 45°. Jde použít samotná věta, samotná fotka i obojí; nejlíp funguje obojí,
       protože věta doplní to, co z obrázku poznat nejde.</p>
-    <button class="btn pri full" id="apiEstBtn" style="margin-top:10px;display:none"
+    <button class="btn pri full" id="apiEstBtn" data-osobni style="margin-top:10px;display:none"
       onclick="apiEstimate()">✨ Rozebrat (Claude API)</button>
-    <p class="tiny muted" id="apiEstMsg" style="margin:8px 0 0;display:none"></p>
+    <p class="tiny muted" id="apiEstMsg" data-osobni style="margin:8px 0 0;display:none"></p>
   </div>
 
-  <p class="tiny muted" id="apiChybi" style="margin:0 0 12px;display:none">
+  <p class="tiny muted" id="apiChybi" data-osobni style="margin:0 0 12px;display:none">
     Rozbor potřebuje <b>klíč ke Claude API</b> — vlož ho v Nastavení → Propojení.
     Bez něj funguje hledání, čárový kód i ruční zápis.</p>
 
@@ -564,7 +570,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   <!-- Nahrání snímku z hodinek či fitness aplikace. Stejná mašinerie jako u etikety:
        apiAsk → parser → potvrzení. Bez potvrzení se neuloží nic. -->
-  <div class="card">
+  <div class="card" id="fitFotoKarta" data-osobni>
     <h3>Ze snímku hodinek nebo aplikace</h3>
     <p class="tiny muted" style="margin:0 0 10px">Vyfoť nebo nahraj snímek obrazovky s tréninkem —
       Claude z něj vytáhne aktivitu, délku a kalorie. Než se to zapíše, ukážu ti to k potvrzení.</p>
@@ -575,7 +581,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <p class="tiny" id="fitFotoMsg" style="margin:8px 0 0;display:none"></p>
   </div>
 
-  <div class="card" id="fitNavrhCard" style="display:none">
+  <div class="card" id="fitNavrhCard" data-osobni style="display:none">
     <h3>Zkontroluj a potvrď</h3>
     <div id="fitNavrhList"></div>
     <p class="tiny" id="fitNavrhPozn" style="margin:8px 0 0;color:var(--warn);display:none"></p>
@@ -730,7 +736,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <div id="stMacros"></div>
   </div>
 
-  <div class="card" id="zdraviKarta" style="display:none">
+  <div class="card" id="zdraviKarta" data-osobni style="display:none">
     <h3>Zdraví</h3>
     <div id="zdraviDlazdice" class="row wrap2" style="margin-bottom:10px"></div>
     <div id="chTep"></div>
@@ -756,20 +762,28 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   </div>
 
   <div class="card">
-    <h3>Rozbor od Claude</h3>
-    <button class="btn pri full" style="margin-bottom:8px" id="rozborBtn" onclick="rozborRun()">✨ Vyhodnotit období</button>
-    <p class="tiny muted" id="rozborMsg" style="margin:0 0 8px"></p>
-    <div id="rozborOut" style="display:none;white-space:pre-wrap;font-size:13px;line-height:1.5;
+    <h3 data-osobni>Rozbor od Claude</h3>
+    <h3 data-verejne>Souhrn období</h3>
+    <button class="btn pri full" style="margin-bottom:8px" id="rozborBtn" data-osobni onclick="rozborRun()">✨ Vyhodnotit období</button>
+    <p class="tiny muted" id="rozborMsg" data-osobni style="margin:0 0 8px"></p>
+    <div id="rozborOut" data-osobni style="display:none;white-space:pre-wrap;font-size:13px;line-height:1.5;
       background:var(--card2);border-radius:12px;padding:12px;margin-bottom:8px"></div>
-    <details><summary class="tiny muted" style="cursor:pointer">Radši ručně, bez API klíče</summary>
+    <details data-osobni><summary class="tiny muted" style="cursor:pointer">Radši ručně, bez API klíče</summary>
       <div style="margin-top:10px">
         <button class="btn full" style="margin-bottom:8px" onclick="copySummary()">Zkopírovat souhrn do schránky</button>
         <button class="btn full" onclick="dlSummary()">Stáhnout jako soubor</button>
         <p class="tiny muted" style="margin:8px 0 0">Vlož souhrn do chatu s Claudem a napiš, na co se chceš zeptat.</p>
       </div>
     </details>
-    <p class="tiny muted" style="margin:8px 0 0">Odešle se souhrn za zvolené období a text z Nastavení →
+    <p class="tiny muted" data-osobni style="margin:8px 0 0">Odešle se souhrn za zvolené období a text z Nastavení →
       O mně. Nic jiného. Rozbor je názor podle čísel, ne lékařská rada.</p>
+    <div data-verejne>
+      <p class="tiny muted" style="margin:0 0 10px">Aplikace sama nic nikam neposílá. Vezmi souhrn a vlož
+        ho do chatu, kterému věříš — zeptej se, co ti čísla říkají.</p>
+      <button class="btn full" style="margin-bottom:8px" onclick="copySummary()">Zkopírovat souhrn do schránky</button>
+      <button class="btn full" onclick="dlSummary()">Stáhnout jako soubor</button>
+      <p class="tiny muted" style="margin:8px 0 0">Cokoli ti chat odpoví, je názor podle čísel, ne lékařská rada.</p>
+    </div>
   </div>
 </section>
 
@@ -789,18 +803,22 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   <div id="dbObal" style="display:none">
   <div class="card">
     <h3>Přidat potravinu</h3>
-    <p class="tiny muted" style="margin:0 0 10px">Pro potravinu, kterou nemáš v databázi
+    <p class="tiny muted" data-osobni style="margin:0 0 10px">Pro potravinu, kterou nemáš v databázi
       a nemá čitelný čárový kód. Nejpřesnější je <b>tabulka výživových údajů</b> — z ní se
       čísla opíšou. Poslouží ale i fotka <b>samotné potraviny nebo obalu</b>; pak se hodnoty
       odhadnou. V dalším kroku můžeš připsat, co to je, nebo všechno vyplnit sám.</p>
-    <div class="row" style="margin-bottom:8px">
+    <p class="tiny muted" data-verejne style="margin:0 0 10px">Pro potravinu, kterou nemáš v databázi
+      a nemá čitelný čárový kód. Opiš čísla z <b>tabulky výživových údajů</b> na obalu — bývá na zadní
+      straně a hodnoty jsou vždy na 100 g nebo 100 ml. Uloží se ti natrvalo, příště ji jen vyhledáš.</p>
+    <div class="row" data-osobni style="margin-bottom:8px">
       <button class="btn pri grow dotyk" onclick="document.getElementById('obalFile').click()">📷 Vyfotit</button>
       <button class="btn grow dotyk" onclick="document.getElementById('obalGal').click()">Z galerie</button>
     </div>
     <input type="file" id="obalFile" accept="image/*" capture="environment" style="display:none"
       onchange="gotObal(this)">
     <input type="file" id="obalGal" accept="image/*" style="display:none" onchange="gotObal(this)">
-    <button class="btn full dotyk" onclick="openEdit(null)">Vyplnit sám, bez fotky</button>
+    <button class="btn full dotyk" data-osobni onclick="openEdit(null)">Vyplnit sám, bez fotky</button>
+    <button class="btn pri full dotyk" data-verejne onclick="openEdit(null)">Vyplnit hodnoty z obalu</button>
     <p class="tiny muted" style="margin:10px 0 0" id="obalNote"></p>
   </div>
   </div>
@@ -868,7 +886,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <section id="p-set" class="page">
   <div class="seg" id="setSeg">
     <button data-t="ja" class="on" onclick="setSetMode('ja')">Já</button>
-    <button data-t="prop" onclick="setSetMode('prop')">Propojení</button>
+    <button data-t="prop" data-osobni onclick="setSetMode('prop')">Propojení</button>
     <button data-t="data" onclick="setSetMode('data')">Data</button>
   </div>
 
@@ -951,7 +969,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 
   </div><!-- /setJa -->
 
-  <div id="setProp" style="display:none">
+  <div id="setProp" data-osobni style="display:none">
   <div class="card">
     <h3>Claude API — odhad z fotky bez kopírování</h3>
     <p class="tiny muted" style="margin:0 0 10px">S vlastním API klíčem pošle aplikace fotku
@@ -1042,7 +1060,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
     <button class="btn dan full" onclick="wipe()">Smazat všechna data</button>
   </div>
 
-  <div class="card">
+  <div class="card" data-osobni>
     <h3>Dny se záznamem z hodinek</h3>
     <p class="tiny muted" style="margin:0 0 10px">Kde všude leží čísla ze snímku Zeppu.
       Klepnutím na den se na něj přepneš.</p>
@@ -1128,7 +1146,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
       <div class="fld"><label>Značka</label><input id="edBrand" placeholder="Albert"></div>
       <div class="fld"><label>Čárový kód</label><input id="edCode" class="mono" inputmode="numeric"></div>
     </div>
-    <div class="card" style="background:var(--card2);margin-bottom:12px">
+    <div class="card" data-osobni style="background:var(--card2);margin-bottom:12px">
       <h3 style="margin-bottom:8px">Vyplnit z fotky nebo popisu</h3>
       <div class="fld" style="margin-bottom:8px">
         <textarea id="edPopis" rows="2" oninput="labUi()"
@@ -1213,7 +1231,22 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 <script>
 'use strict';
 
-const APP_VERSION = '2026.09.05-104';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.09.06-105';   // zvyš při každé změně index.html
+
+/* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
+   kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
+   dvakrát. Přepínač překlápí nasazovací skript, ne člověk v telefonu.
+
+   Co ve veřejné verzi mizí: všechno, co stojí na klíči ke Claude API (fotka
+   jídla, popis, etiketa, rozbor statistik), čtení snímků z hodinek a s ním
+   i zdravotní čísla, která odjinud vzít nejdou, a synchronizace přes GitHub.
+   Zůstává hledání, čárové kódy, ruční zápis jídla i aktivity, alkohol,
+   statistiky a záloha do souboru.
+
+   Schovává se přes třídu na <body> a CSS, ne přes JS — vykreslovací funkce si
+   display přepisují samy a schované karty by se vracely zpátky. */
+const VEREJNA = false;
+if (VEREJNA) document.body.classList.add('verejna');
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
