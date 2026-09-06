@@ -18,7 +18,9 @@ const PROSTREDI = require('./prostredi');
   ck('záložka se jmenuje Nastavení',
     (await p.textContent('nav button[data-p="set"]')).indexOf('Nastavení') >= 0,
     await p.textContent('nav button[data-p="set"]'));
-  ck('nahoře jsou tři skupiny', (await p.locator('#setSeg button').count()) === 3);
+  // od v106 přibyla Nápověda — ve veřejné verzi je to jediný návod, který nový člověk má
+  ck('nahoře jsou čtyři skupiny', (await p.locator('#setSeg button').count()) === 4,
+    String(await p.locator('#setSeg button').count()));
   ck('výchozí je Já', await p.evaluate(() =>
     document.querySelector('#setSeg button[data-t="ja"]').classList.contains('on')));
 
@@ -27,14 +29,15 @@ const PROSTREDI = require('./prostredi');
     const kde = nadpis => {
       const h = [...document.querySelectorAll('#p-set h3')].find(x => x.textContent.indexOf(nadpis) === 0);
       if (!h) return 'CHYBÍ';
-      for (const id of ['setJa', 'setProp', 'setData'])
+      for (const id of ['setJa', 'setProp', 'setData', 'setNapo'])
         if (document.getElementById(id).contains(h)) return id;
       return 'MIMO';
     };
     return {
       cile: kde('Jak počítat cíle'), rmr: kde('Klidový výdej'), omne: kde('O mně'), alk: kde('Alkohol'),
       api: kde('Claude API'), sync: kde('Synchronizace'), sifr: kde('Šifrování'), par: kde('Párování'),
-      data: kde('Data'), ext: kde('Externí databáze'), verze: kde('Verze'), info: kde('Info')
+      data: kde('Data'), ext: kde('Externí databáze'), verze: kde('Verze'), info: kde('Info'),
+      napoJak: kde('Jak to funguje'), napoZal: kde('Zálohuj'), napoNeni: kde('Co tahle aplikace není')
     };
   });
   ck('Já: cíle, klidový výdej, O mně, alkohol',
@@ -43,6 +46,8 @@ const PROSTREDI = require('./prostredi');
     ['api', 'sync', 'sifr', 'par'].every(k => rozdeleni[k] === 'setProp'), JSON.stringify(rozdeleni));
   ck('Data: data, externí databáze, verze, info',
     ['data', 'ext', 'verze', 'info'].every(k => rozdeleni[k] === 'setData'), JSON.stringify(rozdeleni));
+  ck('Nápověda: jak to funguje, zálohování, co aplikace není',
+    ['napoJak', 'napoZal', 'napoNeni'].every(k => rozdeleni[k] === 'setNapo'), JSON.stringify(rozdeleni));
   ck('klidový výdej zůstal samostatnou kartou', rozdeleni.rmr === 'setJa');
 
   /* jen jedna skupina je vidět */

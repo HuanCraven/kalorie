@@ -888,6 +888,7 @@ body.verejna [data-osobni]{display:none!important}
     <button data-t="ja" class="on" onclick="setSetMode('ja')">Já</button>
     <button data-t="prop" data-osobni onclick="setSetMode('prop')">Propojení</button>
     <button data-t="data" onclick="setSetMode('data')">Data</button>
+    <button data-t="napo" onclick="setSetMode('napo')">Nápověda</button>
   </div>
 
   <div id="setJa">
@@ -930,6 +931,7 @@ body.verejna [data-osobni]{display:none!important}
     <h3>Klidový výdej</h3>
     <div class="fld"><label>Bazální metabolismus (kcal/den)</label>
       <input id="gRmr" type="number" inputmode="numeric" placeholder="např. 1750" oninput="gSave()"></div>
+    <button class="btn sm full" style="margin:-4px 0 10px" onclick="uvodOtevri(2)">Spočítat z výšky a váhy</button>
     <p class="tiny" id="gRmrWarn" style="margin:-4px 0 0;color:var(--warn);display:none"></p>
     <details>
       <summary class="tiny muted" style="cursor:pointer">Neznám ho — spočítat</summary>
@@ -1083,6 +1085,92 @@ body.verejna [data-osobni]{display:none!important}
     <p class="tiny muted" id="infoTxt"></p>
   </div>
   </div><!-- /setData -->
+
+  <!-- Nápověda. Ve veřejné verzi je to jediné, co novému člověku vysvětlí,
+       jak se s aplikací zachází — nikdo mu k ní nic nepodá. -->
+  <div id="setNapo" style="display:none">
+  <div class="card">
+    <h3>Jak to funguje</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Zapisuješ, co sníš a vypiješ. Aplikace to sečte
+      a porovná s tím, kolik ten den vydáš. Rozdíl je bilance — podle ní se hubne nebo nabírá.</p>
+    <p class="tiny muted" style="margin:0"><b>Všechna data zůstávají v tomhle telefonu.</b> Nikam se
+      neodesílají, nemáš u nás účet a nikdo jiný je nevidí. Má to ale druhou stranu, viz Zálohuj si to.</p>
+  </div>
+
+  <div class="card">
+    <h3>Zálohuj si to</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Když si vymažeš data prohlížeče, přeinstaluješ
+      aplikaci nebo přejdeš na nový telefon, <b>zápisy jsou nenávratně pryč</b>. Nikde jinde nejsou.</p>
+    <p class="tiny muted" style="margin:0">V <b>Nastavení → Data</b> je Export zálohy. Ulož si soubor
+      jednou za čas na Disk, do e-mailu, kamkoli. Když se něco stane, Importem se všechno vrátí.</p>
+  </div>
+
+  <div class="card">
+    <h3>Zápis jídla</h3>
+    <p class="tiny muted" style="margin:0 0 8px"><b>Hledáním</b> — na záložce Zadat napiš část názvu.
+      Prázdné pole samo nabídne, co k té denní době jíváš.</p>
+    <p class="tiny muted" style="margin:0 0 8px"><b>Čárovým kódem</b> — ikona v poli hledání zapne
+      kameru. Kód se hledá v tvé databázi a v Open Food Facts.</p>
+    <p class="tiny muted" style="margin:0"><b>Ručně</b> — Jídla → Přidat. Opiš hodnoty z tabulky
+      výživových údajů na obalu. Uloží se natrvalo, příště ji jen vyhledáš.</p>
+  </div>
+
+  <div class="card" data-osobni>
+    <h3>Zápis fotkou a popisem</h3>
+    <p class="tiny muted" style="margin:0">S vlastním klíčem ke Claude API umí aplikace odhadnout
+      jídlo z fotky, ze slovního popisu i přečíst tabulku na etiketě a snímek z hodinek. Klíč se
+      vkládá v Nastavení → Propojení a zůstává jen v telefonu.</p>
+  </div>
+
+  <div class="card">
+    <h3>Odkud se berou cíle</h3>
+    <p class="tiny muted" style="margin:0 0 8px"><b>Klidový výdej</b> je, kolik tělo spálí, i kdybys
+      celý den ležel. Počítá se z výšky, váhy, věku a pohlaví. Najdeš ho v Nastavení → Já.</p>
+    <p class="tiny muted" style="margin:0 0 8px"><b>Energie</b> = výdej dne minus deficit. Deficit
+      400 kcal denně znamená úbytek zhruba půl kila za týden.</p>
+    <p class="tiny muted" style="margin:0 0 8px"><b>Bílkoviny</b> 2 g na kilo — víc, než se běžně
+      uvádí, protože při hubnutí chrání svaly.</p>
+    <p class="tiny muted" style="margin:0"><b>Tuky</b> jsou větší z 0,9 g na kilo a 30 % energie.
+      Sacharidy dopočítávají zbytek. Všechna čísla si můžeš v Nastavení přepsat.</p>
+  </div>
+
+  <div class="card">
+    <h3>Výdej a váha</h3>
+    <p class="tiny muted" style="margin:0 0 8px">Na záložce Pohyb zapíšeš aktivitu — název, minuty
+      a kalorie. Kalorie umí aplikace odhadnout sama, když je necháš prázdné.</p>
+    <p class="tiny muted" style="margin:0 0 8px">Máš-li hodinky, opiš <b>celkový výdej za den</b>.
+      To číslo pak nahradí celý výpočet: klidový výdej ani cvičení se k němu nepřičítají.</p>
+    <p class="tiny muted" style="margin:0">Váž se ráno po probuzení, ideálně každý den. Denní výkyvy
+      jsou hlavně voda; smysl dává až průměr za týden, který aplikace počítá sama.</p>
+  </div>
+
+  <div class="card">
+    <h3>Alkohol</h3>
+    <p class="tiny muted" style="margin:0 0 8px">Vlastní záložka. Ťukneš na nápoj a je zapsáno;
+      kalorie se přičtou do dne. Gramy čistého lihu se počítají z objemu a procent.</p>
+    <p class="tiny muted" style="margin:0">Limit je <b>klouzavý průměr za 30 dní</b>, ne týdenní
+      součet — jeden večer nic nezkazí, ale zvyk je vidět.</p>
+  </div>
+
+  <div class="card">
+    <h3>Odkud jsou data o potravinách</h3>
+    <p class="tiny muted" style="margin:0 0 8px">Základní potraviny jsou referenční hodnoty na 100 g.
+      Hotová česká jídla jsou <b>spočítaná ze surovin</b> podle receptur, ne opsaná odjinud.</p>
+    <p class="tiny muted" style="margin:0 0 8px">Potraviny podle čárového kódu pocházejí z databáze
+      <b>Open Food Facts</b> a jsou pod licencí <b>ODbL 1.0</b>. Ta dovoluje je dál šířit, když se
+      uvede zdroj a případná odvozená databáze zůstane pod stejnou licencí.</p>
+    <p class="tiny muted" style="margin:0">Hodnoty jsou orientační. U čárových kódů je plní
+      dobrovolníci a chyby se stávají — když ti něco nesedí, přepiš si to.</p>
+  </div>
+
+  <div class="card">
+    <h3>Co tahle aplikace není</h3>
+    <p class="tiny muted" style="margin:0">Není to lékařská rada. Cíle počítá stroj z čísel, která
+      jsi zadal, a nic o tobě neví — o nemoci, těhotenství, lécích ani o tom, jak ti je. Když řešíš
+      hubnutí nebo nabírání vážněji, probíral bych to s lékařem nebo výživovým poradcem. A pokud ti
+      počítání kalorií zhoršuje vztah k jídlu, je v pořádku aplikaci smazat.</p>
+  </div>
+  </div><!-- /setNapo -->
 </section>
 
 </div>
@@ -1224,6 +1312,71 @@ body.verejna [data-osobni]{display:none!important}
   </div>
 </div>
 
+<!-- Průvodce prvním spuštěním. Bez něj dostane nový člověk prázdnou aplikaci,
+     klidový výdej 0 a hlášku "Nejdřív nastav klidový výdej" — a nemá kde zjistit,
+     jaké číslo tam patří. Ukáže se jen ve veřejné verzi a jen na čisté aplikaci. -->
+<div class="mod" id="modUvod">
+  <div class="sheet">
+    <div id="uv1">
+      <h2>Vítej</h2>
+      <p class="tiny muted" style="margin:0 0 10px">Tahle aplikace počítá, co sníš a vypiješ, a porovnává
+        to s tím, kolik za den vydáš.</p>
+      <p class="tiny muted" style="margin:0 0 10px"><b>Všechno zůstává v tomhle telefonu.</b> Nemáš tu
+        účet, nic se nikam neodesílá. Zato si to musíš sám zálohovat — ukážu ti kde.</p>
+      <p class="tiny muted" style="margin:0 0 14px">Nejdřív se tě zeptám na pár čísel, aby ti aplikace
+        uměla spočítat cíle. Zabere to minutu a kdykoli se to dá změnit.</p>
+      <button class="btn pri full" onclick="uvodKrok(2)">Pojďme na to</button>
+      <button class="btn full" style="margin-top:8px" onclick="uvodKonec()">Přeskočit, vyplním si to sám</button>
+    </div>
+
+    <div id="uv2" style="display:none">
+      <h2>Pár čísel o tobě</h2>
+      <p class="tiny muted" style="margin:0 0 10px">Z toho se počítá klidový výdej — kolik tělo spálí,
+        i kdybys celý den ležel.</p>
+      <div class="grid2">
+        <div class="fld"><label>Pohlaví</label>
+          <select id="uvPohlavi" onchange="uvodPocitej()">
+            <option value="m">muž</option>
+            <option value="z">žena</option>
+          </select></div>
+        <div class="fld"><label>Věk</label>
+          <input id="uvVek" type="number" inputmode="numeric" placeholder="40" oninput="uvodPocitej()"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>Výška (cm)</label>
+          <input id="uvVyska" type="number" inputmode="numeric" placeholder="178" oninput="uvodPocitej()"></div>
+        <div class="fld"><label>Váha (kg)</label>
+          <input id="uvVaha" type="number" inputmode="decimal" placeholder="85" oninput="uvodPocitej()"></div>
+      </div>
+      <p class="tiny" id="uvRmrTxt" style="margin:0 0 12px;color:var(--acc)"></p>
+      <button class="btn pri full" id="uvBtn2" onclick="uvodKrok(3)" disabled>Pokračovat</button>
+      <button class="btn full" style="margin-top:8px" onclick="uvodKonec()">Přeskočit</button>
+    </div>
+
+    <div id="uv3" style="display:none">
+      <h2>Co s tím chceš dělat</h2>
+      <p class="tiny muted" style="margin:0 0 12px">Podle toho se nastaví denní cíl. Změnit se to dá
+        kdykoli v Nastavení.</p>
+      <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(400)">Hubnout
+        <span class="tiny muted"> · asi půl kila týdně</span></button>
+      <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(200)">Hubnout pomalu
+        <span class="tiny muted"> · asi čtvrt kila týdně</span></button>
+      <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(0)">Držet váhu</button>
+      <button class="btn full" onclick="uvodCil(-300)">Nabírat</button>
+    </div>
+
+    <div id="uv4" style="display:none">
+      <h2>Hotovo</h2>
+      <p class="tiny muted" id="uvShrnuti" style="margin:0 0 10px"></p>
+      <p class="tiny muted" style="margin:0 0 10px">Začni tím, že si zapíšeš, co jsi dnes jedl —
+        záložka <b>Zadat</b>, napiš část názvu.</p>
+      <p class="tiny muted" style="margin:0 0 14px">Celý návod je v <b>Nastavení → Nápověda</b>.
+        Přečti si aspoň tu část o zálohování; data jsou jen tady a nikde jinde.</p>
+      <button class="btn pri full" onclick="uvodKonec()">Začít</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script src="zaklad.js"></script>
@@ -1231,7 +1384,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.09.06-105';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.09.06-106';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -1618,6 +1771,7 @@ function offCachePut(k, v) {
   const jdi = new URLSearchParams(location.search).get('jdi');
   if (jdi && $('p-' + jdi)) { go(jdi); if (jdi === 'scan') setAdd('find'); }
   await renderDay();
+  await uvodMozna();
   checkBackup();
   obCheck();
   renderDb();
@@ -1716,6 +1870,61 @@ function go(p) {
   window.scrollTo(0, 0);
 }
 function closeMod(id) { $(id).classList.remove('on'); }
+
+/* ---------------- průvodce prvním spuštěním ----------------
+   Klidový výdej podle Mifflina–St Jeora. Je to dnes nejběžnější rovnice a od
+   naměřených hodnot se drží blíž než starší Harris–Benedict. Výsledek je pořád
+   jen odhad — proto se dá číslo v Nastavení kdykoli přepsat.
+
+   Průvodce se ukáže jen ve veřejné verzi a jen na čisté aplikaci. V osobní verzi
+   ne: Huan má nastaveno a testům by průvodce překrýval obrazovku. */
+function rmrMifflin(pohlavi, kg, cm, vek) {
+  if (!kg || !cm || !vek) return 0;
+  const z = 10 * kg + 6.25 * cm - 5 * vek;
+  return r0(pohlavi === 'z' ? z - 161 : z + 5);
+}
+let uvodData = { rmr: 0, kg: 0 };
+function uvodOtevri(krok) { uvodKrok(krok || 1); $('modUvod').classList.add('on'); }
+function uvodKrok(k) {
+  [1, 2, 3, 4].forEach(i => { const b = $('uv' + i); if (b) b.style.display = i === k ? '' : 'none'; });
+  if (k === 2) uvodPocitej();
+  if (k === 4) {
+    const def = goals.def || 0;
+    const smer = def > 0 ? 'hubnutí' : def < 0 ? 'nabírání' : 'držení váhy';
+    $('uvShrnuti').textContent = 'Klidový výdej ' + uvodData.rmr + ' kcal, cíl na ' + smer +
+      '. Denní cíl se dopočítá podle toho, kolik se ten den pohneš.';
+  }
+}
+function uvodPocitej() {
+  const kg = n($("uvVaha").value), cm = n($("uvVyska").value), vek = n($("uvVek").value);
+  const r = rmrMifflin($('uvPohlavi').value, kg, cm, vek);
+  uvodData = { rmr: r, kg: kg };
+  $('uvRmrTxt').textContent = r ? 'Klidový výdej vychází na ' + r + ' kcal za den.' : '';
+  $('uvBtn2').disabled = !(r && kg);
+}
+async function uvodCil(def) {
+  goals.rmr = uvodData.rmr;
+  goals.def = def;
+  goals.dyn = true;                       // cíl ať se řídí tím, kolik se ten den pohnu
+  await dbPut('meta', { k: 'goals', v: goals });
+  if (uvodData.kg) await zapisDen(curDate, 'uzivatel', { weight: uvodData.kg });
+  fillGoals(); dynUi(); rmrWarnUi(); await renderDay();
+  uvodKrok(4);
+}
+function uvodKonec() {
+  closeMod('modUvod');
+  dbPut('meta', { k: 'uvodHotovo', v: 1 });
+}
+/* Nabídne se jen tomu, kdo aplikaci právě otevřel poprvé: nemá cíl, nemá zápis
+   a nemá za sebou proklikaný průvodce. Po přeskočení se už nevrátí. */
+async function uvodMozna() {
+  if (!document.body.classList.contains('verejna')) return;
+  if (goals.rmr) return;
+  const hotovo = await dbGet('meta', 'uvodHotovo');
+  if (hotovo && hotovo.v) return;
+  if ((await dbAll('log')).length) return;
+  uvodOtevri(1);
+}
 
 /* podzáložky na stránce Zadat */
 function setAdd(k) {
@@ -2100,8 +2309,8 @@ let dbMode = 'moje';
 let nastSkupina = 'ja';
 function setSetMode(m) {
   nastSkupina = m;
-  ['ja', 'prop', 'data'].forEach(x => {
-    const box = $(x === 'ja' ? 'setJa' : x === 'prop' ? 'setProp' : 'setData');
+  ['ja', 'prop', 'data', 'napo'].forEach(x => {
+    const box = $('set' + { ja: 'Ja', prop: 'Prop', data: 'Data', napo: 'Napo' }[x]);
     if (box) box.style.display = x === m ? '' : 'none';
   });
   document.querySelectorAll('#setSeg button').forEach(b => b.classList.toggle('on', b.dataset.t === m));
