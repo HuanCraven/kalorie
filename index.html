@@ -39,6 +39,9 @@ input:focus,select:focus{outline:2px solid var(--acc);outline-offset:-1px}
 /* Dotykový cíl aspoň 44×44 px — pod tím se na telefonu trefuje špatně.
    Týká se hlavně malých knoflíků v hlavičkách jídel a šipek u data. */
 .dotyk{min-width:44px;min-height:44px;padding-left:10px;padding-right:10px}
+/* vypnuté tlačítko musí být vidět — dřív vypadalo stejně jako živé (šipka za dnešní
+   měsíc v kalendáři, Pokračovat v průvodci, dokud nejsou vyplněná pole) */
+.btn:disabled{opacity:.35;cursor:default}
 .btn.full{width:100%}
 .muted{color:var(--dim)}
 .tiny{font-size:12.5px}
@@ -167,6 +170,22 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
            padding:2px 0;cursor:pointer;color:inherit;font:inherit}
   .chodBtn .sip{color:var(--dim);font-size:14px;line-height:1;width:10px}
   .chodBtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+/* kalendář dnů */
+.denBtn{background:none;border:0;color:var(--fg);font:inherit;padding:6px 10px;border-radius:10px;cursor:pointer}
+.denBtn:active{background:var(--card2)}
+.kal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.kal .hl{font-size:11px;color:var(--dim);text-align:center;padding:2px 0}
+.kal button{background:var(--card2);border:1px solid transparent;border-radius:10px;color:var(--fg);
+  padding:6px 0 5px;min-height:46px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  font:inherit;cursor:pointer}
+.kal button .d{font-size:14px;font-weight:600;line-height:1}
+.kal button .k{font-size:10px;line-height:1;color:var(--dim);font-variant-numeric:tabular-nums}
+.kal button.upl .k{color:var(--acc)}
+.kal button.neu .k{color:var(--warn)}
+.kal button.dnes{border-color:var(--acc)}
+.kal button.vybrany{background:var(--acc);color:#0b0d10}
+.kal button.vybrany .k{color:#0b0d10}
+.kal button:disabled{opacity:.3;cursor:default}
 /* Veřejná verze: co stojí na klíči ke Claude API, na snímcích z hodinek nebo
    na synchronizaci, se schová přes CSS. Ne přes JS — vykreslovací funkce si
    display přepisují samy a schované karty by se vracely zpátky. */
@@ -207,7 +226,9 @@ body.verejna [data-osobni]{display:none!important}
   </div>
   <div class="row" style="margin-bottom:10px">
     <button class="btn sm dotyk" id="dayPrev" onclick="shiftDay(-1)" aria-label="Předchozí den">‹</button>
-    <div class="grow" style="text-align:center"><b id="dayLabel"></b></div>
+    <div class="grow" style="text-align:center"><button class="denBtn" id="dayLabelBtn"
+      onclick="kalOtevri()" aria-label="Vybrat den v kalendáři"><b id="dayLabel"></b>
+      <span class="tiny muted">▾</span></button></div>
     <button class="btn sm dotyk" id="daySync" onclick="syncNow(true)" style="display:none"
       title="Sladit s druhým zařízením" aria-label="Synchronizovat">⟳</button>
     <button class="btn sm dotyk" id="dayNext" onclick="shiftDay(1)" aria-label="Další den">›</button>
@@ -260,7 +281,8 @@ body.verejna [data-osobni]{display:none!important}
         <button class="btn sm pri" onclick="vybrKopiruj()">Kopírovat</button>
       </div>
       <p class="tiny muted" style="margin:8px 0 0">Přesun položku posune, kopie ji nechá být
-        a vytvoří druhou.</p>
+        a vytvoří druhou. Kopie míří na dnešek — den jde změnit. Na starší den se dostaneš
+        ťuknutím na datum nahoře.</p>
     </div>
     <div class="hr"></div>
     <label class="row" style="gap:8px;align-items:flex-start">
@@ -718,11 +740,6 @@ body.verejna [data-osobni]{display:none!important}
     <p class="tiny muted" style="margin:8px 0 0">
       <span style="color:#2f8fe6">▬</span> pod výdejem &nbsp;
       <span style="color:#e0574d">▬</span> nad výdejem &nbsp; ┄ výdej toho dne</p>
-  </div>
-
-  <div class="card" id="tydenKarta" style="display:none">
-    <h3>Všední dny proti víkendu</h3>
-    <div id="stTyden"></div>
   </div>
 
   <div class="card" id="kartaVaha">
@@ -1407,6 +1424,28 @@ body.verejna [data-osobni]{display:none!important}
   </div>
 </div>
 
+<!-- Kalendář. Šipkami po jednom dni se na týden starý oběd člověk proklikává
+     dlouho a neví, kam jde. Tady vidí celý měsíc i s kaloriemi a ťukne rovnou. -->
+<div class="mod" id="modKal" onclick="if(event.target===this)closeMod('modKal')">
+  <div class="sheet">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+      <button class="btn sm dotyk" onclick="kalMesic(-1)" aria-label="Předchozí měsíc">‹</button>
+      <b id="kalNazev" style="text-transform:capitalize"></b>
+      <button class="btn sm dotyk" id="kalDalsi" onclick="kalMesic(1)" aria-label="Další měsíc">›</button>
+    </div>
+    <div class="kal" id="kalMrizka"></div>
+    <div class="row tiny muted" style="gap:14px;margin:10px 0 12px;flex-wrap:wrap">
+      <span><b style="color:var(--acc)">1850</b> úplný den</span>
+      <span><b style="color:var(--warn)">1200</b> nekompletní</span>
+      <span>bez čísla = nic nezapsáno</span>
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="btn grow" onclick="kalDnes()">Dnes</button>
+      <button class="btn grow" onclick="closeMod('modKal')">Zavřít</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script src="zaklad.js"></script>
@@ -1414,7 +1453,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.09.06-109';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.09.27-110';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -2191,6 +2230,61 @@ function naDnesek() {
   renderDay();
   if ($('p-stats').classList.contains('on')) renderStats();
 }
+/* ---------------- kalendář ----------------
+   Měsíc po dnech: číslo dne a pod ním kalorie. Úplný den modře, nekompletní
+   oranžově (jeho kalorie jsou jen to, co se stihlo zapsat), prázdný bez čísla.
+   Budoucí dny nejdou vybrat. Ťuknutím se na den přepne Hlavní — a odtamtud se
+   dá kopírovat výběrem položek, cíl kopie je pak rovnou dnešek. */
+let kalMes = '';
+function kalOtevri() {
+  kalMes = curDate.slice(0, 7);
+  $('modKal').classList.add('on');
+  return kalKresli();
+}
+function kalMesic(k) {
+  const [y, m] = kalMes.split('-').map(Number);
+  const d = new Date(y, m - 1 + k, 1);
+  kalMes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  return kalKresli();
+}
+async function kalKresli() {
+  const [y, m] = kalMes.split('-').map(Number);
+  const dnes = dstr(new Date());
+  $('kalNazev').textContent = MES[m - 1] + ' ' + y;
+  // dopředu jen do měsíce, ve kterém je dnešek — dál není co ukazovat
+  $('kalDalsi').disabled = kalMes >= dnes.slice(0, 7);
+  const kc = {}, neu = {};
+  for (const r of await dbAll('log')) {
+    if (r.date && r.date.slice(0, 7) === kalMes) kc[r.date] = (kc[r.date] || 0) + (r.kcal || 0);
+  }
+  for (const d of await dbAll('daily')) {
+    if (d.date && d.date.slice(0, 7) === kalMes && d.neuplny) neu[d.date] = true;
+  }
+  const prvni = (new Date(y, m - 1, 1).getDay() + 6) % 7;   // pondělí = 0
+  const pocet = new Date(y, m, 0).getDate();
+  let h = ['po', 'út', 'st', 'čt', 'pá', 'so', 'ne'].map(x => '<div class="hl">' + x + '</div>').join('');
+  for (let i = 0; i < prvni; i++) h += '<div></div>';
+  for (let den = 1; den <= pocet; den++) {
+    const ds = kalMes + '-' + String(den).padStart(2, '0');
+    const ma = kc[ds] !== undefined;
+    const tr = [ma ? (neu[ds] ? 'neu' : 'upl') : '', ds === dnes ? 'dnes' : '',
+                ds === curDate ? 'vybrany' : ''].join(' ').trim();
+    h += '<button class="' + tr + '"' + (ds > dnes ? ' disabled' : '') +
+      ' data-den="' + ds + '" onclick="kalVyber(this.dataset.den)" aria-label="' + czd(ds) + (ma ? ', ' + r0(kc[ds]) + ' kcal' : '') + '">' +
+      '<span class="d">' + den + '</span><span class="k">' + (ma ? r0(kc[ds]) : '&nbsp;') + '</span></button>';
+  }
+  $('kalMrizka').innerHTML = h;
+}
+function kalVyber(den) {
+  if (!jeDatumTvar(den)) return;
+  curDate = den;
+  closeMod('modKal');
+  syncAddDate();
+  renderDay();
+  if ($('p-stats').classList.contains('on')) renderStats();
+}
+function kalDnes() { kalVyber(dstr(new Date())); }
+
 async function renderDay() {
   const today = dstr(new Date());
   const d = new Date(curDate + 'T12:00:00');
@@ -2350,6 +2444,10 @@ async function sbalChod(k) {
 let vybrane = new Set();
 function vybrPrepni(id) {
   id = Number(id) || 0; if (!id) return;
+  /* Nový výběr = cíl kopie dnešek. Dřív se předvyplnil den, na který se člověk
+     díval, takže po skoku kalendářem do minulého týdne mířila kopie zpátky do
+     téhož dne — a hodnota navíc zůstávala viset z minulého kopírování. */
+  if (!vybrane.size) $('vybrDatum').value = dstr(new Date());
   if (vybrane.has(id)) vybrane.delete(id); else vybrane.add(id);
   vybrUi();
 }
@@ -2390,8 +2488,11 @@ async function vybrKopiruj() {
     await dbPut('log', c);
   }
   vybrane.clear();
-  toast('Zkopírováno na ' + czd(den) + ': ' + ids.length + ' ' +
-    plur(ids.length, 'položka', 'položky', 'položek'));
+  const zprava = 'Zkopírováno na ' + czd(den) + ': ' + ids.length + ' ' +
+    plur(ids.length, 'položka', 'položky', 'položek');
+  // kopie na jiný den, než je vidět — nabídni tam skočit, jinak by nebylo vidět, že se povedla
+  if (den !== curDate) toastAct(zprava, 'Ukázat', () => kalVyber(den));
+  else toast(zprava);
   renderDay();
 }
 
@@ -4463,7 +4564,7 @@ async function renderBalance(intake, wk) {
      není co porovnávat. */
   if (!intake) {
     $('balVal').textContent = '—';
-    $('balVal').style.color = 'var(--muted)';
+    $('balVal').style.color = 'var(--dim)';
   } else {
     $('balVal').textContent = (bal > 0 ? '+' : '') + r0(bal) + ' kcal';
     $('balVal').style.color = bal > 0 ? C_SUR : C_DEF;
@@ -4591,7 +4692,13 @@ function agg(list, w0) {
     balDays, ma, weights: w, wFirst: w.length ? w[0].weight : null,
     wLast: w.length ? w[w.length - 1].weight : null, wSpan, dKg, realTdee,
     alc: list.reduce((a, d) => a + d.alc, 0), alcDays: list.filter(d => d.alc > 0).length,
-    alcKcal: list.reduce((a, d) => a + d.alc * KCAL_ETH, 0)
+    alcKcal: list.reduce((a, d) => a + d.alc * KCAL_ETH, 0),
+    /* Podíl alkoholu na energii se musí počítat ze stejných dnů nahoře i dole.
+       Gramy se sčítají ze všech dnů (alkohol se hlídá vždycky), jenže příjem jen
+       z úplných — alkohol z nekompletního dne pak ležel v čitateli bez svého jídla
+       ve jmenovateli a podíl vycházel nadsazený. */
+    alcKcalUpl: lg.reduce((a, d) => a + d.alc * KCAL_ETH, 0),
+    kUpl: lg.reduce((a, d) => a + d.k, 0)
   };
 }
 
@@ -4792,7 +4899,7 @@ function skocNaKartu(cil) {
   setTimeout(() => { el.style.outline = ''; el.style.transition = ''; }, 1600);
 }
 /* Skryté karty se v liště neobjeví — neslibovala by, co na stránce není. */
-const ST_KOTVY = [['kartaPrijem', 'Příjem'], ['tydenKarta', 'Víkend'],
+const ST_KOTVY = [['kartaPrijem', 'Příjem'],
   ['kartaVaha', 'Váha'], ['kartaMakra', 'Makra'], ['zdraviKarta', 'Zdraví'],
   ['kartaPostrehy', 'Postřehy']];
 function renderKotvy() {
@@ -4958,7 +5065,6 @@ async function renderStats() {
   $('chKcal').innerHTML = a.logged ? svgBars(list, a) : '<p class="tiny muted">Zatím žádná data.</p>';
   $('chWeight').innerHTML = svgWeight(list, a);
   renderZdravi(list);
-  renderTyden(list);
   $('stWeightTxt').innerHTML = a.wFirst !== null && a.wLast !== null
     ? 'Od ' + r1(a.wFirst) + ' na ' + r1(a.wLast) + ' kg (' + (a.dKg > 0 ? '+' : '') + r1(a.wLast - a.wFirst) + ' kg)'
       + (a.realTdee ? '<br><b style="color:#e8ecf3">Reálný výdej podle váhy: ' + r0(a.realTdee) + ' kcal/den</b>'
@@ -4990,10 +5096,11 @@ async function renderStats() {
   renderKotvy();          // až nakonec: teprve teď je jasné, které karty jsou vidět
 }
 
-/* Všední dny proti víkendu. Že příjem kolísá, statistika říká už teď — ale ne kdy.
-   Skoro nikdy to není náhodný šum, bývá to pátek a víkend, a to se dá řešit adresně.
-   Příjem počítáme jen z kompletních dnů (jako všechny ostatní průměry), alkohol ze
-   všech — ten se zapisuje i ve dnech označených jako nekompletní. */
+/* Všední dny proti víkendu. Vlastní karta ve Statistikách byla (v72–v109), ale Huan
+   ji v provozu nepoužíval a zrušila se. Zbyla jen jedna věta v postřehu o kolísání
+   příjmu: když za kolísáním stojí víkend, řekne se to rovnou, protože obecná rada
+   „vyrovnanější dny" se pak špatně použije.
+   Příjem jen z kompletních dnů (jako všechny ostatní průměry), alkohol ze všech. */
 function tydenniVzorec(list) {
   const jeVikend = d => { const w = new Date(d.date + 'T12:00:00').getDay(); return w === 0 || w === 6; };
   const skup = v => {
@@ -5012,37 +5119,6 @@ function tydenniVzorec(list) {
   // o kolik by se hnul týdenní průměr, kdyby víkend držel úroveň všedních dnů
   return { p, v, rozdil, naTyden: rozdil * 2 / 7 };
 }
-function renderTyden(list) {
-  const t = tydenniVzorec(list), karta = $('tydenKarta');
-  if (!t) {
-    // bez jediného zapsaného dne karta mlčí, s částečnými daty řekne, co chybí
-    const kompl = list.filter(d => d.logged).length;
-    karta.style.display = kompl ? '' : 'none';
-    if (kompl) $('stTyden').innerHTML = maloDat('Porovnání všedních dnů s víkendem', 0);
-    return;
-  }
-  karta.style.display = '';
-  const max = Math.max(t.p.k, t.v.k) || 1;
-  const radek = (nm, sk, col) => `
-    <div class="bar" style="margin-bottom:8px"><div class="t"><span>${nm}</span>
-      <span class="mono">${r0(sk.k)} kcal · ${dnu(sk.dnu)}</span></div>
-      <div class="track"><div class="fill" style="width:${Math.min(100, sk.k / max * 100)}%;background:${col}"></div></div></div>`;
-  const zav = Math.abs(t.rozdil) < 150
-    ? 'Víkendy držíš na stejné úrovni jako všední dny — tady není co zlepšovat.'
-    : t.rozdil > 0
-      ? 'O víkendu sníš <b>o ' + r0(t.rozdil) + ' kcal víc</b> než ve všední den. ' +
-        'Na týdenním průměru to dělá <b>' + r0(t.naTyden) + ' kcal/den</b> — o tolik by klesl, ' +
-        'kdyby víkend držel úroveň všedních dnů.'
-      : 'O víkendu jíš <b>o ' + r0(-t.rozdil) + ' kcal méně</b> než ve všední den. ' +
-        'Pokud po víkendu bývá hlad, stojí za zvážení rozložit to rovnoměrněji.';
-  const alk = (t.p.alc > 0 || t.v.alc > 0)
-    ? '<p class="tiny muted" style="margin:8px 0 0">Alkohol: po–pá <b>' + r1(t.p.alc) +
-      ' g/den</b> · so–ne <b>' + r1(t.v.alc) + ' g/den</b>' +
-      (t.v.alc > t.p.alc * 2 && t.v.alc > 5 ? ' — víkendový alkohol je tu hlavní rozdíl.' : '') + '</p>'
-    : '';
-  $('stTyden').innerHTML = radek('po–pá', t.p, '#6ea8ff') + radek('so–ne', t.v, '#f0a742') +
-    '<p class="tiny" style="margin:8px 0 0">' + zav + '</p>' + alk;
-}
 /* Postřeh vychází vždycky z nějaké karty, ale dosud nikam nevedl a člověk ji
    musel hledat rolováním. Každý proto nese cíl: id karty na téže stránce, nebo
    `p-alc` a `p-fit` pro skok na jinou. */
@@ -5052,9 +5128,18 @@ function insights(list, a) {
   const ok = '<span style="color:#3fbf7f">●</span> ', wr = '<span style="color:#f0a742">●</span> ',
         bd = '<span style="color:#e0574d">●</span> ';
   if (!a.logged) return out;
-  if (a.logged < a.days * 0.7)
-    pridej(wr + '<b>Data jsou děravá.</b> Záznam máš jen za ' + a.logged + ' z ' + a.days +
-      ' dnů, takže průměry nejspíš nesedí na realitu.', 'kartaPrijem');
+  /* Dřív tu stálo „Data jsou děravá, záznam máš jen za X z Y dnů" — a do chybějících
+     se počítaly i dny, které člověk sám označil jako nekompletní. Tím je z průměrů
+     vyřadil schválně a aplikace mu to pak vyčítala jako díru. Teď se rozliší, co
+     chybí a proč, a řekne se, co to s průměrem skutečně dělá. */
+  if (a.logged < a.days * 0.7) {
+    const bezZap = Math.max(0, a.days - a.logged - a.neuplnych);
+    pridej(wr + '<b>Průměry stojí na ' + a.logged + ' z ' + a.days + ' dnů.</b> ' +
+      (a.neuplnych ? dnu(a.neuplnych) + ' máš označených jako nekompletní a do průměrů se ' +
+        'schválně nepočítají — bývají to ale dny, kdy se jí víc, takže skutečný průměr může být ' +
+        'o něco vyšší. ' : '') +
+      (bezZap ? dnu(bezZap) + ' je úplně bez zápisu. ' : ''), 'kartaPrijem');
+  }
   if (a.tK) {
     const dp = (a.avgK - a.tK) / a.tK * 100;
     pridej((Math.abs(dp) <= 8 ? ok : wr) + 'Průměrný příjem <b>' + r0(a.avgK) + ' kcal</b> proti cíli ' +
@@ -5067,7 +5152,7 @@ function insights(list, a) {
     pridej(wr + 'Příjem hodně kolísá (' + r0(a.minK) + '–' + r0(a.maxK) + ' kcal). ' +
       (tv && tv.rozdil >= 300
         ? 'Velkou část toho dělá víkend — o ' + r0(tv.rozdil) + ' kcal/den víc než po–pá.'
-        : 'Vyrovnanější dny se snáz drží.'), tv ? 'tydenKarta' : 'kartaPrijem');
+        : 'Vyrovnanější dny se snáz drží.'), 'kartaPrijem');
   }
   if (a.tP && a.avgP < a.tP * 0.85)
     pridej(wr + 'Bílkoviny <b>' + r0(a.avgP) + ' g</b> proti cíli ' + r0(a.tP) + ' g — chybí ti ' +
@@ -5090,9 +5175,11 @@ function insights(list, a) {
                  : 'To je o ' + r0(-d) + ' kcal míň, než ukazují hodinky — hodinky nejspíš výdej nadsazují.')), 'kartaVaha');
   }
   if (a.alc > 0) {
-    const podil = a.alcKcal / (a.avgK * a.logged) * 100;
+    // gramy ze všech dnů, podíl jen z úplných — tam je známé i jídlo, ke kterému se vztahuje
+    const podil = a.kUpl ? a.alcKcalUpl / a.kUpl * 100 : 0;
     pridej((podil < 5 ? ok : wr) + 'Alkohol: <b>' + r0(a.alc) + ' g</b> za období (' + a.alcDays +
-      ' z ' + dnu(a.days) + '), to je ' + pctTxt(podil) + ' přijaté energie.', 'p-alc');
+      ' z ' + dnu(a.days) + ')' +
+      (a.alcKcalUpl > 0 ? ', v úplných dnech to je ' + pctTxt(podil) + ' přijaté energie.' : '.'), 'p-alc');
   }
   /* Jen když nechodí ani aktivní kalorie, ani celkový výdej ze snímku. Ten má
      pohyb v sobě, takže bilance je i bez `burn` úplná — hlásit v takovém případě
@@ -5109,7 +5196,10 @@ function summaryText() {
   const { list, a } = statCache, L = [];
   const pct = (v, t) => t ? r0(v / t * 100) + ' %' : '—';
   L.push('KALORIE — souhrn za ' + a.days + ' dní (' + list[0].date + ' až ' + list[list.length - 1].date + ')');
-  L.push('Dnů se záznamem: ' + a.logged + '/' + a.days);
+  const bezZap = Math.max(0, a.days - a.logged - a.neuplnych);
+  L.push('Úplných dnů: ' + a.logged + '/' + a.days +
+    (a.neuplnych ? ', nekompletních: ' + a.neuplnych : '') +
+    (bezZap ? ', bez zápisu: ' + bezZap : ''));
   L.push('');
   L.push('PŘÍJEM');
   L.push('  průměr: ' + r0(a.avgK) + ' kcal/den (cíl ' + r0(a.tK) + ', ' + pct(a.avgK, a.tK) + ')' +
@@ -5146,10 +5236,19 @@ function summaryText() {
     ' g · ' + alcCache.mName + ' ' + r1(alcCache.avgM) + ' g · celkem ' + r1(alcCache.avgAll) +
     ' g (od ' + alcCache.first + ')');
   L.push('');
-  L.push('DENNÍ ŘADA (datum;kcal;B;S;T;alk_g;aktivni_kcal;vaha)');
-  list.forEach(d => L.push('  ' + d.date + ';' + (d.logged ? r0(d.k) : '') + ';' + r0(d.p) + ';' +
-    r0(d.c) + ';' + r0(d.f) + ';' + r1(d.alc) + ';' + (d.burn === null ? '' : r0(d.burn)) + ';' +
-    (d.weight === null ? '' : r1(d.weight))));
+  /* U nekompletního dne se dřív vynechaly jen kalorie — bílkoviny, sacharidy a tuky
+     zůstaly. Model si z nich kalorie dopočítal, bral takový den jako skutečný den
+     o 900 kcal a radil podle něj. A nevěděl, KTERÉ dny jsou nekompletní, jen kolik.
+     Teď má každý den svůj stav a jídlo z neúplného dne se neukazuje vůbec. */
+  L.push('DENNÍ ŘADA (datum;stav;kcal;B;S;T;alk_g;aktivni_kcal;vaha)');
+  L.push('  stav: úplný = jídlo zapsané celé; neúplný = nestihlo se zapsat, příjem z něj NEBER ' +
+    'jako skutečný; bez zápisu = nic. Alkohol a výdej platí u všech dnů.');
+  list.forEach(d => {
+    const stav = d.logged ? 'úplný' : d.neuplny ? 'neúplný' : 'bez zápisu';
+    const jidlo = d.logged ? [r0(d.k), r0(d.p), r0(d.c), r0(d.f)] : ['', '', '', ''];
+    L.push('  ' + d.date + ';' + stav + ';' + jidlo.join(';') + ';' + r1(d.alc) + ';' +
+      (d.burn === null ? '' : r0(d.burn)) + ';' + (d.weight === null ? '' : r1(d.weight)));
+  });
   const tot = {};
   list.forEach(d => d.items.forEach(it => { tot[it.name] = (tot[it.name] || 0) + it.kcal; }));
   const top = Object.entries(tot).sort((x, y) => y[1] - x[1]).slice(0, 10);

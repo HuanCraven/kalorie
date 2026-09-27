@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 77 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 78 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -57,11 +57,12 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   77 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   78 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
-   `npm install` a `python testy/make-fixtures.py`.
+   `npm install`. Fixtures (`alco.bin`, `nutri.csv`, `bc.y4m`) leží v tempu, které si
+   Windows čas od času uklidí; `runall.sh` je v tom případě vyrobí sám (od v110).
    Regrese běží i v GitHub Actions při každém pushi na `main`.
    Podrobnosti a pasti při psaní testů v `testy/README.md`.
 4. **Open Food Facts: limit 10 dotazů/min/IP.** Aplikace má vlastní hlídač (6/min)
@@ -83,6 +84,12 @@ Kdo to poruší, rozdrobí ji zpátky.
   `statsData` i `alcStats` staví z ní.
 - **`logged` = den má zápis a není označený jako nekompletní.** Podle něj se filtruje
   příjem, výdej, bilance a makra.
+- **Nekompletní den nesmí do ničeho, co se tváří jako příjem** — ani do rad. Postřehy,
+  podíl alkoholu na energii i souhrn pro Clauda to ve v110 porušovaly: souhrn posílal
+  u nekompletního dne makra, model si z nich dopočítal kalorie a radil podle nich.
+  V `summaryText` má proto každý den stav (úplný / neúplný / bez zápisu) a jídlo
+  z neúplného dne se neposílá. Podíl čehokoli na energii počítej ze stejných dnů
+  v čitateli i jmenovateli (`alcKcalUpl / kUpl`).
 - **`alc` se nefiltruje NIKDY.** Počítá se i z nekompletních dnů a den bez zápisu je
   nula, ne chybějící údaj. Uživatel si alkohol hlídá vždycky, jídlo ne — je to vědomá
   výjimka, na které trval, a snadno se setře.
@@ -96,7 +103,7 @@ Kdo to poruší, rozdrobí ji zpátky.
   zůstane nedotčené. Neznámý vlastník vyhodí chybu. Přidáváš-li do dne údaj, zapiš ho
   do jednoho z těch seznamů, jinak se neuloží.
 - **`maloDat(co, chybi)`** je jediná podoba hlášky „ještě nemám dost dat". Prahy se
-  sjednocovat nemají (víkendová karta potřebuje jiný počet dnů než křivka), jejich
+  sjednocovat nemají (reálný výdej potřebuje jiný počet dnů než křivka), jejich
   vyjádření ano. Není-li k tématu ani jeden údaj, karta se neukáže; je-li něco, ale
   málo, karta se ukáže s hláškou.
 

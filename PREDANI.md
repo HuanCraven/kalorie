@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.09.06-109** (`APP_VERSION` v `index.html`, cache `kaltrack-v109` v `sw.js`).
+Aktuální verze: **2026.09.27-110** (`APP_VERSION` v `index.html`, cache `kaltrack-v110` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -46,6 +46,43 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v110 — kalendář, pryč víkend, nekompletní dny v radách
+
+Tři poznámky po třech týdnech používání.
+
+**Kalendář.** Ťuknutím na datum nahoře na Hlavní se otevře měsíc; u každého dne
+kalorie — úplné modře, nekompletní oranžově, prázdné bez čísla. Ťuknutí na den
+přepne Hlavní, budoucí dny vybrat nejdou. Kopírování na to navazuje: nový výběr
+položek má cíl kopie předvyplněný na **dnešek** (dřív na den, na který se člověk
+díval, a hodnota zůstávala viset z minula) a toast po kopii nabídne „Ukázat".
+
+**Karta Všední dny proti víkendu zrušena** i s kotvou. Huan ji nepoužíval. Zbyla
+jedna věta v postřehu o kolísání příjmu — když za kolísáním stojí víkend, řekne se
+to, protože obecná rada se jinak špatně použije. Odkaz postřehu míří na příjem.
+
+**Rady a nekompletní dny** — Huan měl pravdu, prosakovalo to ve třech místech:
+
+- **Souhrn pro Clauda** posílal u nekompletního dne prázdné kalorie, ale makra ano.
+  Model si z nich kalorie dopočítal a radil podle „dne o 900 kcal". A věděl jen,
+  kolik dnů je nekompletních, ne které. Každý den má teď stav a jídlo z neúplného
+  dne se neposílá; modelu se napíše, co stav znamená.
+- **Postřeh „Data jsou děravá"** počítal označené dny mezi chybějící — vyčítal díru,
+  kterou člověk udělal schválně. Teď rozliší nekompletní dny a dny bez zápisu.
+- **Podíl alkoholu na energii** měl alkohol ze všech dnů a jídlo jen z úplných.
+  Nově `alcKcalUpl / kUpl`; když alkohol padl jen na nekompletní dny, podíl se
+  neukáže vůbec.
+
+#### Po cestě
+
+- Tlačítka neměla **vzhled pro vypnutý stav** — šipka za dnešní měsíc i „Pokračovat"
+  v průvodci vypadaly jako živé. Přidáno `.btn:disabled`.
+- Pomlčka v bilanci z v109 odkazovala na barvu `--muted`, která neexistuje.
+- **Fixtures zmizely z tempu podruhé** a pět sad padlo na ENOENT. `runall.sh` je teď
+  vyrobí sám, když chybí.
+- Unikání uvozovek přes Python heredoc se slilo do `kalVyber('' + ds + '')`, což by
+  shodilo celý skript. Nahrazeno `data-den` a `this.dataset.den` — bez vnořených
+  uvozovek to nejde rozbít. Chytilo se to před testy kontrolou syntaxe.
 
 ### Novinky ve v105–v108 — sesterská veřejná aplikace
 

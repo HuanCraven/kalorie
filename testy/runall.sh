@@ -4,12 +4,19 @@
 # Cestu si vezmeme přímo z prostredi.js, ať se logy a fixtures nerozejdou.
 LOGY="$(node -e "process.stdout.write(require('./prostredi').DIR)")/logy"
 mkdir -p "$LOGY"
+# Fixtures leží v tempu a Windows si ho jednou za čas uklidí — stalo se to dvakrát
+# a pět sad pak spadlo na ENOENT dřív, než cokoli ověřily. Chybí-li, vyrobí se znovu.
+FIX="$(dirname "$LOGY")"
+if [ ! -f "$FIX/alco.bin" ] || [ ! -f "$FIX/nutri.csv" ] || [ ! -f "$FIX/bc.y4m" ]; then
+  echo "  (chybí fixtures, vyrábím je znovu)"
+  python make-fixtures.py > /dev/null || { echo "  ✗ make-fixtures.py selhal"; exit 1; }
+fi
 PASS=0; FAIL=0; FAILED=""
 for t in audit.js audit2.js test.js test2.js test3.js test4.js test5.js test6.js test7.js test8.js \
          test9.js test10.js test11.js test12.js test13.js test14.js test15.js test16.js test17.js \
          test18.js test19.js test21.js test22.js test23.js test24.js test25.js test26.js \
          test27.js test28.js test29.js test30.js test32.js test33.js test34.js test35.js test36.js test37.js test38.js \
-         test39.js test40.js test41.js test42.js test43.js test44.js test45.js test46.js test47.js test48.js test49.js test50.js test51.js test52.js test53.js test54.js test55.js test56.js test57.js test58.js test59.js test60.js test61.js test62.js test63.js test64.js test65.js test66.js test67.js test68.js test69.js test70.js test71.js test72.js test73.js test74.js test75.js test76.js test77.js; do
+         test39.js test40.js test41.js test42.js test43.js test44.js test45.js test46.js test47.js test48.js test49.js test50.js test51.js test52.js test53.js test54.js test55.js test56.js test57.js test58.js test59.js test60.js test61.js test62.js test63.js test64.js test65.js test66.js test67.js test68.js test69.js test70.js test71.js test72.js test73.js test74.js test75.js test76.js test77.js test78.js; do
   [ -f "$t" ] || continue
   OUT=$(node "$t" 2>&1); KOD=$?
   echo "$OUT" > "$LOGY/$t.log"
