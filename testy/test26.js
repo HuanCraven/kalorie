@@ -9,13 +9,13 @@ const PROSTREDI = require('./prostredi');
   await p.goto('http://127.0.0.1:8811/index.html'); await p.waitForTimeout(1000);
 
   console.log('1. tabulka načtena =', await p.evaluate(()=>window.ZAKLAD ? ZAKLAD.length : 0), 'položek');
-  await p.click('nav button[data-p="db"]'); await p.click('#dbSeg button[data-d="zaklad"]');   // v40: katalog v záložce Jídla
-  const cats = await p.locator('#zakCats button').allTextContents();
+  await p.click('nav button[data-p="db"]'); await p.click('#dbSeg button[data-d="potr"]');   // v112: jedna databáze, kategorie nad seznamem
+  const cats = await p.locator('#dbKat button').allTextContents();
   console.log('2. kategorie:', cats.join(' · '));
 
-  await p.click('#zakCats button >> nth=0'); await p.waitForTimeout(300);
-  console.log('3. zelenina: položek =', await p.locator('#zakList .item').count());
-  console.log('   první:', (await p.textContent('#zakList .item')).replace(/\s+/g,' ').trim());
+  await p.click('#dbKat button >> nth=0'); await p.waitForTimeout(300);
+  console.log('3. zelenina: položek =', await p.locator('#dbList .item').count());
+  console.log('   první:', (await p.textContent('#dbList .item')).replace(/\s+/g,' ').trim());
 
   // hledání bez diakritiky (v40: zpět na Zadat → Hledat)
   await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="find"]');
@@ -34,9 +34,8 @@ const PROSTREDI = require('./prostredi');
   await p.click('#poAdd'); await p.waitForTimeout(700);
   console.log('8. zapsáno, kcal dne =', await p.textContent('#kcalNow'));
 
-  // uloží se do databáze jako běžná položka
-  await p.click('nav button[data-p="db"]'); await p.waitForTimeout(400);
-  console.log('9. v databázi:', (await p.textContent('#dbList')).replace(/\s+/g,' ').trim().slice(0,90));
+  // od v112 se vestavěná potravina mezi vlastní NEkopíruje — jen si pamatuje použití
+  console.log('9. použití:', JSON.stringify(await p.evaluate(() => dbPouziti)));
 
   // podruhé se nesmí duplikovat
   await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="find"]');
@@ -44,7 +43,8 @@ const PROSTREDI = require('./prostredi');
   await p.click('#nameRes .item .grow >> nth=0'); await p.waitForTimeout(500);
   await p.click('#poAdd'); await p.waitForTimeout(700);
   const cnt = await p.evaluate(async()=>(await dbAll('products')).filter(x=>x.source==='zaklad').length);
-  console.log('10. položek "základní" v databázi =', cnt, '(má být 1)');
+  console.log('10. kopií "základní" mezi vlastními =', cnt, '(má být 0, od v112 se nekopíruje)');
+  if (cnt !== 0) { console.log('NEPROŠLO: 1'); }
 
   // vláknina se propíše
   console.log('11. vláknina dne =', await p.textContent('#fibTxt'));
@@ -55,8 +55,8 @@ const PROSTREDI = require('./prostredi');
               '| položek =', await p.evaluate(()=>window.ZAKLAD?ZAKLAD.length:0));
   await p.context().setOffline(false);
 
-  await p.click('nav button[data-p="db"]'); await p.click('#dbSeg button[data-d="zaklad"]');   // v40: katalog v záložce Jídla
-  await p.click('#zakCats button >> nth=2'); await p.waitForTimeout(400);
+  await p.click('nav button[data-p="db"]'); await p.click('#dbSeg button[data-d="potr"]');   // v112: jedna databáze, kategorie nad seznamem
+  await p.click('#dbKat button >> nth=2'); await p.waitForTimeout(400);
   await p.screenshot({path:PROSTREDI.DIR+'/s9-zak.png', fullPage:true});
   console.log('\nJS chyby: '+(errs.length?errs.join(';'):'žádné'));
   await b.close();

@@ -806,11 +806,11 @@ body.verejna [data-osobni]{display:none!important}
 
 <!-- ============ DATABÁZE ============ -->
 <section id="p-db" class="page">
+  <!-- Od v112 jedna databáze: odkud potravina je, uživatele nezajímá. Zvlášť jsou
+       jen hotová jídla — k nim se sahá jinak než k surovinám. -->
   <div class="seg" id="dbSeg">
-    <button data-d="moje" class="on" onclick="setDbMode('moje')">Moje</button>
-    <button data-d="jidla" onclick="setDbMode('jidla')">Hotová</button>
-    <button data-d="zaklad" onclick="setDbMode('zaklad')">Základní</button>
-    <button data-d="ext" onclick="setDbMode('ext')">ČR</button>
+    <button data-d="potr" class="on" onclick="setDbMode('potr')">Potraviny</button>
+    <button data-d="jidla" onclick="setDbMode('jidla')">Hotová jídla</button>
     <button data-d="rec" onclick="setDbMode('rec')">Recept</button>
     <button data-d="obal" onclick="setDbMode('obal')">Přidat</button>
   </div>
@@ -877,10 +877,13 @@ body.verejna [data-osobni]{display:none!important}
   </div>
 
   <div class="card" id="dbHledatKarta">
-    <input id="dbSearch" placeholder="Hledat v mé databázi…" oninput="renderDbMode()">
+    <input id="dbSearch" placeholder="Hledat potravinu…" oninput="renderDb()">
     <p class="tiny muted" style="margin:8px 0 0" id="dbCount"></p>
   </div>
-  <div class="card" id="dbMoje"><div id="dbList"></div></div>
+  <div class="card" id="dbMoje">
+    <div id="dbKat" class="row wrap2" style="gap:6px;margin-bottom:8px"></div>
+    <div id="dbList"></div>
+  </div>
   <!-- Celá databáze jako jeden soubor — pro člověka na jiném telefonu. -->
   <div class="card" id="potrKarta">
     <h3>Předat databázi jinému telefonu</h3>
@@ -893,22 +896,6 @@ body.verejna [data-osobni]{display:none!important}
       <button class="btn grow" onclick="document.getElementById('potrFile').click()">Načíst ze souboru</button>
     </div>
     <input type="file" id="potrFile" accept="application/json,.json" style="display:none" onchange="importPotraviny(this)">
-  </div>
-  <div class="card" id="dbJid" style="display:none">
-    <p class="tiny muted" style="margin:0 0 8px">Svíčková, guláš, řízek, buchty… Hodnoty na 100 g
-      hotového pokrmu, spočítané ze surovin. Kolik sníš, zadáš sám.</p>
-    <div id="jidCats" class="row wrap2" style="gap:6px"></div>
-    <div id="jidList" style="margin-top:8px"></div>
-  </div>
-  <div class="card" id="dbZak" style="display:none">
-    <p class="tiny muted" style="margin:0 0 8px">Zelenina, maso, obiloviny a další nebalené věci,
-      které v databázi čárových kódů nejsou. Vestavěné, funguje offline.</p>
-    <div id="zakCats" class="row wrap2" style="gap:6px"></div>
-    <div id="zakList" style="margin-top:8px"></div>
-  </div>
-  <div class="card" id="dbExt" style="display:none">
-    <p class="tiny muted" id="extListHint" style="margin:0 0 8px"></p>
-    <div id="extList"></div>
   </div>
 </section>
 
@@ -1348,6 +1335,7 @@ body.verejna [data-osobni]{display:none!important}
       <button class="btn grow" onclick="closeMod('modEdit')">Zrušit</button>
       <button class="btn pri grow" onclick="saveProduct()">Uložit</button>
     </div>
+    <button class="btn sm full" id="edPuvodni" style="margin-top:10px;display:none" onclick="vratitPuvodni()">Vrátit původní hodnoty</button>
     <button class="btn dan sm full" id="edDel" style="margin-top:10px" onclick="deleteProduct()">Smazat z databáze</button>
   </div>
 </div>
@@ -1486,7 +1474,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.01-111';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.01-112';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -1640,7 +1628,10 @@ function uidOf(store, rec) {
 }
 const tombKey = (store, uid) => store + '|' + uid;
 
+// jedna databáze potravin (v112): mezipaměť seznamu a co se kolikrát použilo
+let dbCache = null, dbVerze = 0, dbPouziti = {};
 async function dbPut(s, v) {
+  if (s === 'products' || s === 'ext') dbVerze++;
   if (SYNC_STORES.indexOf(s) >= 0) {
     if (GEN_UID.indexOf(s) >= 0) {
       // řádek bez lokálního id je nový — nesmí zdědit uid předlohy (kopie jídla ap.)
@@ -1661,6 +1652,7 @@ async function dbPut(s, v) {
   return req(tx(s, 'readwrite').put(v));
 }
 async function dbDel(s, k) {
+  if (s === 'products' || s === 'ext') dbVerze++;
   if (SYNC_STORES.indexOf(s) >= 0) {
     const rec = await dbGet(s, k);
     const u = rec && uidOf(s, rec);
@@ -1872,7 +1864,9 @@ function offCachePut(k, v) {
   try { const ek = await dbGet('meta', 'extKdy'); extKdy = (ek && ek.v) || {}; } catch (e) { extKdy = {}; }
   fillGoals();
   await nactiKatalog();                    // musí být před vykreslením kategorií
-  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); renderZakCats(); renderJidCats(); extInfoTxt();
+  try { const pu = await dbGet('meta', 'pouziti'); dbPouziti = (pu && pu.v) || {}; } catch (e) { dbPouziti = {}; }
+  await dbSjednot();                       // jednou: kopie vestavěných a načtených pryč z vlastních
+  renderDrinkBtns(); renderDrinkEdit(); fillMealSelect(); syncAddDate(); extInfoTxt();
   // po prvním úspěšném zpracování fotky se návody sbalí — tlačítka zůstávají
   await nactiSbaleno();
   await loadApi();
@@ -2587,7 +2581,7 @@ document.addEventListener('click', e => {
 }, true);
 
 /* ---------------- database view ---------------- */
-let dbMode = 'moje';
+let dbMode = 'potr', dbKat = '';
 /* Nastavení má tři skupiny podle toho, jak často se do nich chodí:
    Já (občas) · Propojení (jednou při zapínání) · Data (výjimečně). */
 let nastSkupina = 'ja';
@@ -2601,99 +2595,59 @@ function setSetMode(m) {
   window.scrollTo(0, 0);
 }
 function setDbMode(m) {
-  dbMode = m;
+  // staré záložky (Moje, Základní, ČR) vedou na společný seznam
+  if (m === 'moje' || m === 'zaklad' || m === 'ext') m = 'potr';
+  dbMode = m; dbKat = '';
   document.querySelectorAll('#dbSeg button').forEach(b => b.classList.toggle('on', b.dataset.d === m));
-  $('dbMoje').style.display = m === 'moje' ? '' : 'none';
-  $('dbJid').style.display = m === 'jidla' ? '' : 'none';
-  $('dbZak').style.display = m === 'zaklad' ? '' : 'none';
-  $('dbExt').style.display = m === 'ext' ? '' : 'none';
-  // Recept je skládání nové potraviny ze surovin, ne procházení databáze —
-  // proto se mu schová i hledací pole nad seznamem.
-  $('dbRec').style.display = m === 'rec' ? '' : 'none';
-  // Recept ani Z obalu nejsou procházení databáze, ale zakládání nové potraviny —
+  const seznam = m === 'potr' || m === 'jidla';
+  $('dbMoje').style.display = seznam ? '' : 'none';
+  $('potrKarta').style.display = seznam ? '' : 'none';
+  // Recept ani Přidat nejsou procházení databáze, ale zakládání nové potraviny —
   // proto se jim schová i hledací pole nad seznamem.
+  $('dbRec').style.display = m === 'rec' ? '' : 'none';
   $('dbObal').style.display = m === 'obal' ? '' : 'none';
-  $('dbHledatKarta').style.display = (m === 'rec' || m === 'obal') ? 'none' : '';
+  $('dbHledatKarta').style.display = seznam ? '' : 'none';
   if (m === 'rec') { renderRec(); return; }
   if (m === 'obal') return;
-  $('dbSearch').placeholder = {
-    moje: 'Hledat v mé databázi…', jidla: 'Hledat v hotových jídlech…',
-    zaklad: 'Hledat v základních potravinách…', ext: 'Hledat v externí databázi…'
-  }[m];
-  renderDbMode();
+  $('dbSearch').placeholder = m === 'jidla' ? 'Hledat v hotových jídlech…' : 'Hledat potravinu…';
+  renderDb();
 }
-const jidRowHtml = j => `<div class="item"><div class="grow" onclick="useJidlo('${sid(jidloProduct(j).id)}')">
-    <div class="nm">${esc(j.n)}</div>
-    <div class="sub">${r0(j.e)} kcal · B ${r1(j.p)} · S ${r1(j.c)} · T ${r1(j.f)}${
-      j.v ? ' · vl ' + r1(j.v) : ''}${j.s ? ' · sůl ' + r1(j.s) : ''}</div>
-  </div></div>`;
-const zakRowHtml = z => `<div class="item"><div class="grow" onclick="useZaklad('${sid(zakProduct(z).id)}')">
-    <div class="nm">${esc(z.n)}</div>
-    <div class="sub">${r0(z.e)} kcal · B ${r1(z.p)} · S ${r1(z.c)} · T ${r1(z.f)}${
-      z.v ? ' · vl ' + r1(z.v) : ''}${z.s ? ' · sůl ' + r1(z.s) : ''}</div>
-  </div></div>`;
-function renderDbMode() {
-  const q = ($('dbSearch').value || '').trim();
-  if (dbMode === 'moje') { renderDb(); return; }
-  if (dbMode === 'jidla') {
-    if (q.length >= 2) {
-      document.querySelectorAll('#jidCats button').forEach(b => b.classList.remove('pri'));
-      const list = (window.JIDLA || []).filter(j => matchWords(j.n + ' ' + j.k, q));
-      $('jidList').innerHTML = list.map(jidRowHtml).join('') || '<p class="muted tiny">Nic nenalezeno.</p>';
-      $('dbCount').textContent = 'nalezeno ' + list.length;
-    } else {
-      $('dbCount').textContent = (window.JIDLA ? JIDLA.length : 0) + ' hotových jídel — vyber kategorii';
-    }
-    return;
-  }
-  if (dbMode === 'zaklad') {
-    if (q.length >= 2) {
-      document.querySelectorAll('#zakCats button').forEach(b => b.classList.remove('pri'));
-      const list = (window.ZAKLAD || []).filter(z => matchWords(z.n + ' ' + z.k, q));
-      $('zakList').innerHTML = list.map(zakRowHtml).join('') || '<p class="muted tiny">Nic nenalezeno.</p>';
-      $('dbCount').textContent = 'nalezeno ' + list.length;
-    } else {
-      $('dbCount').textContent = (window.ZAKLAD ? ZAKLAD.length : 0) + ' základních potravin — vyber kategorii';
-    }
-    return;
-  }
-  // externí databáze (NutriDatabaze / CSV)
-  if (!extFoods.length) {
-    $('extListHint').innerHTML = 'Nic načteného. Databázi z CSV (např. NutriDatabaze.cz) ' +
-      'nahraješ ve <b>Víc → Externí databáze potravin</b>.';
-    $('extList').innerHTML = '';
-    $('dbCount').textContent = '';
-    return;
-  }
-  $('extListHint').textContent = '';
-  const list = q.length >= 2 ? extFoods.filter(x => matchWords(x.n, q)) : extFoods.slice(0, 30);
-  $('extList').innerHTML = list.slice(0, 60).map(x => {
-    const pr = extProduct(x);
-    return `<div class="item"><div class="grow" onclick="useExt('${sid(pr.id)}')">
-      <div class="nm">${esc(x.n)}</div>
-      <div class="sub">${r0(x.e)} kcal · B ${r1(x.p)} · S ${r1(x.c)} · T ${r1(x.f)}</div>
-    </div></div>`;
-  }).join('') || '<p class="muted tiny">Nic nenalezeno.</p>';
-  $('dbCount').textContent = q.length >= 2
-    ? 'nalezeno ' + list.length
-    : extFoods.length + ' potravin — prvních 30, zbytek přes hledání';
-}
+function renderDbMode() { renderDb(); }
+function dbVyberKat(k) { dbKat = dbKat === k ? '' : k; renderDb(); }
+/* Seznam potravin nebo hotových jídel z jedné databáze. Bez dotazu ukáže u potravin
+   jen ty tvoje — celá databáze má s načtenými stovky až tisíce položek, a ty se
+   hledají, ne listují. Kategorie nesou jen vestavěné položky. */
 function renderDb() {
-  const q = ($('dbSearch').value || '').trim().toLowerCase();
-  const list = products
-    .filter(p => !q || matchWords(p.name + ' ' + (p.brand || '') + ' ' + (p.barcode || ''), q))
-    .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
-  $('dbCount').textContent = products.length + ' položek v databázi' + (q ? ' · nalezeno ' + list.length : '');
-  $('dbList').innerHTML = list.length ? list.map(p => `
-    <div class="item">
+  if (!$('dbList')) return;
+  const druh = dbMode === 'jidla' ? 'jidlo' : 'potravina';
+  const q = ($('dbSearch').value || '').trim();
+  const vse = [...dbVse().values()].filter(p => druhPotraviny(p) === druh);
+  const abc = (a, b) => a.name.localeCompare(b.name, 'cs');
+  const kats = [...new Set(vse.map(p => p.kat).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'cs'));
+  $('dbKat').innerHTML = q.length >= 2 ? '' : kats.map(k =>
+    `<button class="btn sm${k === dbKat ? ' pri' : ''}" data-k="${esc(k)}" onclick="dbVyberKat(this.dataset.k)">${esc(k)}</button>`).join('');
+  let list, popis;
+  if (q.length >= 2) { list = dbHledej(q, druh); popis = 'nalezeno ' + list.length; }
+  else if (dbKat) { list = vse.filter(p => p.kat === dbKat).sort(abc); popis = list.length + ' v kategorii ' + dbKat; }
+  else if (druh === 'jidlo') { list = vse.sort(abc); popis = list.length + ' hotových jídel'; }
+  else {
+    list = vse.filter(p => p._rank === 0).sort(abc);
+    popis = 'V databázi je ' + vse.length + ' potravin. ' + (list.length
+      ? 'Tady jsou tvoje — ostatní najdeš hledáním nebo v kategorii.'
+      : 'Najdeš je hledáním nebo v kategorii.');
+  }
+  $('dbCount').textContent = popis;
+  $('dbList').innerHTML = list.slice(0, 150).map(p => {
+    const zn = znackaZobraz(p);
+    return `<div class="item">
       <div class="grow" onclick="openPortion('${sid(p.id)}')">
         <div class="nm">${esc(p.name)}</div>
-        <div class="sub">${p.brand ? esc(p.brand) + ' · ' : ''}${r0(p.kcal)} kcal/100${esc(p.unit)}
-          <span class="pill ${p.source === 'off' ? 'off' : 'man'}">${p.source === 'off' ? 'OFF' : (p.source === 'recipe' ? 'recept' : (p.source === 'jidlo' ? 'jídlo' : (p.source === 'zaklad' ? 'základní' : (p.source === 'ext' ? 'ČR' : 'ručně'))))}</span></div>
+        <div class="sub">${zn ? esc(zn) + ' · ' : ''}${r0(p.kcal)} kcal/100 ${esc(p.unit)} · B ${r1(p.p)} · S ${r1(p.c)} · T ${r1(p.f)}</div>
       </div>
-      <button class="btn sm" onclick="openEdit('${sid(p.id)}')">✎</button>
-    </div>`).join('')
-    : '<p class="muted tiny">Nic tu není. Naskenuj první produkt.</p>';
+      <button class="btn sm" onclick="openEdit('${sid(p.id)}')" aria-label="Upravit ${esc(p.name)}">✎</button>
+    </div>`;
+  }).join('') + (list.length > 150 ? '<p class="tiny muted" style="margin:8px 0 0">Prvních 150 — upřesni hledání.</p>' : '')
+    || (q.length >= 2 ? '<p class="muted tiny">Nic nenalezeno.</p>' : '');
   potravinyStav();          // počty v kartě předání sedí s tím, co je v seznamu
 }
 
@@ -2701,18 +2655,15 @@ function renderDb() {
 async function lookup(code) {
   code = String(code || '').replace(/\D/g, '');
   if (code.length < 6) { toast('Neplatný kód'); return; }
-  const local = products.find(p => p.barcode === code);
+  const local = products.find(p => p.barcode === code && !p.skryto);
   if (local) { openPortion(local.id); return; }
   /* Externí databáze s čárovými kódy (viz build/off-cz.js) odpoví okamžitě
      a offline — proto se do ní kouká dřív než na internet. Nalezená položka
      se uloží mezi moje potraviny, aby si pamatovala gramáž a četnost. */
   const zvenku = extFoods.find(x => x.k === code);
   if (zvenku) {
-    const p = extProduct(zvenku);
-    await dbPut('products', p);
-    products.push(p);
-    toast('Z databáze v telefonu: ' + p.name);
-    openPortion(p.id);
+    toast('Z databáze v telefonu: ' + zvenku.n);
+    openPortion(zvenku.id);
     return;
   }
   toast('Hledám v Open Food Facts…');
@@ -2873,7 +2824,7 @@ function matchWords(hay, q) {
 function zakProduct(z) {
   return {
     id: 'z-' + norm(z.n).replace(/[^a-z0-9]+/g, '-'), barcode: null,
-    name: z.n, brand: 'základní potravina', unit: z.k === 'nápoje' ? 'ml' : 'g',
+    name: z.n, brand: 'základní potravina', unit: z.k === 'nápoje' ? 'ml' : 'g', kat: z.k,
     kcal: z.e, p: z.p, c: z.c, f: z.f, fib: z.v || 0, salt: z.s || 0,
     serving: null, source: 'zaklad', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
   };
@@ -2886,7 +2837,7 @@ function zakladMatches(q) {
 function jidloProduct(j) {
   return {
     id: 'j-' + norm(j.n).replace(/[^a-z0-9]+/g, '-'), barcode: null,
-    name: j.n, brand: 'hotové jídlo', unit: 'g',
+    name: j.n, brand: 'hotové jídlo', unit: 'g', kat: j.k,
     kcal: j.e, p: j.p, c: j.c, f: j.f, fib: j.v || 0, salt: j.s || 0,
     serving: null, source: 'jidlo', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
   };
@@ -2895,66 +2846,10 @@ function jidlaMatches(q) {
   if (!window.JIDLA) return [];
   return JIDLA.filter(j => matchWords(j.n + ' ' + j.k, q)).slice(0, 8).map(jidloProduct);
 }
-function localMatches(q) {
-  const mine = products
-    .filter(p => matchWords(p.name + ' ' + (p.brand || ''), q))
-    .sort((a, b) => (b.uses || 0) - (a.uses || 0))
-    .slice(0, 6);
-  const ids = new Set(mine.map(p => p.id));
-  const jid = jidlaMatches(q).filter(z => !ids.has(z.id));
-  jid.forEach(z => ids.add(z.id));
-  const zak = zakladMatches(q).filter(z => !ids.has(z.id));
-  zak.forEach(z => ids.add(z.id));
-  const ext = extMatches(q).filter(z => !ids.has(z.id));
-  return mine.concat(jid, zak, ext).slice(0, 18);
-}
+function localMatches(q) { return dbHledej(q, null, 18); }
 
-function renderZakCats() {
-  if (!window.ZAKLAD || !$('zakCats')) return;
-  const cats = [...new Set(ZAKLAD.map(z => z.k))];
-  $('zakCats').innerHTML = cats.map(c =>
-    `<button class="btn sm" data-c="${esc(c)}" onclick="showZak('${esc(c)}')">${esc(c)}</button>`).join('');
-}
-function showZak(cat) {
-  document.querySelectorAll('#zakCats button').forEach(b => b.classList.toggle('pri', b.dataset.c === cat));
-  const list = ZAKLAD.filter(z => z.k === cat).sort((a, b) => a.n.localeCompare(b.n, 'cs'));
-  $('zakList').innerHTML = list.map(z => {
-    const pr = zakProduct(z);
-    return `<div class="item"><div class="grow" onclick="useZaklad('${sid(pr.id)}')">
-      <div class="nm">${esc(z.n)}</div>
-      <div class="sub">${r0(z.e)} kcal · B ${r1(z.p)} · S ${r1(z.c)} · T ${r1(z.f)}${
-        z.v ? ' · vl ' + r1(z.v) : ''}${z.s ? ' · sůl ' + r1(z.s) : ''}</div>
-    </div></div>`;
-  }).join('');
-}
-function renderJidCats() {
-  if (!window.JIDLA || !$('jidCats')) return;
-  const cats = [...new Set(JIDLA.map(j => j.k))];
-  $('jidCats').innerHTML = cats.map(c =>
-    `<button class="btn sm" data-c="${esc(c)}" onclick="showJid('${esc(c)}')">${esc(c)}</button>`).join('');
-}
-function showJid(cat) {
-  document.querySelectorAll('#jidCats button').forEach(b => b.classList.toggle('pri', b.dataset.c === cat));
-  const list = JIDLA.filter(j => j.k === cat).sort((a, b) => a.n.localeCompare(b.n, 'cs'));
-  $('jidList').innerHTML = list.map(j => {
-    const pr = jidloProduct(j);
-    return `<div class="item"><div class="grow" onclick="useJidlo('${sid(pr.id)}')">
-      <div class="nm">${esc(j.n)}</div>
-      <div class="sub">${r0(j.e)} kcal · B ${r1(j.p)} · S ${r1(j.c)} · T ${r1(j.f)}${
-        j.v ? ' · vl ' + r1(j.v) : ''}${j.s ? ' · sůl ' + r1(j.s) : ''}</div>
-    </div></div>`;
-  }).join('');
-}
-async function useJidlo(id) {
-  let pr = products.find(x => x.id === id);
-  if (!pr) {
-    const j = JIDLA.find(x => jidloProduct(x).id === id);
-    if (!j) { toast('Nenalezeno'); return; }
-    pr = jidloProduct(j);
-    await dbPut('products', pr); products.push(pr); renderDb(); info();
-  }
-  openPortion(pr.id);
-}
+// jen kvůli starším odkazům; od v112 se nic nekopíruje
+function useJidlo(id) { openPortion(id); }
 
 /* ---------------- recepturník ---------------- */
 let recIngs = [];
@@ -2980,16 +2875,8 @@ function extMatches(q) {
   }
   return out;
 }
-async function useExt(id) {
-  let pr = products.find(x => x.id === id);
-  if (!pr) {
-    const x = extFoods.find(y => y.id === id);
-    if (!x) { toast('Nenalezeno'); return; }
-    pr = extProduct(x);
-    await dbPut('products', pr); products.push(pr); renderDb(); info();
-  }
-  openPortion(pr.id);
-}
+// jen kvůli starším odkazům; od v112 se nic nekopíruje
+function useExt(id) { openPortion(id); }
 /* Databází může být načteno víc; při hledání se chovají jako jedna, tady se
    vypíšou zvlášť, aby bylo vidět, co v telefonu je a co se dá znovu načíst. */
 function extZdroje() {
@@ -3161,6 +3048,112 @@ function findAny(id) {
   const e = extFoods.find(x => x.id === id);
   return e ? extProduct(e) : null;
 }
+
+/* ---------------- jedna databáze potravin (v112) ----------------
+   Huan chtěl jednu databázi „jak interně, tak navenek": uživateli je jedno, odkud
+   potravina pochází, odlišovat se mají jen hotová jídla. Dřív to byly čtyři seznamy
+   (vlastní, hotová, základní, načtené z CSV), každý s jiným hledáním, a použitá
+   položka se do vlastních KOPÍROVALA — zmrazila si hodnoty a NutriDatabáze tak tekla
+   i do synchronizace.
+
+   Teď je jediný přístup: `dbVse()` vrací všechny potraviny, `potravina(id)` jednu,
+   `dbHledej()` hledá. Uložené zůstávají ve dvou vrstvách, a to schválně:
+   synchronizace maže všechno, co není ve sdíleném souboru (applyState), takže
+   načtené databáze s tisíci řádků v synchronizované vrstvě ležet nemohou.
+   Vlastní a upravené potraviny jsou v `products` a přebíjejí vestavěné i načtené
+   se stejným id; odebraná vestavěná položka je v `products` se `skryto`.
+
+   Stejný název z víc zdrojů se ukáže jednou: vlastní > načtená databáze > vestavěná. */
+const druhPotraviny = p => (p.source === 'jidlo' || p.source === 'recipe') ? 'jidlo' : 'potravina';
+function dbVse() {
+  const c = dbCache;
+  if (c && c.v === dbVerze && c.pr === products && c.prn === products.length && c.ex === extFoods &&
+      c.za === window.ZAKLAD && c.ji === window.JIDLA) return c.mapa;
+  const m = new Map();
+  const vloz = (p, rank) => m.set(p.id, Object.assign({}, p, { _rank: rank }));
+  (window.ZAKLAD || []).forEach(z => vloz(zakProduct(z), 2));
+  (window.JIDLA || []).forEach(j => vloz(jidloProduct(j), 2));
+  extFoods.forEach(x => vloz(extProduct(x), 1));
+  products.forEach(p => {
+    const puv = m.get(p.id);
+    // upravená vestavěná položka si nechá svou kategorii
+    vloz(Object.assign({}, puv && puv.kat ? { kat: puv.kat } : {}, p), 0);
+  });
+  const podleJmena = new Map();
+  for (const p of m.values()) {
+    if (p.skryto) continue;
+    const k = druhPotraviny(p) + '|' + norm(p.name).replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+    const o = podleJmena.get(k);
+    if (!o || p._rank < o._rank) podleJmena.set(k, p);
+  }
+  const mapa = new Map([...podleJmena.values()].map(p => [p.id, p]));
+  dbCache = { v: dbVerze, pr: products, prn: products.length, ex: extFoods,
+              za: window.ZAKLAD, ji: window.JIDLA, mapa };
+  return mapa;
+}
+// i zdvojená nebo odebraná položka se dá otevřít — kvůli starým zápisům a nabídce z deníku
+function potravina(id) { return id ? (dbVse().get(id) || findAny(id)) : null; }
+const pouzitoKrat = p => (p.uses || 0) + ((dbPouziti[p.id] || {}).n || 0);
+function dbHledej(q, druh, limit) {
+  const out = [];
+  for (const p of dbVse().values()) {
+    if (druh && druhPotraviny(p) !== druh) continue;
+    if (!matchWords(p.name + ' ' + (p.brand || '') + ' ' + (p.kat || ''), q)) continue;
+    out.push(p);
+  }
+  out.sort((a, b) => (pouzitoKrat(b) - pouzitoKrat(a)) || (a._rank - b._rank) ||
+    a.name.localeCompare(b.name, 'cs'));
+  return limit ? out.slice(0, limit) : out;
+}
+/* Značka, která je ve skutečnosti jen jméno zdroje („základní potravina",
+   „NutriDatabaze.cz"), se neukazuje — odkud potravina je, uživatele nezajímá. */
+function znackaZobraz(p) {
+  const b = (p.brand || '').trim();
+  if (!b) return '';
+  if (/^(základní potravina|hotové jídlo|externí databáze|csv)$/i.test(b)) return '';
+  if (/nutridatab/.test(norm(b))) return '';
+  if (Object.values(extNazvy).some(v => v && norm(v) === norm(b))) return '';
+  return b;
+}
+// má položka předlohu mezi vestavěnými nebo načtenými? (pak se neodstraňuje, ale skrývá)
+const maPuvodni = id => (window.ZAKLAD || []).some(z => zakProduct(z).id === id) ||
+  (window.JIDLA || []).some(j => jidloProduct(j).id === id) || extFoods.some(x => x.id === id);
+function puvodniPotravina(id) {
+  const z = (window.ZAKLAD || []).find(x => zakProduct(x).id === id); if (z) return zakProduct(z);
+  const j = (window.JIDLA || []).find(x => jidloProduct(x).id === id); if (j) return jidloProduct(j);
+  const e = extFoods.find(x => x.id === id); return e ? extProduct(e) : null;
+}
+/* Jednorázový úklid po dřívějším kopírování: kopie vestavěné položky,
+   která se od předlohy neliší, se z vlastních odstraní (s náhrobkem, ať zmizí i na
+   druhém zařízení) a její četnost a poslední gramáž se přenesou do `dbPouziti`.
+   Upravená kopie zůstává — je to úprava, kterou si člověk udělal. */
+async function dbSjednot() {
+  const hotovo = await dbGet('meta', 'dbSjednoceno');
+  if (hotovo && hotovo.v) return 0;
+  const stejne = (a, b) => a.name === b.name && (a.unit || 'g') === (b.unit || 'g') &&
+    ['kcal', 'p', 'c', 'f'].every(k => r1(a[k] || 0) === r1(b[k] || 0));
+  let pocet = 0;
+  for (const p of products.slice()) {
+    /* Jen vestavěné — ty má každé zařízení s aplikací. Kopie z načtených databází
+       zůstávají: ty se nesynchronizují, a na druhém zařízení bez načtené NutriDatabáze
+       je vidět jen díky kopii. Náhrobek by mu je smazal. */
+    if (['zaklad', 'jidlo'].indexOf(p.source) < 0 || p.skryto) continue;
+    const puv = puvodniPotravina(p.id);
+    if (!puv || !stejne(p, puv)) continue;
+    const u = dbPouziti[p.id] || { n: 0 };
+    u.n += p.uses || 0;
+    if (p.lastAmount) u.posl = p.lastAmount;
+    if (p.lastUsed) u.kdy = p.lastUsed;
+    dbPouziti[p.id] = u;
+    await dbDel('products', p.id);
+    pocet++;
+  }
+  products = await dbAll('products');
+  await dbPut('meta', { k: 'pouziti', v: dbPouziti });
+  await dbPut('meta', { k: 'dbSjednoceno', v: 1 });
+  return pocet;
+}
+
 function recAdd(id) {
   const p = findAny(id);
   if (!p) { toast('Nenalezeno'); return; }
@@ -3225,38 +3218,26 @@ async function saveRecipe(alsoAdd) {
   if (alsoAdd) openPortion(p.id); else setDbMode('rec');   // recept žije v Jídlech, ne v Zadat
 }
 
-async function useZaklad(id) {
-  let pr = products.find(x => x.id === id);
-  if (!pr) {
-    const z = ZAKLAD.find(x => zakProduct(x).id === id);
-    if (!z) { toast('Nenalezeno'); return; }
-    pr = zakProduct(z);
-    await dbPut('products', pr);
-    products.push(pr);
-    renderDb(); info();
-  }
-  openPortion(pr.id);
-}
+// jen kvůli starším odkazům; od v112 se nic nekopíruje
+function useZaklad(id) { openPortion(id); }
 function renderLocalMatches(q) {
   const mine = localMatches(q);
   $('nameRes').innerHTML = (mine.length ? mine.map(p => resCard(p, true)).join('') : '')
     + '<p class="tiny muted" style="margin:8px 0 0">' + (mine.length
-      ? 'Z mých databází. Online (Open Food Facts) hledá až tlačítko <b>Hledat</b>.'
-      : 'V mých databázích nic. Zkus tlačítko <b>Hledat</b> (online) nebo zadej ručně.')
+      ? 'Z databáze v telefonu. Online (Open Food Facts) hledá až tlačítko <b>Hledat</b>.'
+      : 'V databázi v telefonu nic. Zkus tlačítko <b>Hledat</b> (online) nebo zadej ručně.')
     + '</p>';
 }
+/* Odkud potravina je, se neukazuje — jen jestli je to hotové jídlo. Výsledky
+   z internetu ještě v databázi nejsou, proto po ťuknutí jdou přes useFound. */
 function resCard(p, local) {
-  const known = products.some(x => x.id === p.id);
-  const act = (p.source === 'zaklad' && !known) ? `useZaklad('${sid(p.id)}')`
-    : (p.source === 'jidlo' && !known) ? `useJidlo('${sid(p.id)}')`
-    : (p.source === 'ext' && !known) ? `useExt('${sid(p.id)}')`
-    : (local ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`);
+  const act = local ? `openPortion('${sid(p.id)}')` : `useFound('${sid(p.id)}')`;
+  const zn = znackaZobraz(p);
   return `<div class="item"><div class="grow" onclick="${act}">
       <div class="nm">${esc(p.name)}</div>
-      <div class="sub">${p.brand ? esc(p.brand) + ' · ' : ''}${r0(p.kcal)} kcal/100 ${esc(p.unit)}
-        <span class="pill ${(p.source === 'zaklad' || p.source === 'ext' || p.source === 'jidlo' || local) ? 'man' : 'off'}">${
-          p.source === 'jidlo' ? 'jídlo' : p.source === 'zaklad' ? 'základní' : p.source === 'ext' ? 'ČR' : (local ? 'moje' : 'OFF')}</span>${
-          p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
+      <div class="sub">${zn ? esc(zn) + ' · ' : ''}${r0(p.kcal)} kcal/100 ${esc(p.unit)}${
+        druhPotraviny(p) === 'jidlo' ? ' <span class="pill man">hotové jídlo</span>' : ''}${
+        p.cz ? ' <span class="pill off">CZ</span>' : ''}</div>
     </div></div>`;
 }
 
@@ -3582,7 +3563,7 @@ async function editLog(id) {
 }
 
 function openPortion(id) {
-  const p = products.find(x => x.id === id);
+  const p = potravina(id);
   if (!p) { toast('Produkt nenalezen'); return; }
   editLogId = null;
   $('poAdd').textContent = 'Přidat';
@@ -3597,7 +3578,8 @@ function openPortion(id) {
   servingAmt = p.serving || 100;
   $('poServ').textContent = p.serving ? 'porce ' + r0(p.serving) : 'porce';
   $('poServ').style.display = p.serving ? '' : 'none';
-  $('poAmt').value = p.lastAmount || p.serving || 100;   // naposledy zadaná gramáž má přednost
+  // naposledy zadaná gramáž má přednost — u vestavěných a načtených se pamatuje v dbPouziti
+  $('poAmt').value = p.lastAmount || (dbPouziti[p.id] || {}).posl || p.serving || 100;
   rychleGramaze(p);
   calcPortion();
   $('modPortion').classList.add('on');
@@ -3651,11 +3633,20 @@ async function addPortion() {
     await renderDay(); scrollToMeal(rec.meal); return;
   }
   await dbPut('log', rec);
-  if (products.some(x => x.id === curProduct.id)) {
-    curProduct.uses = (curProduct.uses || 0) + 1;
-    curProduct.lastAmount = amt;         // příště se předvyplní stejná gramáž
-    curProduct.lastUsed = Date.now();    // pro seznam „Naposledy použité"
-    await dbPut('products', curProduct);
+  const iVl = products.findIndex(x => x.id === curProduct.id);
+  if (iVl >= 0) {
+    const p = products[iVl];
+    p.uses = (p.uses || 0) + 1;
+    p.lastAmount = amt;                  // příště se předvyplní stejná gramáž
+    p.lastUsed = Date.now();
+    await dbPut('products', p);
+  } else {
+    /* Vestavěná a načtená potravina se mezi vlastní nekopíruje (v112) — jen si
+       pamatuje, kolikrát a v jaké gramáži se použila. */
+    const u = dbPouziti[curProduct.id] || { n: 0 };
+    u.n++; u.posl = amt; u.kdy = Date.now();
+    dbPouziti[curProduct.id] = u;
+    await dbPut('meta', { k: 'pouziti', v: dbPouziti });
   }
   pendingMeal = null;
   closeMod('modPortion');
@@ -3713,7 +3704,7 @@ function editCurrent() {
 /* ---------------- edit sheet ---------------- */
 function openEdit(id, presetCode) {
   editingId = id;
-  const p = id ? products.find(x => x.id === id) : null;
+  const p = id ? potravina(id) : null;
   $('edTitle').textContent = p ? 'Upravit potravinu' : 'Nová potravina';
   $('edName').value = p ? p.name : '';
   $('edBrand').value = p ? (p.brand || '') : '';
@@ -3733,6 +3724,8 @@ function openEdit(id, presetCode) {
   $('edUnitTxt').textContent = p ? p.unit : 'g';
   $('edServ').value = p && p.serving ? p.serving : '';
   $('edDel').style.display = p ? '' : 'none';
+  // upravená vestavěná či načtená položka se dá vrátit do původního stavu
+  $('edPuvodni').style.display = (p && maPuvodni(id) && products.some(x => x.id === id && !x.skryto)) ? '' : 'none';
   $('modEdit').classList.add('on');
   // kurzor do názvu, ale jen když uživatel mezitím nezačal psát jinam —
   // jinak by odložené přeskočení fokusu přepsalo rozepsané pole (kód skončil v názvu)
@@ -3750,6 +3743,11 @@ async function saveProduct() {
   const id = (editingId && !neniPotravina(editingId)) ? editingId
     : (code || ('m' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)));
   const old = products.find(x => x.id === editingId) || {};
+  /* Zdroj se při úpravě zachová. Dřív se z upravené položky stala „ruční" — a upravená
+     položka z NutriDatabáze by se tak dostala i do databáze předávané jinému člověku. */
+  const puv = (editingId && potravina(editingId)) || {};
+  const zdroj = ['zaklad', 'jidlo', 'ext', 'recipe', 'off'].indexOf(old.source || puv.source) >= 0
+    ? (old.source || puv.source) : 'manual';
   const pos = v => Math.max(0, n(v));                  // záporné hodnoty nedávají smysl
   const anyNeg = ['edKcal', 'edP', 'edC', 'edF', 'edFib', 'edSalt', 'edServ']
     .some(k => n($(k).value) < 0);
@@ -3761,7 +3759,7 @@ async function saveProduct() {
     fib: pos($('edFib').value), salt: pos($('edSalt').value),
     serving: pos($('edServ').value) || null,
     abv: pos($('edAbv').value) || 0,        // % objemových; >0 = počítá se i do alkoholu
-    source: old.source === 'off' ? 'off' : 'manual',
+    source: zdroj,
     uses: old.uses || 0, createdAt: old.createdAt || Date.now(), updatedAt: Date.now()
   };
   await dbPut('products', p);
@@ -3774,10 +3772,33 @@ async function saveProduct() {
 }
 async function deleteProduct() {
   if (!editingId) return;
+  const id = editingId;
+  if (maPuvodni(id)) {
+    /* Vestavěná nebo načtená položka se nemaže, ale skryje — jinak by se při dalším
+       načtení katalogu nebo databáze vrátila. Skrytí se synchronizuje. */
+    if (!confirm('Odebrat tuhle potravinu z databáze? Přestane se nabízet.')) return;
+    const p = potravina(id) || {};
+    const zaz = { id, name: p.name || id, source: p.source || 'zaklad', skryto: true };
+    await dbPut('products', zaz);
+    products = products.filter(x => x.id !== id).concat([zaz]);
+    closeMod('modEdit'); renderDb(); info(); toast('Odebráno');
+    return;
+  }
   if (!confirm('Smazat tuhle potravinu z databáze?')) return;
+  await dbDel('products', id);
+  products = products.filter(x => x.id !== id);
+  closeMod('modEdit'); renderDb(); info(); toast('Smazáno');
+}
+async function vratitPuvodni() {
+  if (!editingId || !maPuvodni(editingId)) return;
   await dbDel('products', editingId);
   products = products.filter(x => x.id !== editingId);
-  closeMod('modEdit'); renderDb(); info(); toast('Smazáno');
+  closeMod('modEdit'); renderDb(); toast('Vráceny původní hodnoty');
+}
+async function dbOdkryj() {
+  for (const p of products.filter(x => x.skryto)) await dbDel('products', p.id);
+  products = products.filter(x => !x.skryto);
+  renderDb(); toast('Odebrané potraviny jsou zpátky');
 }
 
 /* ---------------- goals ---------------- */
@@ -3983,6 +4004,7 @@ function importData(inp) {
    Vestavěné potraviny se nepředávají — každý telefon je má s aplikací. */
 const ZD_PREDAT = ['openfoodfa'];
 function lzePredat(p) {
+  if (p.skryto) return false;               // odebrání je osobní volba, ne potravina
   if (p.source !== 'ext') return true;
   const x = extFoods.find(y => y.id === p.id);
   return !!(x && ZD_PREDAT.indexOf(x.zd || 'csv') >= 0);
@@ -4055,9 +4077,12 @@ function importPotraviny(inp) {
 async function potravinyStav() {
   if (!$('potrStav')) return;
   const k = await potravinyKPredani();
-  const vest = (window.ZAKLAD ? ZAKLAD.length : 0) + (window.JIDLA ? JIDLA.length : 0);
-  $('potrStav').innerHTML = 'Vestavěných <b>' + vest + '</b> · tvých <b>' + products.length +
-    '</b> · načtených z databází <b>' + extFoods.length + '</b>' +
+  const vse = [...dbVse().values()];
+  const jidel = vse.filter(p => druhPotraviny(p) === 'jidlo').length;
+  const skrytych = products.filter(p => p.skryto).length;
+  $('potrStav').innerHTML = 'V databázi je <b>' + (vse.length - jidel) + '</b> potravin a <b>' + jidel +
+    '</b> hotových jídel' +
+    (skrytych ? ' · odebraných ' + skrytych + ' (<a href="#" onclick="dbOdkryj();return false">vrátit</a>)' : '') +
     (k.vynechano ? '<br>Předá se ' + k.predano + ' — ' + k.vynechano +
       ' z NutriDatabáze a neznámých CSV zůstane jen u tebe.' : '');
 }

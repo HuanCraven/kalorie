@@ -232,8 +232,12 @@ Celkem 508 kcal.`); await p.waitForTimeout(400);
   // ────────────────────────────────────────────
   sec('13 · Databáze potravin');
   await p.click('nav button[data-p="db"]'); await p.waitForTimeout(400);
+  // od v112 se použité vestavěné potraviny mezi vlastní nekopírují — bez dotazu je
+  // vidět jen to, co uživatel sám založil nebo naskenoval
   const dbCount = await p.locator('#dbList .item').count();
-  ck('produkty uloženy', dbCount>=4, dbCount+' položek');
+  ck('produkty uloženy', dbCount>=2, dbCount+' položek');
+  ck('použité vestavěné potraviny se mezi vlastní nekopírují',
+     await p.evaluate(async()=>(await dbAll('products')).every(x=>x.source!=='zaklad'&&x.source!=='jidlo')));
   await p.fill('#dbSearch','rolka'); await p.waitForTimeout(300);
   ck('hledání v databázi', await p.locator('#dbList .item').count()===1);
   await p.click('#dbList .item .btn >> nth=0'); await p.waitForTimeout(400);

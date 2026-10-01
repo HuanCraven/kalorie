@@ -26,12 +26,12 @@ const PROSTREDI = require('./prostredi');
 
   // kategorie
   await p.click('nav button[data-p="db"]'); await p.click('#dbSeg button[data-d="jidla"]');   // v40: katalog v záložce Jídla
-  const cats = await p.locator('#jidCats button').allTextContents();
+  const cats = await p.locator('#dbKat button').allTextContents();
   console.log('5) kategorie jídel:', cats.join(' · '));
-  await p.click('#jidCats button >> nth=3'); await p.waitForTimeout(400);
-  const rows = await p.locator('#jidList .item').count();
+  await p.click('#dbKat button >> nth=3'); await p.waitForTimeout(400);
+  const rows = await p.locator('#dbList .item').count();
   console.log('   po kliku na kategorii řádků:', rows, '| ✓', rows>0);
-  console.log('   první:', (await p.locator('#jidList .item').first().textContent()).replace(/\s+/g,' ').trim());
+  console.log('   první:', (await p.locator('#dbList .item').first().textContent()).replace(/\s+/g,' ').trim());
 
   // přežije reload (uložilo se do mé databáze)
   await p.reload(); await p.waitForTimeout(900);

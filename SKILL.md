@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 79 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 80 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -57,7 +57,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   79 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   80 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -90,6 +90,22 @@ Kdo to poruší, rozdrobí ji zpátky.
   V `summaryText` má proto každý den stav (úplný / neúplný / bez zápisu) a jídlo
   z neúplného dne se neposílá. Podíl čehokoli na energii počítej ze stejných dnů
   v čitateli i jmenovateli (`alcKcalUpl / kUpl`).
+- **Databáze potravin je jedna** (od v112). Všechno jde přes `dbVse()`, `potravina(id)`
+  a `dbHledej(q, druh)` — nesahej na `products`, `extFoods`, `ZAKLAD` a `JIDLA` zvlášť,
+  rozejde se to. Uživateli se zdroj neukazuje (`znackaZobraz`), odlišují se jen hotová
+  jídla (`druhPotraviny`: zdroj `jidlo` nebo `recipe`).
+- **Fyzicky jsou to dál dvě vrstvy a musí zůstat.** `applyState` maže každý lokální řádek,
+  který není ve sdíleném souboru — načtené databáze (`ext`) proto nesmí do synchronizované
+  vrstvy. Vlastní a upravené potraviny jsou v `products` a přebíjejí vestavěné i načtené se
+  stejným id; odebraná vestavěná položka je v `products` se `skryto: true`.
+- **Použitá potravina se nekopíruje mezi vlastní.** Četnost a poslední gramáž vestavěných
+  a načtených položek drží `dbPouziti` (meta `pouziti`). Kopírování zmrazovalo hodnoty
+  a s NutriDatabází teklo do synchronizace. Staré kopie jednou uklidí `dbSjednot` — **jen
+  vestavěných**: shodná s předlohou zmizí, **upravená zůstane** (je to oprava uživatele).
+  Kopie z načtených databází se nemažou: `ext` se nesynchronizuje a na druhém zařízení bez
+  načtené NutriDatabáze je položka vidět jen díky kopii — náhrobek by ji tam smazal.
+- **Úprava potraviny zachová zdroj** (`saveProduct`). Dřív se z upravené položky stala
+  „ruční" a upravená položka z NutriDatabáze by tak prošla do předávané databáze.
 - **Záloha nese všechno, synchronizace ne** (od v111). `exportData` dává i `ext`
   (načtené databáze) a `extNazvy`, protože záloha je zároveň přenos na jiný telefon.
   Do synchronizace `ext` dál nejde — ta posílá celý stav při každém sladění.

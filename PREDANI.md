@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.01-111** (`APP_VERSION` v `index.html`, cache `kaltrack-v111` v `sw.js`).
+Aktuální verze: **2026.10.01-112** (`APP_VERSION` v `index.html`, cache `kaltrack-v112` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -46,6 +46,49 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v112 — jedna databáze potravin
+
+Huan: „jednou databází jsem myslel jak interně, tak to, co uživatel vidí. Krom hotových
+jídel není třeba pokrmy odlišovat. Uživateli je jedno, z jaké databáze jídlo pochází."
+
+**Navenek.** Záložky na Jídlech jsou *Potraviny · Hotová jídla · Recept · Přidat* —
+Moje, Základní a ČR splynuly. Jedno hledání přes všechno, kategorie nad seznamem, bez
+dotazu se u potravin ukazují vlastní. Zdroj se nikde neukazuje (ani štítkem, ani místo
+značky); značka výrobce zůstává, hotová jídla mají štítek. Každou položku jde upravit
+(i vestavěnou — pak „Vrátit původní hodnoty") a vestavěnou či načtenou odebrat (karta
+na Jídlech nabídne vrácení). Stejný název z víc zdrojů se ukáže jednou: vlastní >
+načtená databáze > vestavěná.
+
+**Interně** jeden přístup `dbVse()` / `potravina()` / `dbHledej()` a jedno pravidlo
+přednosti. Fyzicky dvě vrstvy: synchronizace (`applyState`) maže každý lokální řádek,
+který není ve sdíleném souboru, takže načtené databáze s tisíci řádků nemohou ležet ve
+synchronizované vrstvě. To se prověřilo v kódu, ne odhadlo.
+
+**Konec kopírování.** Použitá vestavěná či načtená položka se dřív zkopírovala mezi
+vlastní — zmrazila si hodnoty a NutriDatabáze tak tekla do synchronizace. Teď si použití
+pamatuje `dbPouziti`. Staré kopie jednou uklidí `dbSjednot`: shodné s předlohou zmizí
+s náhrobkem a předají četnost a gramáž, upravené zůstanou. **Jen u vestavěných** — kopie
+z načtených databází zůstávají. Načtené databáze se nesynchronizují, takže na druhém
+zařízení bez načtené NutriDatabáze je položka vidět jen díky kopii; náhrobek by ji tam
+smazal. Přišlo se na to až po zelené regresi, při domýšlení druhého zařízení.
+
+**K NutriDatabázi** (Huan se ptal, jestli po zapsání nejde položku předat dál):
+podmínky užití, bod 5 — uživatel není oprávněn předat data třetí osobě, celá ani po
+částech, za úplatu ani zdarma. Zapsání na tom nic nemění. Pro vlastní potřebu bez
+omezení; druhý člověk si ji může zdarma stáhnout sám.
+
+#### Chyby nalezené při tom
+
+- **`saveProduct` měnil zdroj na „ruční"**, takže upravená položka z NutriDatabáze by
+  prošla do předávané databáze. Zdroj se teď zachovává.
+- Odebrání položky, která zakrývala stejně pojmenovanou z jiného zdroje, tu druhou
+  odhalí. Je to jiná položka s jinými hodnotami, takže správně — jen to může vypadat,
+  že odebrání nezabralo.
+
+Testy: `test80.js` (39 tvrzení, hlavně úklid kopií na obou stranách). Přepsané na nové
+uspořádání: `test41`, `test26`, `test29`, `test38`, `test2`, `audit`; `test62` na pravidlo
+„sken z načtené databáze nekopíruje, gramáž si pamatuje".
 
 ### Novinky ve v111 — přenos na jiný telefon a databáze pro dalšího člověka
 

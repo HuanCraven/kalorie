@@ -36,10 +36,10 @@ const PROSTREDI = require('./prostredi');
     console.log(`5. "${q}": ${r.slice(0,110)}`);
   }
   // kategorie pečivo (v40: v záložce Jídla)
-  await p.click('nav button[data-p="db"]'); await p.click('#dbSeg button[data-d="zaklad"]');
-  await p.click('#zakCats button[data-c="pečivo"]'); await p.waitForTimeout(400);
-  console.log('6. kategorie pečivo:', await p.locator('#zakList .item').count(), 'položek');
-  const names = (await p.locator('#zakList .nm').allTextContents()).slice(0,10);
+  await p.click('nav button[data-p="db"]'); await p.click('#dbSeg button[data-d="potr"]');
+  await p.click('#dbKat button[data-k="pečivo"]'); await p.waitForTimeout(400);
+  console.log('6. kategorie pečivo:', await p.locator('#dbList .item').count(), 'položek');
+  const names = (await p.locator('#dbList .nm').allTextContents()).slice(0,10);
   console.log('   ', names.join(' · '));
 
   await p.click('nav button[data-p="scan"]'); await p.click('#addSeg button[data-s="find"]');   // v40: zpět na hledání

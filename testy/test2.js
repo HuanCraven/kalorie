@@ -51,8 +51,11 @@ Dej vědět, jestli mám něco upřesnit.`;
   await p.waitForTimeout(600);
   console.log('8. day kcal =', await p.textContent('#kcalNow'), '| log rows =', await p.locator('#logList .item').count());
 
+  // od v112 je recept hotové jídlo a leží v segmentu Hotová jídla
   await p.click('nav button[data-p="db"]');
+  await p.evaluate(() => setDbMode('jidla'));
   await p.waitForTimeout(300);
+  await p.fill('#dbSearch', 'kuřecí s rýží'); await p.waitForTimeout(300);
   console.log('9. db =', await p.textContent('#dbCount'));
   console.log('   entry =', (await p.textContent('#dbList .item .sub')).replace(/\s+/g,' ').trim());
 

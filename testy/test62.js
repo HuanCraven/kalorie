@@ -49,15 +49,22 @@ const CSV_BEZ_KODU = ['origFdNm;ENERC [kcal];PROT [g];CHO [g];FAT [g];FIBT [g];N
   ck('hodnoty sedí', (await p.textContent('#poSub')).indexOf('521 kcal') > 0,
      await p.textContent('#poSub'));
 
-  ck('nalezené se uloží mezi moje potraviny (kvůli gramáži a četnosti)',
-     (await p.evaluate(async () => (await dbAll('products')).length)) === 1);
-  await p.evaluate(() => closeMod('modPortion'));
+  /* Od v112 se položka z načtené databáze mezi vlastní NEkopíruje — kopie si
+     zmrazila hodnoty a s NutriDatabází tekla i do synchronizace. Gramáž a četnost
+     si pamatuje dbPouziti. */
+  ck('nalezené se mezi vlastní potraviny nekopíruje',
+     (await p.evaluate(async () => (await dbAll('products')).length)) === 0);
+  await p.fill('#poAmt', '45');
+  await p.evaluate(() => addPortion()); await p.waitForTimeout(600);
+  ck('gramáž a četnost si zapamatuje bez kopie',
+     await p.evaluate(() => { const u = dbPouziti[curProduct.id]; return !!u && u.n === 1 && u.posl === 45; }));
 
   // podruhé se najde rovnou mezi mými potravinami
   await p.evaluate(k => lookup(k), '4014400400007');
   await p.waitForTimeout(500);
-  ck('opakované naskenování nezdvojí potravinu',
-     (await p.evaluate(async () => (await dbAll('products')).length)) === 1);
+  ck('opakované naskenování nic nekopíruje',
+     (await p.evaluate(async () => (await dbAll('products')).length)) === 0);
+  ck('a předvyplní zapamatovanou gramáž', (await p.inputValue('#poAmt')) === '45', await p.inputValue('#poAmt'));
   await p.evaluate(() => closeMod('modPortion'));
 
   /* ---- 3. neznámý kód bez internetu selže srozumitelně ------------- */
