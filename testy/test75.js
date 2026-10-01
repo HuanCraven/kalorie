@@ -41,7 +41,7 @@ const PROSTREDI = require('./prostredi');
      await p.evaluate(async () => { const m = await dbGet('meta', 'katalog'); return !!(m && m.v.zaklad.length); }));
 
   // katalog musí umět totéž co vestavěné soubory — hledání jde skrz něj
-  const nalez = await p.evaluate(() => zakladMatches('cizrna').length);
+  const nalez = await p.evaluate(() => dbHledej('cizrna', null).filter(x => x.source === 'zaklad').length);
   ck('vyhledávání v základních potravinách funguje', nalez > 0, String(nalez));
 
   /* ---- 2. offline: poslední uložený --------------------------------- */

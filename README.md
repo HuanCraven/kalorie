@@ -12,13 +12,13 @@ Data zůstávají výhradně v telefonu (IndexedDB), na server se nic neukládá
 ## 2. Nahraj soubory
 
 1. V prázdném repu klikni **uploading an existing file**
-2. Vyber **všech 6 souborů** naráz:
+2. Vyber **všech 7 souborů** naráz:
    - `index.html`
    - `sw.js`
    - `manifest.json`
    - `zxing.js`
-   - `zaklad.js`
-   - `jidla.js`
+   - `katalog.json` — databáze vestavěných potravin a hotových jídel
+   - `zaklad.js`, `jidla.js` — táž databáze jako záloha pro první spuštění bez sítě
 3. **Commit changes**
 
 > Soubory musí ležet v kořeni repa, ne ve složce. Složky `build/` a `testy/`
@@ -334,14 +334,19 @@ Alternativa **Stáhnout jako soubor** dá `.txt`, který můžeš přiložit.
 
 Spodní lišta: **Hlavní · Zadat · Alkohol · Pohyb · Jídla · Staty · Nastavení**
 
-Nastavení je rozdělené do tří skupin podle toho, jak často je potřebuješ:
-**Já** (cíle, klidový výdej, limit alkoholu, O mně) · **Propojení** (Claude API, synchronizace,
-šifrování, párování telefonu) · **Data** (záloha, import, externí databáze, verze, smazání).
+Nastavení je rozdělené do čtyř skupin: **Já** (cíle, klidový výdej, limit alkoholu, O mně) ·
+**Propojení** (Claude API, synchronizace, šifrování, párování telefonu) · **Data** (přenos do jiného
+telefonu, záloha, import, externí databáze, verze, smazání) · **Nápověda**.
 
-Stránka **Zadat** má nahoře přepínač **Hledat · Kód · Foto · Ručně · Recept** a pod ním volbu data.
-Otevírá se rovnou na Hledání.
+Stránka **Zadat** má záložky **Hledat · Popsat** a nad nimi volbu data. Prázdné pole hledání
+nabízí, co k danému chodu jíváš; čtečka kódu je ikona v poli.
 
-Záložka **Jídla** má segmenty **Moje · Hotová · Základní · ČR** — tady se procházejí všechny databáze.
+Záložka **Jídla** má segmenty **Potraviny · Hotová jídla · Recept · Přidat**. Databáze potravin
+je jedna — vestavěné, načtené i vlastní se hledají naráz a odkud potravina je, se neukazuje.
+
+> Podrobný popis jednotlivých funkcí níže vznikal postupně od srpna 2026 a místy popisuje
+> stav, který už neplatí (třeba ruční cestu přes chat, zrušenou ve v67). Aktuální a úplný
+> přehled je v aplikaci v **Nastavení → Nápověda** a pro vývoj v `PREDANI.md`.
 
 ## Jídla dne
 

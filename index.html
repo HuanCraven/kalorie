@@ -159,8 +159,6 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
          cursor:pointer;white-space:nowrap}
   .kotva:hover,.kotva:focus-visible{color:var(--fg);border-color:var(--dim2)}
   /* „Časté" po chodech: název chodu vlevo, tlačítka za ním na jednom řádku */
-  .casteChod{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}
-  .casteChod > span:first-child{flex:0 0 100%;margin-bottom:-2px}
   /* Zaškrtávátko pro výběr položek — samostatný dotykový cíl vedle názvu, aby
      klepnutí na řádek dál otvíralo úpravu. */
   .item > .vyb{width:20px;height:20px;margin:0 10px 0 0;flex:none;accent-color:var(--acc)}
@@ -259,9 +257,6 @@ body.verejna [data-osobni]{display:none!important}
       <span class="tiny muted">Sůl <b class="mono" id="saltTxt">0</b></span>
     </div>
   </div>
-
-  <!-- Časté jsou hned pod kruhem: opakovaný zápis je nejčastější úkon dne.
-       Dřív byly úplně dole, přes dvě obrazovky scrollování. -->
 
   <div class="card">
     <h3>Záznam dne</h3>
@@ -1430,7 +1425,6 @@ body.verejna [data-osobni]{display:none!important}
       <button class="btn full" style="margin-bottom:8px" onclick="uvodCil(0)">Držet váhu</button>
       <button class="btn full" onclick="uvodCil(-275)">Nabírat
         <span class="tiny muted"> · čtvrt kila týdně</span></button>
-      <p class="tiny muted" id="uvCilPozn" style="margin:10px 0 0"></p>
     </div>
 
     <div id="uv4" style="display:none">
@@ -1474,7 +1468,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.01-112';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.01-113';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -2829,10 +2823,6 @@ function zakProduct(z) {
     serving: null, source: 'zaklad', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
   };
 }
-function zakladMatches(q) {
-  if (!window.ZAKLAD) return [];
-  return ZAKLAD.filter(z => matchWords(z.n, q)).slice(0, 8).map(zakProduct);
-}
 /* hotová jídla — hodnoty na 100 g uvařeného pokrmu */
 function jidloProduct(j) {
   return {
@@ -2842,14 +2832,8 @@ function jidloProduct(j) {
     serving: null, source: 'jidlo', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
   };
 }
-function jidlaMatches(q) {
-  if (!window.JIDLA) return [];
-  return JIDLA.filter(j => matchWords(j.n + ' ' + j.k, q)).slice(0, 8).map(jidloProduct);
-}
 function localMatches(q) { return dbHledej(q, null, 18); }
 
-// jen kvůli starším odkazům; od v112 se nic nekopíruje
-function useJidlo(id) { openPortion(id); }
 
 /* ---------------- recepturník ---------------- */
 let recIngs = [];
@@ -2862,21 +2846,6 @@ function extProduct(x) {
     serving: null, source: 'ext', uses: 0, createdAt: Date.now(), updatedAt: Date.now()
   };
 }
-function extMatches(q) {
-  if (!extFoods.length) return [];
-  const out = [], videno = new Set();
-  for (const x of extFoods) {
-    if (!matchWords(x.n, q)) continue;
-    // tatáž potravina může být ve dvou databázích — ukážeme ji jednou
-    const klic = norm(x.n) + '|' + Math.round(x.e);
-    if (videno.has(klic)) continue;
-    videno.add(klic);
-    out.push(extProduct(x)); if (out.length >= 10) break;
-  }
-  return out;
-}
-// jen kvůli starším odkazům; od v112 se nic nekopíruje
-function useExt(id) { openPortion(id); }
 /* Databází může být načteno víc; při hledání se chovají jako jedna, tady se
    vypíšou zvlášť, aby bylo vidět, co v telefonu je a co se dá znovu načíst. */
 function extZdroje() {
@@ -3218,8 +3187,6 @@ async function saveRecipe(alsoAdd) {
   if (alsoAdd) openPortion(p.id); else setDbMode('rec');   // recept žije v Jídlech, ne v Zadat
 }
 
-// jen kvůli starším odkazům; od v112 se nic nekopíruje
-function useZaklad(id) { openPortion(id); }
 function renderLocalMatches(q) {
   const mine = localMatches(q);
   $('nameRes').innerHTML = (mine.length ? mine.map(p => resCard(p, true)).join('') : '')
@@ -6653,7 +6620,7 @@ async function renderAlc() {
     ' · celkem ' + r0(s.allSum) + ' g za ' + dnu(s.allDays) + ' od ' + czd(s.first) +
     ' (dny bez alkoholu se do průměru počítají)';
   $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : '<p class="tiny muted" style="margin:0">' +
-    'Limit není nastavený (Víc → Alkohol).</p>';
+    'Limit není nastavený (Nastavení → Já → Alkohol).</p>';
   $('alcTrendHead').textContent = 'Vývoj ' + period + 'denního průměru';
   $('alcTrend').innerHTML = svgAlcTrend(s.long, alcKlouzavy(s.long, period, s.first), s.lim, period);
   document.querySelectorAll('#alcSeg button').forEach(b => b.classList.toggle('on', +b.dataset.a === period));

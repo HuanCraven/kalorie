@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.01-112** (`APP_VERSION` v `index.html`, cache `kaltrack-v112` v `sw.js`).
+Aktuální verze: **2026.10.01-113** (`APP_VERSION` v `index.html`, cache `kaltrack-v113` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -36,6 +36,10 @@ srovnalo. Kdo sáhne na body níže, rozdrobí ji zpátky.
 | do `daily` se zapisuje výhradně přes `zapisDen(datum, vlastnik, hodnoty)` | `DEN_POLE` |
 | `maloDat(co, chybi)` je jediná podoba hlášky „ještě nemám dost dat" | karty na Statistikách |
 | výdej dne řeší `vydejDne`: `daily.total` z hodinek přebíjí výpočet a nic se k němu nepřičítá | bilance i cíle |
+| cíle dne počítá jediná `cileZVydeje(w, vydej)`, se zábradlím pro lidi s nízkým výdejem (v108) | `dayTargets` i `agg` |
+| nekompletní den nesmí do ničeho, co se tváří jako příjem — ani do postřehů a souhrnu pro Clauda (v110) | `insights`, `summaryText` |
+| databáze potravin je jedna: `dbVse` / `potravina` / `dbHledej`; fyzicky dvě vrstvy, protože synchronizace maže, co není ve sdíleném souboru (v112) | Jídla, Zadat, okno porce |
+| jeden zdroj kódu, dvě podoby: `VEREJNA` překlápí jen `build/verejna.py`, schovává se přes CSS (v105) | `data-osobni` / `data-verejne` |
 
 Ta výjimka u alkoholu je vědomá, ne opomenutí: uživatel si alkohol hlídá vždycky,
 jídlo ne. Trval na ní a snadno se setře — je proto napsaná přímo nad `denniRada`.
@@ -46,6 +50,27 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v113 — úklid zbytků
+
+Huan se zeptal, jestli v aplikaci nejsou zbytky. Hledalo se strojově (funkce bez odkazu,
+odkazy na neexistující prvky, nepoužité CSS třídy, soubory v repozitáři), ne odhadem.
+
+- Pryč šest funkcí po v112: `zakladMatches`, `jidlaMatches`, `extMatches` (hledání po
+  zdrojích) a obaly `useZaklad`, `useJidlo`, `useExt`. `test62` a `test75` je ještě volaly;
+  přepojeny na `dbHledej`, které aplikace skutečně používá.
+- Pryč styl `.casteChod` a komentář ke kartě Časté (v103), prázdný `uvCilPozn` (v108).
+- **Chyba pro uživatele:** stránka Alkohol radila „Limit není nastavený (Víc → Alkohol)" —
+  záložka Víc dávno neexistuje. Teď „Nastavení → Já → Alkohol".
+- `README.md` uváděl k nahrání 6 souborů (chyběl `katalog.json`) a staré záložky Jídel.
+  Opraveno a doplněno upozornění, že podrobný popis funkcí v něm místy zastaral.
+- Tabulka pravidel v úvodu tohohle souboru doplněna o pravidla z v105–v112.
+
+**Poučení z úklidu:** první pokus shodil 72 sad na `extProduct is not defined`. Skript
+mazal funkci „od začátku po první řádek `}`" — a u jednořádkové funkce smazal i ty, které
+následovaly. Kontrola syntaxe to nechytí (smazaná celá funkce je platný kód) a hledání
+nevolaných funkcí taky ne. Při mazání funkcí **porovnej seznam funkcí před a po** — musí
+zmizet přesně ty zamýšlené.
 
 ### Novinky ve v112 — jedna databáze potravin
 

@@ -93,7 +93,7 @@ const CSV_BEZ_KODU = ['origFdNm;ENERC [kcal];PROT [g];CHO [g];FAT [g];FIBT [g];N
      bez.prvni && bez.prvni.z.indexOf('NutriDatab') >= 0, bez.prvni && bez.prvni.z);
 
   /* ---- 5. hledání podle názvu funguje u obojího -------------------- */
-  const nalez = await p.evaluate(() => extMatches('mrkev').map(x => x.name));
+  const nalez = await p.evaluate(() => dbHledej('mrkev', null).map(x => x.name));
   ck('externí databáze se dá prohledat i názvem', nalez.indexOf('Mrkev syrová') >= 0, JSON.stringify(nalez));
 
   /* ---- 6. obě databáze naráz -------------------------------------- */
@@ -110,7 +110,7 @@ const CSV_BEZ_KODU = ['origFdNm;ENERC [kcal];PROT [g];CHO [g];FAT [g];FIBT [g];N
      obe.info.indexOf('Databáze s kódy') >= 0, obe.info.slice(0, 90));
 
   ck('hledání sahá do obou najednou', await p.evaluate(() =>
-     extMatches('mrkev').length > 0 && extMatches('toffifee').length > 0));
+     dbHledej('mrkev', null).some(x => x.source === 'ext') && dbHledej('toffifee', null).length > 0));
 
   await p.evaluate(k => lookup(k), '8584004030000');
   await p.waitForTimeout(700);
@@ -132,7 +132,7 @@ const CSV_BEZ_KODU = ['origFdNm;ENERC [kcal];PROT [g];CHO [g];FAT [g];FIBT [g];N
   await p.evaluate(t => parseExt(t), ['nazev;kcal;bilkoviny;sacharidy;tuky;zdroj',
     'Mrkev syrová;41;0.9;9.6;0.2;Jiná databáze'].join('\n'));
   await p.waitForTimeout(800);
-  const dupl = await p.evaluate(() => extMatches('mrkev').map(x => x.name));
+  const dupl = await p.evaluate(() => dbHledej('mrkev', null).map(x => x.name));
   ck('duplicita se v nabídce neopakuje',
      dupl.filter(x => x === 'Mrkev syrová').length === 1, JSON.stringify(dupl));
 
