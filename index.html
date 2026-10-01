@@ -881,6 +881,19 @@ body.verejna [data-osobni]{display:none!important}
     <p class="tiny muted" style="margin:8px 0 0" id="dbCount"></p>
   </div>
   <div class="card" id="dbMoje"><div id="dbList"></div></div>
+  <!-- Celá databáze jako jeden soubor — pro člověka na jiném telefonu. -->
+  <div class="card" id="potrKarta">
+    <h3>Předat databázi jinému telefonu</h3>
+    <p class="tiny muted" style="margin:0 0 8px" id="potrStav"></p>
+    <p class="tiny muted" style="margin:0 0 10px">Jeden soubor s tvými potravinami a recepty, bez deníku,
+      váhy a nastavení. Na druhém telefonu ho někdo načte a začne s tvou databází a vlastním deníkem.
+      Vestavěné potraviny má každý s aplikací sám.</p>
+    <div class="row" style="gap:8px">
+      <button class="btn pri grow" onclick="exportPotraviny()">Předat</button>
+      <button class="btn grow" onclick="document.getElementById('potrFile').click()">Načíst ze souboru</button>
+    </div>
+    <input type="file" id="potrFile" accept="application/json,.json" style="display:none" onchange="importPotraviny(this)">
+  </div>
   <div class="card" id="dbJid" style="display:none">
     <p class="tiny muted" style="margin:0 0 8px">Svíčková, guláš, řízek, buchty… Hodnoty na 100 g
       hotového pokrmu, spočítané ze surovin. Kolik sníš, zadáš sám.</p>
@@ -1080,6 +1093,16 @@ body.verejna [data-osobni]{display:none!important}
 
   <div id="setData" style="display:none">
   <div class="card">
+    <h3>Přenést do jiného telefonu</h3>
+    <p class="tiny muted" style="margin:0 0 8px"><b>1.</b> Tady dej <b>Export zálohy</b> a pošli si
+      soubor do nového telefonu — e-mailem, přes Disk nebo Quick Share. Nese úplně všechno: deník,
+      nastavení, tvoje potraviny i načtené databáze.</p>
+    <p class="tiny muted" style="margin:0 0 8px"><b>2.</b> V novém telefonu otevři aplikaci a dej
+      <b>Import zálohy</b>.</p>
+    <p class="tiny muted" style="margin:0" data-osobni>Máš-li zapnutou synchronizaci, jde to i bez
+      souboru: v Propojení zobraz párovací kód a v novém telefonu ho naskenuj.</p>
+  </div>
+  <div class="card">
     <h3>Data</h3>
     <button class="btn full" style="margin-bottom:8px" onclick="exportData()">Export zálohy (JSON)</button>
     <button class="btn full" style="margin-bottom:8px" onclick="document.getElementById('impFile').click()">Import zálohy</button>
@@ -1197,6 +1220,16 @@ body.verejna [data-osobni]{display:none!important}
       uvede zdroj a případná odvozená databáze zůstane pod stejnou licencí.</p>
     <p class="tiny muted" style="margin:0">Hodnoty jsou orientační. U čárových kódů je plní
       dobrovolníci a chyby se stávají — když ti něco nesedí, přepiš si to.</p>
+  </div>
+
+  <div class="card">
+    <h3>Nový telefon a další lidé</h3>
+    <p class="tiny muted" style="margin:0 0 8px"><b>Měníš telefon?</b> V Nastavení → Data je
+      Export zálohy. Nese úplně všechno včetně tvých potravin; v novém telefonu ho načteš
+      Importem zálohy.</p>
+    <p class="tiny muted" style="margin:0"><b>Chceš někomu dát svoje potraviny?</b> Na záložce
+      Jídla je Předat databázi. Soubor nese jen potraviny a recepty — žádný deník, váhu ani
+      nastavení. Druhý člověk ho načte tamtéž a začne s tvou databází a vlastním deníkem.</p>
   </div>
 
   <div class="card">
@@ -1453,7 +1486,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.09.27-110';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.01-111';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -2661,6 +2694,7 @@ function renderDb() {
       <button class="btn sm" onclick="openEdit('${sid(p.id)}')">✎</button>
     </div>`).join('')
     : '<p class="muted tiny">Nic tu není. Naskenuj první produkt.</p>';
+  potravinyStav();          // počty v kartě předání sedí s tím, co je v seznamu
 }
 
 /* ---------------- lookup ---------------- */
@@ -3814,13 +3848,16 @@ async function checkBackup() {
 }
 
 async function exportData() {
-  /* Bez `ext`: načtená cizí databáze potravin (NutriDatabáze, Open Food Facts)
-     nejsou data uživatele a s desítkami tisíc řádků by ze zálohy udělala megabajty.
-     Načte se znovu ze souboru. Starší zálohy `ext` obsahují a import je pořád přijme. */
+  /* Záloha je od v111 zároveň přenos na jiný telefon, a proto nese VŠECHNO —
+     i načtené databáze potravin (`ext`). Dřív se vynechávaly, aby soubor nebyl
+     velký, jenže na novém telefonu pak chyběly a musely se nahrávat znovu z CSV,
+     které tam člověk zpravidla nemá. Tady jde o vlastní telefon téhož člověka,
+     takže licence předání nebrání; jinému člověku se dává `exportPotraviny`. */
   const data = {
     v: 5, exported: new Date().toISOString(), goals, drinks,
     products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily'),
-    workout: await dbAll('workout'), tomb: await dbAll('tomb')
+    workout: await dbAll('workout'), tomb: await dbAll('tomb'), ext: await dbAll('ext'),
+    extNazvy: extNazvy
   };
   const jmeno = 'kalorie-zaloha-' + dstr(new Date()) + '.json';
   const text = JSON.stringify(data, null, 1);
@@ -3910,7 +3947,12 @@ function importData(inp) {
           if (old && (old.upd || 1) >= (x.upd || 1)) continue;
           await req(tx('ext', 'readwrite').put(Object.assign({ upd: 1 }, x)));
         }
-        extFoods = await dbAll('ext'); extInfoTxt();
+        extFoods = await dbAll('ext');
+        if (d.extNazvy && typeof d.extNazvy === 'object') {
+          extNazvy = Object.assign({}, d.extNazvy, extNazvy);
+          await dbPut('meta', { k: 'extNazvy', v: extNazvy });
+        }
+        extInfoTxt();
       }
       // náhrobky ze zálohy uplatníme na výsledek — sloučení stavu se sebou samým
       const selfSt = await collectState();
@@ -3929,6 +3971,97 @@ function importData(inp) {
   };
   fr.readAsText(file);
 }
+/* ---------------- databáze potravin pro jiného člověka ----------------
+   Jeden soubor s potravinami, bez deníku, váhy, cílů a nastavení. Na jiném
+   telefonu si ho načte někdo další a začne s Huanovou databází a vlastním deníkem.
+
+   Co se NEpředává: řádky z databází, které si člověk stahuje pod vlastní
+   registrací (NutriDatabáze), a z neznámých CSV, u kterých nevíme, odkud jsou.
+   Pozor, nejde jen o `ext` — když se položka z importu jednou použije, zkopíruje
+   se do `products` (zdroj `ext`), takže se filtruje i tam. Open Food Facts jde
+   předat (ODbL dovoluje šíření s uvedením zdroje, a to je v Nápovědě).
+   Vestavěné potraviny se nepředávají — každý telefon je má s aplikací. */
+const ZD_PREDAT = ['openfoodfa'];
+function lzePredat(p) {
+  if (p.source !== 'ext') return true;
+  const x = extFoods.find(y => y.id === p.id);
+  return !!(x && ZD_PREDAT.indexOf(x.zd || 'csv') >= 0);
+}
+async function potravinyKPredani() {
+  const vsechnyP = await dbAll('products'), vsechnyX = await dbAll('ext');
+  const prod = vsechnyP.filter(lzePredat).map(p => {
+    const c = Object.assign({}, p); delete c.uses; return c;   // zvyky se nepředávají
+  });
+  const ext = vsechnyX.filter(x => ZD_PREDAT.indexOf(x.zd || 'csv') >= 0);
+  /* Počítá se podle potravin, ne podle řádků: použitá položka z importu leží
+     jednou v `ext` a podruhé jako kopie v `products`, takže by se jinak
+     ukázala dvakrát — „zůstane 3" u dvou potravin. */
+  const predane = new Set(prod.map(p => p.id).concat(ext.map(x => x.id)));
+  const vynechane = new Set(vsechnyP.map(p => p.id).concat(vsechnyX.map(x => x.id))
+    .filter(id => !predane.has(id)));
+  return { prod, ext, predano: predane.size, vynechano: vynechane.size };
+}
+async function exportPotraviny() {
+  const k = await potravinyKPredani();
+  if (!k.prod.length && !k.ext.length) { toast('Zatím nemáš žádné vlastní potraviny k předání'); return; }
+  const data = {
+    typ: 'databaze-potravin', v: 1, exported: new Date().toISOString(),
+    products: k.prod, ext: k.ext,
+    extNazvy: Object.fromEntries(Object.entries(extNazvy).filter(e => ZD_PREDAT.indexOf(e[0]) >= 0))
+  };
+  await zalohuVen('kalorie-potraviny-' + dstr(new Date()) + '.json', JSON.stringify(data));
+  if (k.vynechano) toast('Předáno ' + k.predano + ' potravin · ' + k.vynechano +
+    ' z NutriDatabáze a neznámých CSV jsem vynechal');
+}
+/* Načte ze souboru JEN potraviny. Kdyby někdo omylem vybral celou zálohu, deník,
+   váha ani cíle cizího člověka se k němu nedostanou. */
+function importPotraviny(inp) {
+  const file = inp.files && inp.files[0];
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = async () => {
+    try {
+      const d = JSON.parse(fr.result);
+      const nove = new Set();
+      for (const p of (d.products || [])) {
+        if (!p || !p.id || !p.name) continue;
+        const old = await dbGet('products', p.id);
+        if (old && (old.upd || 1) >= (p.upd || 1)) continue;
+        const c = Object.assign({ upd: 1 }, p); delete c.uses;
+        await req(tx('products', 'readwrite').put(c));
+        nove.add(p.id);
+      }
+      for (const x of (d.ext || [])) {
+        if (!x || !x.id || !x.n) continue;
+        const old = await dbGet('ext', x.id);
+        if (old && (old.upd || 1) >= (x.upd || 1)) continue;
+        await req(tx('ext', 'readwrite').put(Object.assign({ upd: 1 }, x)));
+        nove.add(x.id);
+      }
+      if (d.extNazvy && typeof d.extNazvy === 'object') {
+        extNazvy = Object.assign({}, d.extNazvy, extNazvy);
+        await dbPut('meta', { k: 'extNazvy', v: extNazvy });
+      }
+      products = await dbAll('products'); extFoods = await dbAll('ext');
+      extInfoTxt(); renderDb(); await potravinyStav();
+      const cizi = (d.log && d.log.length) || (d.daily && d.daily.length);
+      toast('Načteno ' + nove.size + ' potravin' +
+        (cizi ? ' · deník a nastavení ze souboru jsem schválně vynechal' : ''));
+    } catch (e) { toast('Soubor se nepodařilo načíst: ' + e.message); }
+    inp.value = '';
+  };
+  fr.readAsText(file);
+}
+async function potravinyStav() {
+  if (!$('potrStav')) return;
+  const k = await potravinyKPredani();
+  const vest = (window.ZAKLAD ? ZAKLAD.length : 0) + (window.JIDLA ? JIDLA.length : 0);
+  $('potrStav').innerHTML = 'Vestavěných <b>' + vest + '</b> · tvých <b>' + products.length +
+    '</b> · načtených z databází <b>' + extFoods.length + '</b>' +
+    (k.vynechano ? '<br>Předá se ' + k.predano + ' — ' + k.vynechano +
+      ' z NutriDatabáze a neznámých CSV zůstane jen u tebe.' : '');
+}
+
 async function wipe() {
   // Se zapnutou synchronizací je „smazat všechno" zavádějící: v telefonu se sice
   // smaže, ale druhé zařízení má data pořád a při dalším sladění je pošle zpátky.

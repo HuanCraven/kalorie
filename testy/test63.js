@@ -1,7 +1,11 @@
-/* Test v63 — cizí databáze potravin se nesynchronizuje ani nezálohuje.
+/* Test v63 — cizí databáze potravin se nesynchronizuje.
    S Open Food Facts jde o desítky tisíc řádků; sladění posílá vždycky celý stav,
-   takže by každý commit i každá záloha narostly o megabajty. Data uživatele to
-   nejsou a dají se znovu načíst ze souboru. */
+   takže by každý commit narostl o megabajty.
+
+   Do zálohy se od v111 naopak dává. Záloha je zároveň přenos na jiný telefon,
+   a dřív na novém telefonu načtené databáze chyběly — musely se nahrávat znovu
+   z CSV, které tam člověk zpravidla nemá. Jednorázový soubor o pár megabajtech
+   nevadí, synchronizace při každém sladění ano. */
 const { chromium } = require('playwright');
 const zlib = require('zlib');
 const PROSTREDI = require('./prostredi');
@@ -65,7 +69,7 @@ const rozbal = b64 => {
   ck('vlastní data se synchronizují dál', (stav.log || []).length === 1 &&
      (stav.products || []).length === 1, 'log ' + (stav.log || []).length + ', potravin ' + (stav.products || []).length);
 
-  /* ---- 2. ani v záloze ------------------------------------------- */
+  /* ---- 2. v záloze ano (od v111) ---------------------------------- */
   const zaloha = await p.evaluate(() => {
     let zachyceno = null;
     const puvodni = window.dl;
@@ -73,7 +77,8 @@ const rozbal = b64 => {
     return exportData().then(() => { window.dl = puvodni; return zachyceno; });
   });
   const z = JSON.parse(zaloha);
-  ck('cizí databáze není v záloze', !('ext' in z), Object.keys(z).join(','));
+  ck('cizí databáze je v záloze, aby přežila přenos na jiný telefon',
+     Array.isArray(z.ext) && z.ext.length > 0, Object.keys(z).join(','));
   ck('ale vlastní potraviny a deník ano', (z.products || []).length === 1 && (z.log || []).length === 1);
 
   /* ---- 3. úklid zbytku po starší verzi ---------------------------- */

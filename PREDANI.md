@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.09.27-110** (`APP_VERSION` v `index.html`, cache `kaltrack-v110` v `sw.js`).
+Aktuální verze: **2026.10.01-111** (`APP_VERSION` v `index.html`, cache `kaltrack-v111` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -46,6 +46,33 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v111 — přenos na jiný telefon a databáze pro dalšího člověka
+
+Huan zvažoval APK a ptal se na aplikaci z ChatGPT (AIE Postava). Rozbor ukázal,
+že ta je okno na web (`WebView`) nad serverem na Vercelu s přihlášením — propojení
+s webem dělá server, ne to, že je to APK. Jeho skutečné potřeby (rychlý přesun na
+jiný telefon, nový člověk s jeho databází, jedna databáze potravin) APK nevyžadují,
+a tak se postavily v aplikaci. APK (TWA) zůstává na později.
+
+**Záloha nese všechno.** `exportData` přidává `ext` a `extNazvy`. Dřív se načtené
+databáze vynechávaly kvůli velikosti (v63) a na novém telefonu chyběly. Synchronizace
+je dál nenese. V Nastavení → Data je karta *Přenést do jiného telefonu*.
+
+**Databáze pro jiného člověka** — karta *Předat databázi jinému telefonu* na Jídlech.
+Jeden soubor (`typ: 'databaze-potravin'`) s vlastními potravinami a recepty, bez
+deníku, váhy, cílů, nastavení a počtů použití. Vestavěné potraviny se nepředávají.
+
+- **NutriDatabáze ani neznámá CSV se nepředávají** (`ZD_PREDAT = ['openfoodfa']`).
+  Filtruje se i `products`, protože použitá položka z importu se tam zkopíruje se
+  zdrojem `ext` — jinak by tudy proklouzla.
+- **`importPotraviny` bere jen potraviny.** Kdyby někdo vybral celou zálohu, deník,
+  váha ani cíle se nepřenesou, a aplikace to řekne.
+- Počítá se **po potravinách, ne po řádcích** — položka v importu i jako kopie mezi
+  vlastními se dřív ukázala dvakrát.
+
+`test79.js` hraje dva telefony ve dvou kontextech prohlížeče. `test63.js` přepsán:
+synchronizace bez `ext` platí dál, záloha s ním.
 
 ### Novinky ve v110 — kalendář, pryč víkend, nekompletní dny v radách
 

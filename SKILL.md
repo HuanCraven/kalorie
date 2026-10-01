@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 78 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 79 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -57,7 +57,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   78 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   79 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -90,6 +90,13 @@ Kdo to poruší, rozdrobí ji zpátky.
   V `summaryText` má proto každý den stav (úplný / neúplný / bez zápisu) a jídlo
   z neúplného dne se neposílá. Podíl čehokoli na energii počítej ze stejných dnů
   v čitateli i jmenovateli (`alcKcalUpl / kUpl`).
+- **Záloha nese všechno, synchronizace ne** (od v111). `exportData` dává i `ext`
+  (načtené databáze) a `extNazvy`, protože záloha je zároveň přenos na jiný telefon.
+  Do synchronizace `ext` dál nejde — ta posílá celý stav při každém sladění.
+- **Databáze pro jiného člověka (`exportPotraviny`) nesmí nést NutriDatabázi** ani
+  neznámá CSV; projde jen `ZD_PREDAT = ['openfoodfa']`. Filtruje se i `products`:
+  použitá položka z importu se tam zkopíruje se zdrojem `ext`. `importPotraviny`
+  bere ze souboru jen `products` a `ext` — nikdy deník, váhu, cíle ani nápoje.
 - **`alc` se nefiltruje NIKDY.** Počítá se i z nekompletních dnů a den bez zápisu je
   nula, ne chybějící údaj. Uživatel si alkohol hlídá vždycky, jídlo ne — je to vědomá
   výjimka, na které trval, a snadno se setře.
