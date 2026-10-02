@@ -58,8 +58,12 @@ io.open(p, 'w', encoding='utf-8').write(s)
 PY
   fi
 
+  # loggingBehavior production: jinak Capacitor ve vydávané verzi nepouští výpis z konzole
+  # do logu Androidu a zkouška na emulátoru nemá jak ověřit, že most žije. Aplikace do
+  # konzole vypisuje jen kontrolní řádek KALORIE_NATIVNI, nic citlivého.
   cat > capacitor.config.json <<EOF
 { "appId": "$ID", "appName": "$NAZEV", "webDir": "www",
+  "loggingBehavior": "production",
   "android": { "backgroundColor": "#12151a" } }
 EOF
   npx cap add android
