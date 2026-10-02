@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#12151a">
+<meta name="theme-color" content="#0e1116">
 <title>Kalorie</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2312151a'/%3E%3Cg fill='%23e8ecf3'%3E%3Crect x='6' y='9' width='2' height='14'/%3E%3Crect x='10' y='9' width='1' height='14'/%3E%3Crect x='13' y='9' width='3' height='14' fill='%234ea3ff'/%3E%3Crect x='18' y='9' width='1' height='14'/%3E%3Crect x='21' y='9' width='2' height='14'/%3E%3Crect x='25' y='9' width='1' height='14'/%3E%3C/g%3E%3C/svg%3E">
@@ -17,6 +17,12 @@
 html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
   font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+/* Pruh pod stavovou lištou. V APK (Capacitor 8, Android 15+) kreslí stránka až pod
+   lištu, a co je pod ní, je vidět — bez pruhu by tam při rolování projížděl obsah.
+   V prohlížeči je výška nula. */
+body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);
+  background:var(--bg);z-index:50}
+body{padding-top:env(safe-area-inset-top)}
 .tajne{-webkit-text-security:disc;text-security:disc}
 .tajne.videt{-webkit-text-security:none;text-security:none}
 h1,h2,h3{margin:0 0 8px;font-weight:600}
@@ -151,7 +157,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   .postreh .sip{margin-left:auto;color:var(--dim);flex:none}
   /* Statistiky mají devět karet pod sebou; od výběru dne po zdroje kalorií je to
      dlouhé rolování a zpátky nahoru ještě delší. Lišta drží u horního kraje. */
-  .kotvy{position:sticky;top:0;z-index:5;display:flex;gap:6px;overflow-x:auto;
+  .kotvy{position:sticky;top:env(safe-area-inset-top);z-index:5;display:flex;gap:6px;overflow-x:auto;
          padding:8px 0 6px;margin:0 0 2px;background:var(--bg);scrollbar-width:none}
   .kotvy::-webkit-scrollbar{display:none}
   .kotva{flex:none;font-size:12px;padding:5px 11px;border-radius:99px;
@@ -1471,7 +1477,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.01-114';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.02-115';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala

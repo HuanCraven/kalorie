@@ -60,7 +60,7 @@ jobs:
       - name: Zkouška na emulátoru
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 35   # Android 15 — od něj je edge-to-edge povinné, viz build/apk.sh
           arch: x86_64
           target: google_apis
           disable-animations: true

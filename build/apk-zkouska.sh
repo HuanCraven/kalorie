@@ -30,6 +30,12 @@ zkus() {
     echo "✗ $ID: chyba JavaScriptu"; chyba=1
   fi
   adb shell screencap -p "/sdcard/snimek-$VAR.png" && adb pull "/sdcard/snimek-$VAR.png" . || true
+  # Pod stavovou lištou i pod gesty musí být barva aplikace, ne černý (bílý) rámeček
+  # z motivu Androidu. Jen u osobní podoby: veřejná při prvním spuštění ukáže
+  # průvodce a jeho ztmavení legitimně ztmaví i lišty.
+  if [ "$VAR" = osobni ] && [ -f "snimek-$VAR.png" ]; then
+    python3 build/apk-listy.py "snimek-$VAR.png" || chyba=1
+  fi
   echo "::endgroup::"
 }
 

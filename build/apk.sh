@@ -61,16 +61,42 @@ PY
   # loggingBehavior production: jinak Capacitor ve vydávané verzi nepouští výpis z konzole
   # do logu Androidu a zkouška na emulátoru nemá jak ověřit, že most žije. Aplikace do
   # konzole vypisuje jen kontrolní řádek KALORIE_NATIVNI, nic citlivého.
+  #
+  # Lišty Androidu: od Androidu 15 kreslí aplikace pod stavovou lištu i pod gesta
+  # (edge-to-edge, targetSdk 36). Co je pod lištami, obarví Capacitor barvou pozadí
+  # okna ze systémového motivu — v tmavém režimu černou, ve světlém bílou — a to
+  # kolem aplikace vypadalo jako rámeček. SystemBars proto dostane:
+  #   style DARK  = světlé ikony na liště, aplikace je tmavá i při světlém motivu
+  #   initialViewportFitValueHint cover = stránka má viewport-fit=cover, ať lišty
+  #     od prvního snímku propustí stránku a nečekají na její načtení
+  # a pozadí okna (styles.xml níže) je pozadí aplikace pro případ, že WebView je
+  # starší než 140 a Capacitor místo propuštění odsadí okraje.
   cat > capacitor.config.json <<EOF
 { "appId": "$ID", "appName": "$NAZEV", "webDir": "www",
   "loggingBehavior": "production",
-  "android": { "backgroundColor": "#12151a" } }
+  "android": { "backgroundColor": "#0e1116" },
+  "plugins": { "SystemBars": { "style": "DARK", "initialViewportFitValueHint": "cover" } } }
 EOF
   npx cap add android
   npx cap sync android
 
   # --- ikona z manifestu webové aplikace ---
   python3 "$KOREN/build/apk-ikony.py" "$D/www/manifest.json" "$D/android/app/src/main/res"
+
+  # --- pozadí okna = pozadí aplikace (--bg v index.html), viz SystemBars výše ---
+  cat > android/app/src/main/res/values/kalorie.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<resources><color name="kalorie_pozadi">#0E1116</color></resources>
+EOF
+  python3 - <<'PY2'
+import io
+p = 'android/app/src/main/res/values/styles.xml'
+s = io.open(p, encoding='utf-8').read()
+znacka = '<item name="android:background">@null</item>'
+assert znacka in s, 'šablona Capacitoru změnila styles.xml'
+s = s.replace(znacka, znacka + '\n        <item name="android:windowBackground">@color/kalorie_pozadi</item>', 1)
+io.open(p, 'w', encoding='utf-8').write(s)
+PY2
 
   # --- kamera pro čtečku čárových kódů a focení ---
   python3 - <<'PY'

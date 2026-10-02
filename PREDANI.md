@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.01-114** (`APP_VERSION` v `index.html`, cache `kaltrack-v114` v `sw.js`).
+Aktuální verze: **2026.10.02-115** (`APP_VERSION` v `index.html`, cache `kaltrack-v115` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,39 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v115 — lišty Androidu v barvě aplikace
+
+Huan hlásil, že APK má kolem sebe **černý rámeček** — stavová lišta nahoře a pruh
+gest dole nebyly v barvě aplikace.
+
+**Příčina.** APK cílí na Android 16 (`targetSdk 36` v šabloně Capacitoru 8), a od
+Androidu 15 je edge-to-edge povinné: lišty jsou průhledné a co je pod nimi, kreslí
+aplikace. Capacitor 8 (doplněk `SystemBars`) buď pustí stránku až pod lišty (WebView
+140+ a `viewport-fit=cover`), nebo okno odsadí a pod lištami je **pozadí okna ze
+systémového motivu** — šablona má `Theme.AppCompat.DayNight`, takže v tmavém režimu
+černá, ve světlém bílá. Na odsazení navíc padne vždy, dokud se stránka nenačte,
+protože o `viewport-fit=cover` se dozví až z ní. Emulátor ve zkoušce běžel na
+Androidu 14, kde edge-to-edge povinné není, proto to zkouška neviděla.
+
+**Oprava** (`build/apk.sh`, `index.html`):
+- `SystemBars.style: DARK` — světlé ikony na liště i při světlém motivu telefonu
+  (aplikace je tmavá vždy); `initialViewportFitValueHint: cover` — stránka pod
+  lišty od prvního snímku;
+- pozadí okna v `styles.xml` = `--bg` aplikace (`#0e1116`) pro případ odsazení;
+- v `index.html` pruh `body::before` výšky `env(safe-area-inset-top)` v barvě
+  pozadí, `body` odsazené o totéž a lišta kotev na Statistikách se lepí pod lištu,
+  ne pod ni. V prohlížeči je inset nula, nic se nemění. Spodek už ošetřený byl —
+  navigace má `padding-bottom: env(safe-area-inset-bottom)`;
+- `theme-color` webu sjednocená s pozadím (`#12151a` → `#0e1116`).
+
+**Hlídání:** zkouška APK běží na emulátoru **Androidu 15** a `build/apk-listy.py`
+ze snímku osobní podoby ověří, že střed horní i dolní lišty má barvu aplikace.
+Veřejná podoba se takhle neměří — při prvním spuštění ukáže průvodce a jeho
+ztmavení ztmaví i lišty.
+
+**Chyba s gramáží** (níže u v57 „Nedořešeno") je vyřešená od v60 — viz příčina se
+zástupným `productId` u v60. Poznámka u v57 zůstává jako historie.
 
 ### Novinky ve v114 — samostatná aplikace (APK)
 
@@ -1576,7 +1609,7 @@ Když ty testy konečně běžely, našly dvě věci:
   že neúspěšné mazání **nepřidá další** náhrobky. Úklid v aplikaci ověřen v izolaci —
   chová se správně, vada byla v očekávání testu.
 
-**Nedořešeno:** uživatel hlásí, že po zápisu popisu „po položkách" a následné úpravě
+**Nedořešeno (vyřešeno ve v60, viz tam):** uživatel hlásí, že po zápisu popisu „po položkách" a následné úpravě
 gramáže v deníku se uloží jiná potravina. Nepodařilo se zopakovat — zkoušeno se dvěma
 i pěti položkami, s napojením na databázi i bez, s klepnutím přes UI i programově,
 a s desetinnou čárkou v poli množství. Pokaždé se uložil správný záznam. Chybí
