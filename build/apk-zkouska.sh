@@ -27,7 +27,11 @@ zkus() {
     echo "::error::✗ $ID: běží jiná podoba aplikace, než měla"; chyba=1
   fi
   local jsChyba
-  jsChyba=$(grep -E "Capacitor/Console.*(Uncaught|TypeError|ReferenceError|SyntaxError)" "log-$VAR.txt" | head -3)
+  # Výjimka: Capacitor 8 na Androidu 15+ vkládá --safe-area-inset-* i do prázdné
+  # stránky před načtením aplikace (document.documentElement je null). Chybu si sám
+  # chytí a po načtení vloží proměnné znovu — s aplikací nesouvisí.
+  jsChyba=$(grep -E "Capacitor/Console.*(Uncaught|TypeError|ReferenceError|SyntaxError)" "log-$VAR.txt" |
+    grep -v "Error injecting safe area CSS" | head -3)
   if [ -n "$jsChyba" ]; then
     echo "$jsChyba"
     # celé znění do anotace — log běhu se ne vždy dá stáhnout
@@ -37,8 +41,12 @@ zkus() {
   # Pod stavovou lištou i pod gesty musí být barva aplikace, ne černý (bílý) rámeček
   # z motivu Androidu. Jen u osobní podoby: veřejná při prvním spuštění ukáže
   # průvodce a jeho ztmavení legitimně ztmaví i lišty.
-  if [ "$VAR" = osobni ] && [ -f "snimek-$VAR.png" ]; then
-    python3 build/apk-listy.py "snimek-$VAR.png" || chyba=1
+  if [ "$VAR" = osobni ]; then
+    if [ -f "snimek-$VAR.png" ]; then
+      python3 build/apk-listy.py "snimek-$VAR.png" || chyba=1
+    else
+      echo "::error::✗ $ID: chybí snímek obrazovky, lišty nejde ověřit"; chyba=1
+    fi
   fi
   echo "::endgroup::"
 }
