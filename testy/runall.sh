@@ -1,4 +1,5 @@
 #!/bin/bash
+cd "$(dirname "$0")"          # ať jde spustit odkudkoli, sady i prostredi.js leží tady
 # Výstup každé sady se ukládá, aby po pádu bylo vidět KTERÉ tvrzení padlo.
 # Stejná složka jako fixtures (KAL_DIR, jinak temp) — viz prostredi.js.
 # Cestu si vezmeme přímo z prostredi.js, ať se logy a fixtures nerozejdou.
@@ -10,6 +11,12 @@ FIX="$(dirname "$LOGY")"
 if [ ! -f "$FIX/alco.bin" ] || [ ! -f "$FIX/nutri.csv" ] || [ ! -f "$FIX/bc.y4m" ]; then
   echo "  (chybí fixtures, vyrábím je znovu)"
   python make-fixtures.py > /dev/null || { echo "  ✗ make-fixtures.py selhal"; exit 1; }
+fi
+# Bez serveru spadne každá sada na ERR_CONNECTION_REFUSED — radši jedna jasná hláška.
+if ! curl -sf -o /dev/null http://127.0.0.1:8811/index.html; then
+  echo "  ✗ aplikace neběží na http://127.0.0.1:8811 — spusť z kořene repa:"
+  echo "    python -m http.server 8811 --bind 127.0.0.1"
+  exit 1
 fi
 PASS=0; FAIL=0; FAILED=""
 for t in audit.js audit2.js test.js test2.js test3.js test4.js test5.js test6.js test7.js test8.js \
