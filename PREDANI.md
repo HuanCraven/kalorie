@@ -1918,6 +1918,42 @@ takže běží na Windows, Linuxu i v cloudu. Dřív byly cesty zadrátované
 na `/opt/pw-browsers` a `/home/claude` a šly spustit jen v sandboxu.
 Podrobnosti a pasti při psaní testů v `testy/README.md`.
 
+### Runner a verze akcí (od 2. 10. 2026)
+
+Obě úlohy (`regrese.yml`, `apk.yml`) běží na **`ubuntu-26.04` napevno**, ne na
+`ubuntu-latest`. GitHub ohlásil, že `ubuntu-latest` přejde 19. 10. 2026 na Ubuntu 26;
+s pevnou verzí se přechod ověřil hned a příští změna Ubuntu nepřijde jako pád.
+Až bude `ubuntu-26.04` zastaralé, zvedá se ručně v obou souborech.
+
+Co přechod vyžadoval:
+- **Playwright 1.55 → 1.63** (`package.json`, verze přesná). Stará verze Ubuntu 26.04
+  nezná a `npx playwright install --with-deps chromium` na ní spadl. Lokálně se nic
+  nestahuje — po `git pull` stačí jednou `npm install`. V cloudu běží 1.63 s Chromiem
+  předinstalovaným v kontejneru (`/opt/pw-browsers`), regrese 81/81.
+- **Akce na Node 24** (Node 20 GitHub vyřazuje): `checkout`, `setup-node`,
+  `upload-artifact` v7, `setup-python` v7, `setup-java` v6, `gradle/actions/setup-gradle` v6.
+  Při aktualizaci akcí ověř nejnovější hlavní verzi (`git ls-remote --tags`), nehádej.
+- **`apk.yml` má vlastní Python 3.12** (`setup-python`). Systémový Python na novějším
+  Ubuntu může `pip install` odmítnout (PEP 668) a Pillow je potřeba pro ikony i pro
+  kontrolu lišt (`build/apk-listy.py`).
+
+Ověřeno: regrese v CI i zkouška APK na emulátoru na `ubuntu-26.04` prošly.
+
+**Logy z Actions se do cloudové session Claude Code stáhnout nedají** (úložiště logů
+a artefaktů blokuje síťová politika). Proto zkouška APK píše důvod pádu jako
+**anotaci** (`::error::`), kterou jde přečíst přes API:
+`gh api repos/HuanCraven/kalorie/check-runs/<job-id>/annotations`. Stejně se dá
+postupovat u dalších kroků, které by bylo potřeba ladit na dálku.
+
+### Claude Code v cloudu (od 2. 10. 2026)
+
+Na projektu jde pracovat i z Claude Code na webu nebo v mobilní aplikaci Claude.
+`CLAUDE.md` načte `SKILL.md` z repa, takže cloudová session zná pravidla i bez
+skillu na claude.ai. `.claude/hooks/session-start.sh` (registrovaný v
+`.claude/settings.json`) při startu nainstaluje závislosti, vyrobí fixtures a pustí
+server na 8811 — regrese jde spustit hned. Mimo cloud (`CLAUDE_CODE_REMOTE` není
+`true`) hook nedělá nic.
+
 **Konce řádků:** `.gitattributes` má `* -text`, tedy žádné převádění CRLF/LF.
 Soubory se servírují tak, jak leží v repu, a nechceme, aby se lišil bajt.
 
