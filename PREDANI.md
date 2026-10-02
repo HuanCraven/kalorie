@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.02-116** (`APP_VERSION` v `index.html`, cache `kaltrack-v116` v `sw.js`).
+Aktuální verze: **2026.10.02-117** (`APP_VERSION` v `index.html`, cache `kaltrack-v117` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,23 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v117 — ikona v aplikaci, barvy maker podle ikony
+
+- **Ikona je v aplikaci** na dvou místech, kde aplikace mluví sama o sobě:
+  karta *Verze a aktualizace* (Nastavení → Data) a první krok průvodce *Vítej*.
+  Na Hlavní ne — tam má místo den a čísla. Vkládá se jednou jako SVG
+  `<symbol id="ikonaApp">` mezi značky `<!--ikona-->…<!--/ikona-->` hned za `<body>`
+  a používá přes `<svg><use href="#ikonaApp"/></svg>`. Symbol zapisuje
+  `build/ikona-aplikace.py` ze stejných konstant jako PNG ikonu — ručně ho neměň.
+- **Barvy maker = barvy kruhu v ikoně**: bílkoviny modrá (`--mB` = `--acc`),
+  sacharidy oranžová (`--mS` = `--warn`), tuky zelená (`--mT` = `--ok`). Dřív byly
+  bílkoviny `#6ea8ff` (skoro, ale ne úplně `--acc`) a tuky červené `#e2564d` — jenže
+  červená v aplikaci znamená překročení limitu, takže tuky vypadaly jako chyba i při
+  splněném cíli. Platí pro Hlavní i Statistiky; nové místo s makry ber z `--mB/--mS/--mT`.
+- Grafy klidového tepu a HRV používaly téměř-duplikáty paletových barev
+  (`#e2564d`, `#6ea8ff`) — nahrazeny přesnými `#e0574d` a `#4ea3ff`.
+- Vidlička v ikoně má bílou aplikace (`--fg` `#eef2f8`).
 
 ### Novinky ve v116 — nová ikona
 

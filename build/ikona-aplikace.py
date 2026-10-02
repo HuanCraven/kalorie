@@ -15,7 +15,9 @@ import base64, io, json, re, sys
 from PIL import Image, ImageDraw
 
 POZADI = '#0e1116'   # --bg v index.html
-MODRA, ZELENA, ORANZ, BILA = '#4ea3ff', '#3fbf7f', '#f0a742', '#e8ecf3'
+# = --acc, --ok, --warn, --fg v index.html; zároveň barvy maker v aplikaci
+# (bílkoviny modrá, tuky zelená, sacharidy oranžová — --mB, --mT, --mS)
+MODRA, ZELENA, ORANZ, BILA = '#4ea3ff', '#3fbf7f', '#f0a742', '#eef2f8'
 # geometrie v jednotkách 512px ikony; ZVETSENI zvětší celý motiv kolem středu
 # (1,15 → kruh má poloměr 31 % strany, bezpečná zóna maskovací ikony je 40 %)
 STRED, R_VNE, R_VNI = 256, 140, 93
@@ -66,6 +68,29 @@ def favicon_svg():
             ) % (POZADI, oblouky, BILA)
 
 
+def symbol_svg():
+    """Stejná ikona jako vektor pro stránku: <symbol id="ikonaApp">, použití
+    <svg><use href="#ikonaApp"/></svg>. Geometrie je z týchž konstant jako PNG."""
+    from math import cos, sin, pi
+    rs = (R_VNE + R_VNI) / 2                 # střed tloušťky kruhu
+    obl = lambda a0, a1, c: (
+        '<path d="M{:.1f} {:.1f}A{r} {r} 0 0 1 {:.1f} {:.1f}" stroke="{}"/>'.format(
+            STRED + rs * cos(a0), STRED + rs * sin(a0),
+            STRED + rs * cos(a1), STRED + rs * sin(a1), c, r=rs))
+    oblouky = obl(pi / 2, pi, MODRA) + obl(pi, 3 * pi / 2, MODRA) + \
+        obl(3 * pi / 2, 2 * pi, ZELENA) + obl(0, pi / 2, ORANZ)
+    vidlicka = ''.join('<rect x="%d" y="202" width="8" height="48" rx="4"/>' % x
+                       for x in (236, 252, 268))
+    vidlicka += ('<path d="M236 236H276V248A20 22 0 0 1 236 248Z"/>'
+                 '<rect x="247" y="240" width="18" height="82" rx="9"/>')
+    return ('<symbol id="ikonaApp" viewBox="0 0 512 512">'
+            '<rect width="512" height="512" rx="112" fill="%s"/>'
+            '<g transform="translate(%g %g) scale(%g)">'
+            '<g fill="none" stroke-width="%g">%s</g><g fill="%s">%s</g></g></symbol>'
+            ) % (POZADI, STRED * (1 - ZVETSENI), STRED * (1 - ZVETSENI), ZVETSENI,
+                 R_VNE - R_VNI, oblouky, BILA, vidlicka)
+
+
 def data_uri_png(im):
     b = io.BytesIO()
     # 64 barev bez rozptylu stačí na čtyři plné barvy s vyhlazenými hranami;
@@ -102,6 +127,11 @@ if __name__ == '__main__':
         nove, pocet = re.subn(r'<link rel="icon" href="data:image/svg\+xml,[^"]*">',
                               '<link rel="icon" href="data:image/svg+xml,' + svg + '">', s, 1)
         assert pocet == 1, 'v index.html chybí <link rel="icon">'
+        # symbol mezi značkami — skript ho při každém spuštění přepíše
+        nove, pocet = re.subn(r'(<!--ikona-->).*?(<!--/ikona-->)',
+                              lambda m: m.group(1) + '<svg width="0" height="0" style="position:absolute" '
+                              'aria-hidden="true">' + symbol_svg() + '</svg>' + m.group(2), nove, 1, flags=re.S)
+        assert pocet == 1, 'v index.html chybí <!--ikona--><!--/ikona-->'
         return nove
 
     print('manifest.json', 'změněn' if prepis('manifest.json', manifest) else 'beze změny')
