@@ -85,7 +85,14 @@ PY
   sed -i "s/versionCode [0-9]*/versionCode $KOD/; s/versionName \"[^\"]*\"/versionName \"$V\"/" android/app/build.gradle
   grep -E "versionCode|versionName|applicationId" android/app/build.gradle
 
-  (cd android && ./gradlew assembleRelease --no-daemon --console=plain)
+  # Stažení Gradlu z GitHubu občas skončí chybou 500 na jejich straně (první stavba
+  # v114 na tom spadla). Přechodný výpadek se zkusí ještě dvakrát.
+  local pokus
+  for pokus in 1 2 3; do
+    (cd android && ./gradlew assembleRelease --no-daemon --console=plain) && break
+    [ "$pokus" = 3 ] && { echo "✗ Gradle selhal třikrát"; exit 1; }
+    echo "Gradle selhal (pokus $pokus), zkouším znovu za 20 s…"; sleep 20
+  done
 
   local U=android/app/build/outputs/apk/release/app-release-unsigned.apk
   local Z="$RUNNER_TEMP/zarovnane-$VAR.apk"
