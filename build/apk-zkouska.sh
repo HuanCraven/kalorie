@@ -26,8 +26,12 @@ zkus() {
   if ! echo "$znacka" | grep -q " $VAR "; then
     echo "::error::✗ $ID: běží jiná podoba aplikace, než měla"; chyba=1
   fi
-  if grep -E "Capacitor/Console.*(Uncaught|TypeError|ReferenceError|SyntaxError)" "log-$VAR.txt"; then
-    echo "::error::✗ $ID: chyba JavaScriptu"; chyba=1
+  local jsChyba
+  jsChyba=$(grep -E "Capacitor/Console.*(Uncaught|TypeError|ReferenceError|SyntaxError)" "log-$VAR.txt" | head -3)
+  if [ -n "$jsChyba" ]; then
+    echo "$jsChyba"
+    # celé znění do anotace — log běhu se ne vždy dá stáhnout
+    echo "::error::✗ $ID: chyba JavaScriptu: $(echo "$jsChyba" | tr '\n' ' ' | cut -c1-900)"; chyba=1
   fi
   adb shell screencap -p "/sdcard/snimek-$VAR.png" && adb pull "/sdcard/snimek-$VAR.png" . || true
   # Pod stavovou lištou i pod gesty musí být barva aplikace, ne černý (bílý) rámeček
