@@ -1,0 +1,92 @@
+# Stavba APK — osobní i veřejné podoby jako samostatných aplikací (Capacitor).
+#
+# Spouští se ručně (Actions → APK → Run workflow), ne při každém pushi: APK se
+# vydává vědomě, stejně jako veřejná webová verze. Postaví obě APK, podepíše je,
+# vyzkouší na emulátoru Androidu a teprve když je zaškrtnuté „vydat", založí na
+# GitHubu vydání apk-<verze> s oběma soubory ke stažení.
+name: APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      vydat:
+        description: 'Po úspěšné zkoušce založit vydání ke stažení'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Pillow pro ikony
+        run: pip install --quiet pillow
+
+      - name: Postavit a podepsat obě APK
+        env:
+          KS_B64: ${{ secrets.APK_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.APK_KEYSTORE_PASS }}
+        run: bash build/apk.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: vystup/*.apk
+
+      # emulátor potřebuje KVM, na běžcích GitHubu je potřeba ho zpřístupnit
+      - name: KVM pro emulátor
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Zkouška na emulátoru
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash build/apk-zkouska.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zkouska
+          path: |
+            log-*.txt
+            snimek-*.png
+
+      - name: Vydání ke stažení
+        if: ${{ inputs.vydat }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(grep -o "APP_VERSION = '[^']*'" index.html | head -1 | cut -d"'" -f2)
+          cat > poznamky.md <<EOF
+          **Kalorie $V**
+
+          - \`kalorie-verejna-$V.apk\` — **pro kamarády**: bez fotek, čtení hodinek a synchronizace
+          - \`kalorie-osobni-$V.apk\` — plná verze
+
+          **Instalace:** stáhni APK v telefonu a otevři ho. Telefon se zeptá, jestli smí prohlížeč
+          instalovat aplikace — povol to. Play Protect může varovat před neznámým vývojářem.
+
+          **Data jsou jen v aplikaci.** Při odinstalaci zmizí — zálohuj v Nastavení → Data.
+          Aktualizace se instaluje přes starou verzi a data zůstanou.
+          EOF
+          gh release create "apk-$V" vystup/*.apk --title "Kalorie $V" --notes-file poznamky.md

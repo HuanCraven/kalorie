@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.01-113** (`APP_VERSION` v `index.html`, cache `kaltrack-v113` v `sw.js`).
+Aktuální verze: **2026.10.01-114** (`APP_VERSION` v `index.html`, cache `kaltrack-v114` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,36 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v114 — samostatná aplikace (APK)
+
+Huan chtěl aplikaci, kterou jde „někam nahrát a pak stáhnout a instalovat". Zvolil
+**samostatnou aplikaci** (soubory zabalené v APK) pro **obě podoby**, ne obal na web (TWA).
+Ověřovací repozitář domény `huancraven.github.io` proto zakládán nebyl — potřebuje ho jen TWA.
+
+**Jak:** Capacitor zabalí stejné soubory do WebView Androidu (stránka na `https://localhost`).
+Staví se v GitHub Actions (`.github/workflows/apk.yml`, spouští se ručně) skriptem
+`build/apk.sh`: veřejná podoba přes `build/verejna.py`, ikony z manifestu (`build/apk-ikony.py`),
+oprávnění kamery, `versionCode` z čísla za pomlčkou v `APP_VERSION`. Pak zkouška na emulátoru
+Androidu (`build/apk-zkouska.sh`) a teprve se zaškrtnutým „vydat" vydání `apk-<verze>`.
+
+**Co se v APK chová jinak** (`NATIVNI` v `index.html`, na webu false):
+- `<a download>` ve WebView nefunguje a `navigator.share` tam není → `dl()` zapíše soubor do
+  mezipaměti aplikace a předá ho sdílecí nabídce (doplňky Filesystem a Share);
+- service worker se neregistruje, varování o trvalém úložišti se neukazuje;
+- tlačítko Zpět napřed zavře okno, pak vrátí na Hlavní, teprve pak aplikaci opustí;
+- „Zkontrolovat aktualizaci" se ptá na poslední vydání na GitHubu a odkáže na nové APK.
+
+**Data jsou v aplikaci zvlášť** — nesdílí se s prohlížečem ani mezi oběma APK. Osobní APK se
+proto otevře prázdné; data se přenesou Importem zálohy nebo spárováním synchronizace.
+Odinstalace data smaže.
+
+**Podpisový klíč** `kalorie-podpis.p12` je mimo repozitář ve složce `podpisovy-klic` vedle
+projektu, heslo v souboru vedle. V GitHubu jako tajemství `APK_KEYSTORE_B64` a
+`APK_KEYSTORE_PASS`. **Bez klíče nejde vydat aktualizaci**, která se nainstaluje přes starou
+verzi — kdo ho ztratí, musí aplikaci odinstalovat i s daty. Do repozitáře nikdy.
+
+`test81.js` napodobuje Capacitor v prohlížeči; skutečný běh zkouší emulátor.
 
 ### Novinky ve v113 — úklid zbytků
 

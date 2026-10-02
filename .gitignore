@@ -5,3 +5,8 @@ testy/fixtures/
 off-cz.csv
 off-export.csv.gz
 *.rozdelane.json
+
+# výstup stavby APK (build/apk.sh) — APK patří do vydání, ne do repozitáře
+vystup/
+log-*.txt
+snimek-*.png

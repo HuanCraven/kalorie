@@ -1118,6 +1118,9 @@ body.verejna [data-osobni]{display:none!important}
     <button class="btn pri full" onclick="checkUpdate()">Zkontrolovat aktualizaci</button>
     <p class="tiny muted" id="updMsg" style="margin:8px 0 0">
       Stáhne novou verzi ze serveru a restartuje aplikaci. Data zůstanou.</p>
+    <p class="tiny muted" id="apkPozn" style="margin:8px 0 0;display:none">Tohle je aplikace
+      nainstalovaná z APK. Nová verze se neinstaluje sama — tlačítko zjistí, jestli je venku
+      novější, a odkáže na ni. Při odinstalaci aplikace zmizí i data, zálohuj.</p>
   </div>
 
   <div class="card">
@@ -1468,7 +1471,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.01-113';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.01-114';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -1484,6 +1487,29 @@ const APP_VERSION = '2026.10.01-113';   // zvyš při každé změně index.html
    display přepisují samy a schované karty by se vracely zpátky. */
 const VEREJNA = false;
 if (VEREJNA) document.body.classList.add('verejna');
+
+/* Samostatná aplikace (APK, od v114). Stejné soubory běží zabalené v Capacitoru —
+   ve WebView Androidu se stránkou na https://localhost. Tam chybí tři věci, které
+   prohlížeč umí sám: stažení souboru přes <a download>, sdílecí nabídka
+   (navigator.share) a service worker není k ničemu, soubory jsou v telefonu.
+   Proto se v APK soubory předávají přes nativní doplňky Filesystem a Share,
+   service worker se neregistruje a tlačítko Zpět zavírá okna.
+   Na webu je NATIVNI false a nic z toho se nespustí. */
+const NATIVNI = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' &&
+  window.Capacitor.isNativePlatform());
+if (NATIVNI) document.body.classList.add('nativni');
+function nativniPlugin(jm) {
+  if (!NATIVNI) return null;
+  const C = window.Capacitor;
+  if (C.Plugins && C.Plugins[jm]) return C.Plugins[jm];
+  if (typeof C.registerPlugin === 'function') return C.registerPlugin(jm);
+  if (window.capacitorExports && typeof window.capacitorExports.registerPlugin === 'function')
+    return window.capacitorExports.registerPlugin(jm);
+  return null;
+}
+// kde se hledá novější APK — obě podoby se vydávají jako přílohy téhož vydání
+const APK_VYDANI = 'https://github.com/HuanCraven/kalorie/releases/latest';
+const APK_VYDANI_API = 'https://api.github.com/repos/HuanCraven/kalorie/releases/latest';
 
 /* ---------------- utils ---------------- */
 const $ = id => document.getElementById(id);
@@ -1877,7 +1903,9 @@ function offCachePut(k, v) {
   obCheck();
   renderDb();
   info();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // v APK jsou soubory v telefonu a WebView si je cachovat nemá — service worker by jen překážel
+  if ('serviceWorker' in navigator && !NATIVNI) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (NATIVNI) nativniStart();
   if (syCfg.on) syncNow(false);
   document.addEventListener('visibilitychange', () => {
     // návrat k aplikaci: srovnat, ale ne častěji než jednou za minutu
@@ -1904,13 +1932,33 @@ function offCachePut(k, v) {
     /* Až když je o co přijít. Na prázdné aplikaci to bylo první, co člověk viděl —
        výhrůžka ztrátou dat, která ještě nemá. */
     const maData = (await dbAll('log')).length > 0;
-    if ($('persWarn')) $('persWarn').style.display = (persisted === false && maData) ? '' : 'none';
+    // v APK je úložiště soukromé aplikaci a prohlížeč ho mazat nemůže — varování nepatří
+    if ($('persWarn')) $('persWarn').style.display = (persisted === false && maData && !NATIVNI) ? '' : 'none';
   }
 })();
 
 /* --- kontrola aktualizace --- */
+/* V APK se aplikace sama nepřepíše — nová verze je nové APK. Zeptá se proto na
+   poslední vydání na GitHubu a odkáže na něj. Značka vydání je „apk-<verze>". */
+async function checkUpdateApk() {
+  $('updMsg').textContent = 'Ptám se GitHubu…';
+  try {
+    const r = await fetch(APK_VYDANI_API, { cache: 'no-store' });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    const v = String(j.tag_name || '').replace(/^apk-/, '');
+    if (!v) throw new Error('bez verze');
+    if (v === APP_VERSION) { $('updMsg').textContent = 'Máš nejnovější verzi (' + v + ').'; return; }
+    $('updMsg').innerHTML = 'Je venku verze <b>' + esc(v) + '</b>. ' +
+      '<a href="' + APK_VYDANI + '" target="_blank" rel="noopener">Stáhnout nové APK</a> — ' +
+      'nainstaluje se přes tuhle a data zůstanou.';
+  } catch (e) {
+    $('updMsg').textContent = 'Nejde se spojit s GitHubem — jsi offline?';
+  }
+}
 async function checkUpdate() {
   $('verNow').textContent = APP_VERSION;
+  if (NATIVNI) return checkUpdateApk();
   if (navigator.onLine === false) {
     $('updMsg').textContent = 'Jsi offline — aktualizaci nejde ověřit.';
     return;
@@ -1945,6 +1993,23 @@ async function checkUpdate() {
     }
   } catch (e) { /* i tak zkusíme reload */ }
   location.reload(true);
+}
+
+/* Tlačítko Zpět na Androidu by aplikaci rovnou zavřelo i s otevřeným oknem porce.
+   Napřed zavře okno, pak se vrátí na Hlavní, teprve potom aplikaci opustí. */
+function nativniStart() {
+  if ($('apkPozn')) $('apkPozn').style.display = '';
+  const App = nativniPlugin('App');
+  if (App && App.addListener) App.addListener('backButton', () => {
+    const okno = document.querySelector('.mod.on');
+    if (okno) { okno.classList.remove('on'); return; }
+    const str = document.querySelector('.page.on');
+    if (str && str.id !== 'p-day') { go('day'); return; }
+    if (App.exitApp) App.exitApp();
+  });
+  // zkouška na emulátoru čte tenhle řádek z logu, aby věděla, že most i doplňky žijí
+  console.log('KALORIE_NATIVNI ' + APP_VERSION + ' ' + (VEREJNA ? 'verejna' : 'osobni') + ' pluginy=' +
+    ['Filesystem', 'Share', 'App'].filter(p => !!nativniPlugin(p)).join(','));
 }
 
 function info() {
@@ -3814,6 +3879,7 @@ async function saveGoals() {
 
 /* ---------------- export / import ---------------- */
 function dl(name, text, type) {
+  if (NATIVNI) { nativniUloz(name, text); return; }
   const b = new Blob([text], { type: type || 'application/json' });
   const u = URL.createObjectURL(b);
   const a = document.createElement('a'); a.href = u; a.download = name; a.click();
@@ -3858,6 +3924,19 @@ async function exportData() {
    telefon — a přesně tam data jednou budou chybět. Sdílecí nabídka telefonu
    dovolí uložit zálohu rovnou na Disk nebo poslat e-mailem. Když ji prohlížeč
    neumí (počítač, starší Android), spadne se zpátky na stažení. */
+/* V APK nejde <a download> — WebView odkaz na blob tiše ignoruje a soubor by se
+   nikam neuložil. Zapíše se proto do mezipaměti aplikace a předá sdílecí nabídce. */
+async function nativniUloz(jmeno, text) {
+  const Fs = nativniPlugin('Filesystem'), Sh = nativniPlugin('Share');
+  if (!Fs || !Sh) { toast('Soubor tu nejde uložit — chybí doplněk aplikace'); return; }
+  try {
+    const r = await Fs.writeFile({ path: jmeno, data: text, directory: 'CACHE', encoding: 'utf8' });
+    await Sh.share({ title: jmeno, files: [r.uri], dialogTitle: 'Kam soubor uložit nebo poslat' });
+  } catch (e) {
+    const zpr = String((e && e.message) || e);
+    if (!/cancel|zrušen|abort/i.test(zpr)) toast('Soubor se nepodařilo předat: ' + zpr);
+  }
+}
 async function zalohuVen(jmeno, text) {
   try {
     if (navigator.canShare) {
@@ -3873,7 +3952,7 @@ async function zalohuVen(jmeno, text) {
     if (e && e.name === 'AbortError') { toast('Zrušeno'); return; }
   }
   dl(jmeno, text);
-  toast('Záloha stažena');
+  if (!NATIVNI) toast('Záloha stažena');   // v APK se otevře sdílecí nabídka, ta mluví sama
 }
 async function exportCsv() {
   const rows = await dbAll('log');

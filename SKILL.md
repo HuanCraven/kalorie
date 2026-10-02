@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 80 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 81 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -57,7 +57,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   80 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   81 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -149,6 +149,18 @@ synchronizaci a nedozví se proč; test to hlídá.
   vestavěné `zaklad.js` a `jidla.js`. Nikdy nespoléhej jen na jeden stupeň.
 - Data o čárových kódech jsou z **Open Food Facts pod ODbL 1.0** — uvedení zdroje
   je povinnost, ne zdvořilost, a je splněná v Nastavení → Nápověda.
+
+### Samostatná aplikace (APK, od v114)
+
+Obě podoby se dají postavit jako APK přes Capacitor: **Actions → APK → Run workflow**
+(`.github/workflows/apk.yml`, skript `build/apk.sh`). Postaví, podepíše, vyzkouší na emulátoru;
+vydání `apk-<verze>` založí jen se zaškrtnutým „vydat".
+
+- V APK je `NATIVNI` true. Soubory ven jdou přes `nativniUloz` (Filesystem + Share), protože
+  `<a download>` ve WebView tiše nic neudělá. Service worker se neregistruje.
+- Data APK jsou soukromá aplikaci — nesdílí se s prohlížečem; odinstalace je smaže.
+- `versionCode` je číslo za pomlčkou v `APP_VERSION` — musí s každým vydáním APK růst.
+- **Podpisový klíč nikdy do repozitáře.** Je v tajemství repozitáře a u Huana mimo repozitář.
 
 ### Jak se vydává veřejná verze
 
