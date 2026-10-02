@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.02-115** (`APP_VERSION` v `index.html`, cache `kaltrack-v115` v `sw.js`).
+Aktuální verze: **2026.10.02-116** (`APP_VERSION` v `index.html`, cache `kaltrack-v116` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,24 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v116 — nová ikona
+
+Čárový kód nahradil **kruh maker s vidličkou**: modrá, zelená a oranžová jako na
+kalorickém kruhu na Hlavní, uprostřed bílá vidlička. Huan vybral ze čtyř návrhů
+vygenerovaných přes Hugging Face (Z-Image Turbo).
+
+Vygenerovaný obrázek se **nepřebírá** — měl bílé rohy, stín a přechody místo barev
+aplikace. Motiv je překreslený geometricky v `build/ikona-aplikace.py`, který zapíše
+512px PNG do `manifest.json` (`any` i `maskable`) a SVG favicon do `index.html`.
+Při změně ikony uprav skript a spusť ho znovu, data URI v manifestu ručně neměň.
+
+- Kruh má poloměr 31 % strany ikony, takže se vejde do bezpečné zóny maskovací
+  ikony (40 %) — Android ji ořízne do kruhu nebo „squircle" a nic se neusekne.
+- Favicon 32 px má kruh tlustší a vidličku zjednodušenou, jinak by v liště zanikly.
+- `background_color` v manifestu je nově `#0e1116` (= `--bg`); `build/apk-ikony.py`
+  z něj bere pozadí adaptivní ikony APK.
+- Ikony zkratek (talíř / sklenice / činka, `build/ikony-zkratek.py`) zůstaly.
 
 ### Novinky ve v115 — lišty Androidu v barvě aplikace
 
