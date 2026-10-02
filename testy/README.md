@@ -1,6 +1,6 @@
 # Regresní testy
 
-57 sad Playwright testů proti skutečné aplikaci. Testy mockují Open Food Facts,
+81 sad Playwright testů proti skutečné aplikaci. Testy mockují Open Food Facts,
 takže **neposílají žádný dotaz ven** — limit 10 dotazů/min/IP se jimi nedá vyčerpat.
 
 ## Jednorázová příprava
