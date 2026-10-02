@@ -19,21 +19,21 @@ concurrency:
 
 jobs:
   testy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04   # pevně, ať přechod na další Ubuntu není překvapení
     timeout-minutes: 45
     env:
       KAL_CHROME: playwright        # vlastní Chromium Playwrightu, ne to na runneru
       KAL_DIR: ${{ github.workspace }}/.testy-data
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -76,7 +76,7 @@ jobs:
 
       - name: Výpisy z testů
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vypisy-testu
           path: ${{ env.KAL_DIR }}/logy
