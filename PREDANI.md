@@ -81,6 +81,20 @@ verzi — kdo ho ztratí, musí aplikaci odinstalovat i s daty. Do repozitáře 
 
 `test81.js` napodobuje Capacitor v prohlížeči; skutečný běh zkouší emulátor.
 
+**První vydání** `apk-2026.10.01-114`: https://github.com/HuanCraven/kalorie/releases/latest
+— obě APK přímo z běhu, který prošel emulátorem (značka `KALORIE_NATIVNI … pluginy=Filesystem,Share,App`
+u obou podob, žádná chyba JavaScriptu). Kamera, výběr fotek a sdílecí nabídka se na emulátoru
+nezkoušely — ty ověří až skutečný telefon.
+
+Co se při stavbě ukázalo (tři běhy):
+- **Stažení Gradlu z GitHubu vrátilo HTTP 500** — výpadek na jejich straně. `apk.sh` teď Gradle
+  zkusí až třikrát a `setup-gradle` drží mezipaměť.
+- **Capacitor ve vydávané verzi nepouští `console` do logu Androidu** (`loggingBehavior` je
+  ve výchozím stavu `debug`). Aplikace na emulátoru běžela, ale zkouška neviděla kontrolní
+  řádek. Nastaveno `production`; aplikace jinak do konzole nic nevypisuje.
+- Obě APK mají shodou okolností stejnou velikost (zarovnání v zipu). Liší se — ověřeno
+  obsahem: `VEREJNA` a `lite` v manifestu.
+
 ### Novinky ve v113 — úklid zbytků
 
 Huan se zeptal, jestli v aplikaci nejsou zbytky. Hledalo se strojově (funkce bez odkazu,
