@@ -14,5 +14,6 @@ for kde, xy in (('nahoře', (w // 2, 8)), ('dole', (w // 2, h - 4))):
     px = im.getpixel(xy)
     if min(max(abs(a - b) for a, b in zip(px, c)) for c in ok) > 6:
         spatne.append('%s #%02x%02x%02x' % ((kde,) + px))
-print('lišty: ' + (', '.join(spatne) or 'v barvě aplikace'))
+# ::error:: = anotace běhu, je vidět i bez stažení celého logu
+print(('::error::lišty: ' + ', '.join(spatne)) if spatne else 'lišty: v barvě aplikace')
 sys.exit(1 if spatne else 0)

@@ -12,7 +12,7 @@ chyba=0
 zkus() {
   local APK=$1 ID=$2 VAR=$3
   echo "::group::$ID"
-  adb install -r "$APK" || { echo "✗ instalace selhala"; chyba=1; echo "::endgroup::"; return; }
+  adb install -r "$APK" || { echo "::error::✗ instalace selhala"; chyba=1; echo "::endgroup::"; return; }
   adb logcat -c
   adb shell am start -n "$ID/.MainActivity"
   sleep 30
@@ -21,13 +21,13 @@ zkus() {
   znacka=$(grep -o "KALORIE_NATIVNI.*" "log-$VAR.txt" | head -1)
   echo "značka: ${znacka:-žádná}"
   if ! echo "$znacka" | grep -q "pluginy=Filesystem,Share,App"; then
-    echo "✗ $ID: most nebo doplňky nežijí"; chyba=1
+    echo "::error::✗ $ID: most nebo doplňky nežijí (značka: ${znacka:-žádná})"; chyba=1
   fi
   if ! echo "$znacka" | grep -q " $VAR "; then
-    echo "✗ $ID: běží jiná podoba aplikace, než měla"; chyba=1
+    echo "::error::✗ $ID: běží jiná podoba aplikace, než měla"; chyba=1
   fi
   if grep -E "Capacitor/Console.*(Uncaught|TypeError|ReferenceError|SyntaxError)" "log-$VAR.txt"; then
-    echo "✗ $ID: chyba JavaScriptu"; chyba=1
+    echo "::error::✗ $ID: chyba JavaScriptu"; chyba=1
   fi
   adb shell screencap -p "/sdcard/snimek-$VAR.png" && adb pull "/sdcard/snimek-$VAR.png" . || true
   # Pod stavovou lištou i pod gesty musí být barva aplikace, ne černý (bílý) rámeček
