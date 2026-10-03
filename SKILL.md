@@ -62,7 +62,11 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
    `npm install`. Fixtures (`alco.bin`, `nutri.csv`, `bc.y4m`) leží v tempu, které si
-   Windows čas od času uklidí; `runall.sh` je v tom případě vyrobí sám (od v110).
+   Windows čas od času uklidí; `runall.sh` je v tom případě vyrobí sám (od v110), a když
+   neběží testovací server, zkusí ho spustit (od v118). Celá regrese trvá déle než časový
+   limit nástroje na pozadí — pouštěj ji odpojeně (`nohup`) a čekej na řádek „PROŠLO:".
+   **Na projektu se pracuje i z Claude Code v cloudu** — před prací `git fetch` a zkontroluj,
+   jestli na `main` nepřibyly commity odjinud.
    Regrese běží i v GitHub Actions při každém pushi na `main`.
    Podrobnosti a pasti při psaní testů v `testy/README.md`.
 4. **Open Food Facts: limit 10 dotazů/min/IP.** Aplikace má vlastní hlídač (6/min)

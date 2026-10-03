@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.02-117** (`APP_VERSION` v `index.html`, cache `kaltrack-v117` v `sw.js`).
+Aktuální verze: **2026.10.03-118** (`APP_VERSION` v `index.html`, cache `kaltrack-v118` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,25 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v118 — záloha nenese klíč, a teď to i říká
+
+Huan po přenosu dat do APK hlásil, že nejde číst snímek z hodinek. Příčina: **klíč ke Claude
+API v záloze není** (schválně — soubor se posílá e-mailem a přes Disk) a karta *Přenést do
+jiného telefonu* přitom tvrdila, že záloha „nese úplně všechno". Po importu tak klíč v APK
+chyběl. Vyřešeno vložením klíče; text na kartě i v Nápovědě teď výslovně říká, že klíč
+a přihlášení k synchronizaci je v novém telefonu potřeba vložit znovu (`data-osobni`).
+Opraveny i poznámky k vydání `apk-2026.10.01-114`.
+
+**`runall.sh` zkusí spustit testovací server**, když neběží (`python3`, jinak `python`), a teprve
+když se to nepovede, skončí hláškou z v116. Na Huanově počítači server umírá při každém
+spánku a regrese pak padala celá na `ERR_CONNECTION_REFUSED`, aniž by se dostala ke kódu.
+
+**Souběh se cloudovou relací.** v115–v117 vznikly v Claude Code na webu, zatímco byl Huanův
+počítač vypnutý; lokální relace mezitím rozpracovala vlastní „v115". Push to odhalil (odmítnut,
+protože na GitHubu byly cizí commity). Lokální změny šly stranou (`git stash`), větev se srovnala
+s GitHubem a změny se nanesly znovu jako v118 — nic z cloudu se nepřepsalo. **Před prací vždy
+`git fetch` a podívej se, jestli na `main` nepřibylo něco odjinud.**
 
 ### Novinky ve v117 — ikona v aplikaci, barvy maker podle ikony
 

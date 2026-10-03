@@ -1086,10 +1086,17 @@ body.verejna [data-osobni]{display:none!important}
   <div class="card">
     <h3>Přenést do jiného telefonu</h3>
     <p class="tiny muted" style="margin:0 0 8px"><b>1.</b> Tady dej <b>Export zálohy</b> a pošli si
-      soubor do nového telefonu — e-mailem, přes Disk nebo Quick Share. Nese úplně všechno: deník,
-      nastavení, tvoje potraviny i načtené databáze.</p>
+      soubor do nového telefonu — e-mailem, přes Disk nebo Quick Share. Nese deník, cíle,
+      tvoje potraviny i načtené databáze.</p>
     <p class="tiny muted" style="margin:0 0 8px"><b>2.</b> V novém telefonu otevři aplikaci a dej
       <b>Import zálohy</b>.</p>
+    <!-- Dřív tu stálo „nese úplně všechno" — a Huan po přenosu do APK nechápal, proč
+         nečte snímky hodinek. Klíč a token jsou ze zálohy vynechané schválně: soubor se
+         posílá e-mailem a přes Disk, a tam tajné údaje nepatří. -->
+    <p class="tiny" style="margin:0 0 8px;color:var(--warn)" data-osobni><b>3.</b> Klíč ke Claude API
+      a přihlášení k synchronizaci záloha schválně nenese — soubor se posílá e-mailem a přes Disk.
+      V novém telefonu je vlož znovu v Nastavení → Propojení, jinak nebude fungovat čtení fotek
+      a snímků z hodinek.</p>
     <p class="tiny muted" style="margin:0" data-osobni>Máš-li zapnutou synchronizaci, jde to i bez
       souboru: v Propojení zobraz párovací kód a v novém telefonu ho naskenuj.</p>
   </div>
@@ -1220,8 +1227,10 @@ body.verejna [data-osobni]{display:none!important}
   <div class="card">
     <h3>Nový telefon a další lidé</h3>
     <p class="tiny muted" style="margin:0 0 8px"><b>Měníš telefon?</b> V Nastavení → Data je
-      Export zálohy. Nese úplně všechno včetně tvých potravin; v novém telefonu ho načteš
+      Export zálohy. Nese deník, cíle i tvoje potraviny; v novém telefonu ho načteš
       Importem zálohy.</p>
+    <p class="tiny muted" style="margin:0 0 8px" data-osobni>Klíč ke Claude API a přihlášení
+      k synchronizaci se nepřenášejí — v novém telefonu je vlož znovu v Nastavení → Propojení.</p>
     <p class="tiny muted" style="margin:0"><b>Chceš někomu dát svoje potraviny?</b> Na záložce
       Jídla je Předat databázi. Soubor nese jen potraviny a recepty — žádný deník, váhu ani
       nastavení. Druhý člověk ho načte tamtéž a začne s tvou databází a vlastním deníkem.</p>
@@ -1482,7 +1491,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.02-117';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.03-118';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala

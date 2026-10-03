@@ -13,6 +13,18 @@ if [ ! -f "$FIX/alco.bin" ] || [ ! -f "$FIX/nutri.csv" ] || [ ! -f "$FIX/bc.y4m"
   python make-fixtures.py > /dev/null || { echo "  ✗ make-fixtures.py selhal"; exit 1; }
 fi
 # Bez serveru spadne každá sada na ERR_CONNECTION_REFUSED — radši jedna jasná hláška.
+# Napřed se ale zkusí spustit: na Huanově počítači server umírá při každém spánku
+# a regrese pak padala celá, aniž by se dostala ke kódu.
+if ! curl -sf -o /dev/null http://127.0.0.1:8811/index.html; then
+  PY=$(command -v python3 || command -v python)
+  if [ -n "$PY" ]; then
+    echo "  (aplikace neběží, spouštím server)"
+    (cd .. && nohup "$PY" -m http.server 8811 --bind 127.0.0.1 > /dev/null 2>&1 &)
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      curl -sf -o /dev/null http://127.0.0.1:8811/index.html && break; sleep 1
+    done
+  fi
+fi
 if ! curl -sf -o /dev/null http://127.0.0.1:8811/index.html; then
   echo "  ✗ aplikace neběží na http://127.0.0.1:8811 — spusť z kořene repa:"
   echo "    python -m http.server 8811 --bind 127.0.0.1"
