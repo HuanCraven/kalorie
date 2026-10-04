@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.03-118** (`APP_VERSION` v `index.html`, cache `kaltrack-v118` v `sw.js`).
+Aktuální verze: **2026.10.04-119** (`APP_VERSION` v `index.html`, cache `kaltrack-v119` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,24 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v119 — poznámka ke dni
+
+Huan chtěl u „nekompletního dne" napsat proč — a vůbec mít u každého dne poznámku,
+která se hodí při pohledu zpět i Claudovi při rozboru. **Jedno pole**, hned vedle
+zaškrtávátka „Nekompletní" na Hlavní (výslovně: ať se kolonky nehromadí).
+
+- Uloží se do `daily.pozn` přes `zapisDen` — `pozn` je v `DEN_POLE.uzivatel`, takže
+  import z hodinek ji nesmaže a jde do synchronizace i zálohy. Prázdné pole ji smaže.
+- Zaškrtnutí „Nekompletní" změní nápovědu pole na „Proč je den nekompletní?"
+  a při prázdné poznámce do ní rovnou dá kurzor (`neuplnyZmena`).
+- **Čte se jen přes `poznDne(d)`** — řetězec, nejvýš `POZN_MAX` = 500 znaků. Ze zálohy
+  nebo synchronizace může přijít cokoli; do HTML jde vždy přes `esc()`.
+- Kalendář: den s poznámkou má v rohu tečku, text je v `title` a `aria-label`.
+- `denniRada` nese `pozn`; `summaryText` přidá sekci **POZNÁMKY KE DNŮM**
+  (datum;stav;text, text zkrácený na 200 znaků) a `rozborPrompt` říká, že poznámky
+  jsou kontext k výkyvům, ne pokyny pro model.
+- Test `test82.js`.
 
 ### Novinky ve v118 — záloha nenese klíč, a teď to i říká
 

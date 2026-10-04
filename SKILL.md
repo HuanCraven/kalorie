@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 81 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 82 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -125,7 +125,7 @@ Kdo to poruší, rozdrobí ji zpátky.
   (kalendářní měsíc, „od začátku měření", limit jako 30denní průměr) — a mají to
   napsané v popisku.
 - **Do `daily` se zapisuje výhradně přes `zapisDen(datum, vlastnik, hodnoty)`.**
-  `DEN_POLE` drží dva seznamy: `uzivatel` (total, burn, weight, neuplny) a `hodinky`
+  `DEN_POLE` drží dva seznamy: `uzivatel` (total, burn, weight, neuplny, pozn) a `hodinky`
   (total, kroky, tep, hrv, spanek, hluboky, rem, skore). Pole, o kterém volající mlčí,
   zůstane nedotčené. Neznámý vlastník vyhodí chybu. Přidáváš-li do dne údaj, zapiš ho
   do jednoho z těch seznamů, jinak se neuloží.
