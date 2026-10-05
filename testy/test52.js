@@ -31,7 +31,8 @@ const PROSTREDI = require('./prostredi');
     return { hesla: t, tajna };
   });
   ck('v aplikaci není žádné pole typu password', pole.hesla.length === 0, JSON.stringify(pole.hesla));
-  ck('citlivá pole jsou tři a maskovaná', pole.tajna.length === 3 && pole.tajna.every(x => x.typ === 'text'),
+  // čtvrté je pole pro vložení párovacího kódu (v120) — kód nese token i šifrovací klíč
+  ck('citlivá pole jsou čtyři a maskovaná', pole.tajna.length === 4 && pole.tajna.every(x => x.typ === 'text'),
     JSON.stringify(pole.tajna));
   const skryte = await p.evaluate(() => {
     const el = document.getElementById('syTok');

@@ -35,7 +35,7 @@ const PROSTREDI = require('./prostredi');
     };
     return {
       cile: kde('Jak počítat cíle'), rmr: kde('Klidový výdej'), omne: kde('O mně'), alk: kde('Alkohol'),
-      api: kde('Claude API'), sync: kde('Synchronizace'), sifr: kde('Šifrování'), par: kde('Párování'),
+      api: kde('Claude API'), sync: kde('Synchronizace'), sifr: kde('Šifrování'), par: kde('Spárovat další zařízení'),
       data: kde('Data'), ext: kde('Externí databáze'), verze: kde('Verze'), info: kde('Info'),
       napoJak: kde('Jak to funguje'), napoZal: kde('Zálohuj'), napoNeni: kde('Co tahle aplikace není')
     };
