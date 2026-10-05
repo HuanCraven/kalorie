@@ -68,7 +68,10 @@ const PROSTREDI = require('./prostredi');
   const zap = await heslo(A, 'tajneheslo123');
   ck('heslo se přijme', zap.indexOf('✓') === 0, zap);
   const klic = await A.evaluate(() => ({ mam: !!syKey, ext: syKey && syKey.extractable, alg: syKey && syKey.algorithm.name }));
-  ck('klíč je uložený a nejde z prohlížeče vyčíst', klic.mam && klic.ext === false, JSON.stringify(klic));
+  /* Od v120 je klíč exportovatelný — párovací kód ho nese, aby druhé zařízení nemuselo
+     znát heslo. Heslo samo se ale dál nikde neukládá. */
+  ck('klíč je uložený a heslo samo nikde', klic.mam && !(await A.evaluate(async () =>
+    JSON.stringify(await dbGet('meta', 'crypt') || {}).indexOf('tajneheslo') >= 0)), JSON.stringify(klic));
   ck('klíč je AES-GCM', klic.alg === 'AES-GCM', klic.alg);
 
   await A.evaluate(() => syncNow(true));

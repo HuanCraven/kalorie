@@ -224,6 +224,12 @@ body.verejna [data-osobni]{display:none!important}
       <button class="btn sm pri dotyk" style="flex:0 0 auto" onclick="exportData()">Zálohovat</button>
     </div>
   </div>
+  <!-- Synchronizace přestala běžet (vypršel token, dlouho se nesladilo). Dřív to
+       aplikace neřekla a člověk zjistil až podle chybějících dat (v120). -->
+  <div class="card" id="syVarovani" style="display:none;border-color:#4a3a20" data-osobni>
+    <p class="tiny" style="margin:0 0 8px;color:var(--warn)" id="syVarTxt"></p>
+    <button class="btn sm full" onclick="syJdiParovat()">Otevřít synchronizaci</button>
+  </div>
   <div class="card" id="obCard" style="display:none">
     <div class="row" style="justify-content:space-between;align-items:flex-start">
       <h3 style="margin-bottom:6px">Začni tady</h3>
@@ -231,6 +237,7 @@ body.verejna [data-osobni]{display:none!important}
     </div>
     <p class="tiny muted" style="margin:0 0 10px">Tři kroky a aplikace začne dávat smysl.
       Kartu kdykoli zavřeš křížkem.</p>
+    <button class="btn full" style="margin-bottom:8px" data-osobni onclick="syJdiParovat()">Mám Kalorie i na jiném zařízení — spárovat</button>
     <button class="btn full" id="obKrok1" style="margin-bottom:8px" onclick="go('set')">1 · Nastavit denní cíle a klidový výdej</button>
     <button class="btn full" id="obKrok2" style="margin-bottom:8px" onclick="go('scan');setAdd('code')">2 · Naskenovat první potravinu</button>
     <button class="btn full" id="obKrok3" onclick="go('scan')">3 · Nebo najít jídlo podle názvu</button>
@@ -1069,15 +1076,21 @@ body.verejna [data-osobni]{display:none!important}
     <button class="btn full" style="margin-bottom:8px" id="syPassOff" onclick="syPassOff()">Vypnout šifrování</button>
 
     <div class="hr"></div>
-    <h3 style="margin-top:0">Párování telefonu</h3>
-    <p class="tiny muted" style="margin:0 0 10px">Aby ses nemusel na telefonu trápit s opisováním tokenu:
-      na počítači si nech zobrazit kód a telefonem ho naskenuj. <b>Kód obsahuje token</b> — nefoť ho
-      a nenech si ho přes rameno přečíst.</p>
-    <button class="btn full" style="margin-bottom:8px" onclick="syQrShow()">Zobrazit kód pro spárování</button>
-    <div id="syQr" style="text-align:center"></div>
-    <button class="btn full" style="margin-bottom:8px" onclick="syScanToggle()" id="syScanBtn">Načíst nastavení z kódu</button>
-    <video id="syVid" playsinline muted style="display:none;width:100%;border-radius:12px"></video>
-    <p class="tiny muted" id="syScanMsg" style="margin:0 0 8px"></p>
+    <h3 style="margin-top:0" id="syParovani">Spárovat další zařízení</h3>
+<p class="tiny muted" style="margin:0 0 10px">Na zařízení, které už synchronizuje, ukaž kód. Na novém
+ho naskenuj — nebo ho zkopíruj a vlož, když nové zařízení nemá kameru. <b>Kód nese token
+i šifrování</b>: kdo ho má, má přístup k datům.</p>
+<button class="btn full" style="margin-bottom:8px" onclick="syQrShow()">Zobrazit kód pro spárování</button>
+<div id="syQr" style="text-align:center"></div>
+<button class="btn full" style="margin-bottom:8px" onclick="syKodKopiruj()">Zkopírovat párovací kód</button>
+<button class="btn full" style="margin-bottom:8px" onclick="syScanToggle()" id="syScanBtn">Načíst nastavení z kódu</button>
+<video id="syVid" playsinline muted style="display:none;width:100%;border-radius:12px"></video>
+<div class="row" style="gap:6px;margin-bottom:8px">
+<input id="syKodVloz" class="grow tajne" autocomplete="off" spellcheck="false" placeholder="nebo sem vlož zkopírovaný kód"
+data-lpignore="true" data-1p-ignore>
+<button class="btn sm pri" onclick="syKodPouzij()">Připojit</button>
+</div>
+<p class="tiny muted" id="syScanMsg" style="margin:0 0 8px"></p>
 
     <details><summary class="tiny muted">Jak si to jednou nastavit</summary>
       <ol class="tiny muted" style="margin:8px 0 0;padding-left:18px">
@@ -1503,7 +1516,7 @@ body.verejna [data-osobni]{display:none!important}
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.04-119';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.05-120';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -5697,7 +5710,21 @@ async function syLogout() {
   syUi(); syPassNote(''); syCryptUi(); syNote('Odpojeno.');
 }
 function syNote(t) { if ($('syMsg')) $('syMsg').textContent = t; }
+/* Varování na Hlavní: synchronizace je nastavená, ale neběží. Bez něj se odpojení
+   projevilo až chybějícími daty na druhém zařízení. */
+const SY_VAR_DNI = 3;
+function syVarovani() {
+  const box = $('syVarovani'); if (!box) return;
+  let t = '';
+  if (syCfg.on && syCfg.chyba) t = 'Synchronizace neběží: ' + String(syCfg.chyba).replace(/^✕\s*/, '');
+  else if (syCfg.on && syCfg.last && Date.now() - syCfg.last > SY_VAR_DNI * 864e5)
+    t = 'Naposledy sladěno před ' + Math.floor((Date.now() - syCfg.last) / 864e5) +
+      ' dny — data z druhého zařízení tu můžou chybět.';
+  box.style.display = t ? '' : 'none';
+  $('syVarTxt').textContent = t;
+}
 function syUi() {
+  syVarovani();
   if ($('daySync')) $('daySync').style.display = syCfg.on ? '' : 'none';
   if (!$('sySyncBtn')) return;
   $('sySyncBtn').disabled = !syCfg.on;
@@ -5748,7 +5775,7 @@ const SY_ITER = 200000;
 async function syDerive(heslo, salt) {
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(heslo), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: SY_ITER, hash: 'SHA-256' },
-    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    base, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);   // exportovatelný kvůli párovacímu kódu (v120)
 }
 async function loadCrypt() {
   const m = await dbGet('meta', 'crypt');
@@ -5935,9 +5962,40 @@ function syPrint(st) {
    Kód nese jen nastavení spojení (repozitář, token, cesta), ne data ani heslo
    k šifrování — to se na druhém zařízení zadává zvlášť, aby token a heslo
    nikdy neputovaly pohromadě. */
-function syQrData() {
-  return JSON.stringify({ kal: 1, repo: syCfg.repo, tok: syCfg.token, path: syCfg.path });
+async function syQrData() {
+  const o = { kal: 1, repo: syCfg.repo, tok: syCfg.token, path: syCfg.path };
+  // šifrovací klíč (ne heslo — to se nikde neukládá) jede s kódem, ať se páruje na jeden krok
+  if (syKey && sySalt && syKey.extractable) {
+    o.k = b64FromBytes(new Uint8Array(await crypto.subtle.exportKey('raw', syKey)));
+    o.s = b64FromBytes(sySalt);
+  }
+  return JSON.stringify(o);
 }
+/* Klíč odvozený před v120 nejde vyexportovat (vznikal jako neexportovatelný).
+   Kód pak šifrování nenese a řekne to — stačí jednou znovu zadat heslo. */
+const syKodBezKlice = () => !!(syKey && !syKey.extractable);
+const SY_KOD_PREFIX = 'kalorie-par:';
+async function syKodText() { return SY_KOD_PREFIX + b64FromBytes(new TextEncoder().encode(await syQrData())); }
+async function syKodKopiruj() {
+  if (!syCfg.on) { syScanNote('Nejdřív vyplň repozitář a token.'); return; }
+  const t = await syKodText();
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { $('syKodVloz').value = t; $('syKodVloz').select(); }
+  syScanNote('✓ Párovací kód je ve schránce. Na novém zařízení ho vlož do pole níže a dej Připojit.' +
+    (syKodBezKlice() ? ' Šifrování nenese — viz výš.' : ''));
+  if (syKodBezKlice()) syPassNote('Aby kód nesl i šifrování, zadej tady heslo ještě jednou a dej Zapnout šifrování.');
+}
+async function syKodPouzij() {
+  const t = ($('syKodVloz').value || '').trim();
+  if (!t) { syScanNote('Vlož kód zkopírovaný z druhého zařízení.'); return; }
+  if (!(await syQrUse(t))) syScanNote('✕ Tohle není párovací kód aplikace.');
+  else $('syKodVloz').value = '';
+}
+function syJdiParovat() {
+  go('set'); setSetMode('prop');
+  setTimeout(() => { const h = $('syParovani'); if (h) h.scrollIntoView({ block: 'start' }); }, 50);
+}
+let syQrSchovej = null;
 async function syQrShow() {
   if (!syCfg.on) { syScanNote('Nejdřív vyplň repozitář a token.'); return; }
   const box = $('syQr');
@@ -5946,10 +6004,14 @@ async function syQrShow() {
     await loadZXing();
     if (!window.ZXing || !window.ZXing.BrowserQRCodeSvgWriter) throw new Error('generátor nedostupný');
     const w = new window.ZXing.BrowserQRCodeSvgWriter();
-    const svg = w.write(syQrData(), 260, 260);
+    const svg = w.write(await syQrData(), 300, 300);
     svg.setAttribute('style', 'background:#fff;padding:10px;border-radius:12px;max-width:280px');
     box.innerHTML = ''; box.appendChild(svg);
-    syScanNote('Naskenuj telefonem. Klepnutím kód schováš.');
+    syScanNote('Naskenuj druhým zařízením. Za minutu se kód sám schová.' +
+      (syKodBezKlice() ? ' Šifrování nenese — viz výš.' : ''));
+    if (syKodBezKlice()) syPassNote('Aby kód nesl i šifrování, zadej tady heslo ještě jednou a dej Zapnout šifrování.');
+    clearTimeout(syQrSchovej);
+    syQrSchovej = setTimeout(() => { $('syQr').innerHTML = ''; syScanNote(''); }, 60000);
   } catch (e) { syScanNote('✕ Kód se nepodařilo vytvořit (' + (e.message || 'chyba') + ').'); }
 }
 function syScanNote(t) { if ($('syScanMsg')) $('syScanMsg').textContent = t; }
@@ -5957,13 +6019,30 @@ function syScanNote(t) { if ($('syScanMsg')) $('syScanMsg').textContent = t; }
 /* přijme obsah naskenovaného kódu; vrací true, když nastavení sedělo */
 async function syQrUse(text) {
   let o = null;
-  try { o = JSON.parse(text); } catch (e) { return false; }
-  if (!o || o.kal !== 1 || !o.repo || !o.tok) return false;
+  text = String(text || '').trim();
+  try {
+    if (text.indexOf(SY_KOD_PREFIX) === 0)
+      text = new TextDecoder().decode(bytesFromB64(text.slice(SY_KOD_PREFIX.length)));
+    o = JSON.parse(text);
+  } catch (e) { return false; }
+  if (!o || o.kal !== 1 || typeof o.repo !== 'string' || typeof o.tok !== 'string' || !o.repo || !o.tok) return false;
   $('syRepo').value = o.repo;
   $('syTok').value = o.tok;
   await sySave();
-  if (o.path) { syCfg.path = o.path; await syStore(); }
-  syScanNote('✓ Nastavení načteno. Zbývá zadat heslo k šifrování, pokud ho používáš.');
+  if (typeof o.path === 'string' && o.path) { syCfg.path = o.path; await syStore(); }
+  let sifra = false;
+  if (typeof o.k === 'string' && typeof o.s === 'string') {
+    try {
+      const key = await crypto.subtle.importKey('raw', bytesFromB64(o.k), { name: 'AES-GCM' }, true,
+        ['encrypt', 'decrypt']);
+      syKey = key; sySalt = bytesFromB64(o.s);
+      await dbPut('meta', { k: 'crypt', v: { salt: sySalt, key: key } });
+      syPassNote('✓ Šifrování zapnuto z párovacího kódu.'); syCryptUi();
+      sifra = true;
+    } catch (e) { syPassNote('✕ Šifrovací klíč z kódu nešel načíst — zadej heslo ručně.'); }
+  }
+  syScanNote('✓ Spárováno' + (sifra ? ' i se šifrováním' : '') + '. Slaďuji…');
+  syncNow(true);
   return true;
 }
 
@@ -6052,12 +6131,16 @@ async function syncRun(manual) {
       if (res.conflict) continue;                 // druhé zařízení psalo dřív — celé kolo znovu
       ok = true; break;
     }
-    if (ok) { syCfg.last = Date.now(); await syStore(); syNote('✓ Sladěno ' + new Date(syCfg.last).toLocaleTimeString('cs-CZ') + '.'); }
+    if (ok) { syCfg.last = Date.now(); delete syCfg.chyba; await syStore(); syNote('✓ Sladěno ' + new Date(syCfg.last).toLocaleTimeString('cs-CZ') + '.'); }
     else syNote('✕ Nepodařilo se doladit, zkus to za chvíli znovu.');
   } catch (e) {
     syNote(e.message && e.message[0] === '✕' ? e.message : '✕ Chyba spojení (' + (e.message || 'síť') + ').');
+    // trvalé chyby (token, oprávnění, repozitář) si pamatujeme pro varování na Hlavní;
+    // výpadek sítě ne — ten se spraví sám
+    if ([401, 403, 404].indexOf(e.status) >= 0) { syCfg.chyba = e.message; await syStore(); }
   } finally {
     sySyncing = false;
+    syVarovani();
     syBtn(ok ? 'ok' : 'chyba');
     if (syDirty) { syDirty = false; syLater(); }
   }

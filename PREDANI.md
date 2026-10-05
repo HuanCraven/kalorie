@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.04-119** (`APP_VERSION` v `index.html`, cache `kaltrack-v119` v `sw.js`).
+Aktuální verze: **2026.10.05-120** (`APP_VERSION` v `index.html`, cache `kaltrack-v120` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,31 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v120 — jednodušší párování, varování o odpojení
+
+Huanovi se po delší pauze rozpojil počítač a nevěděl, jak ho spárovat znovu: bylo to
+na dva kroky (QR s tokenem, pak zvlášť heslo k šifrování), počítač bez kamery QR
+nenačetl a o odpojení aplikace mlčela. Huan rozhodl, že data nejsou citlivá a pohodlí
+má přednost — **párovací kód proto nese i šifrovací klíč**.
+
+- **Kód nese klíč, ne heslo.** `syQrData` přidá `k` (surový AES klíč) a `s` (sůl);
+  `syQrUse` klíč naimportuje a uloží do `meta.crypt` — druhé zařízení heslo nezná
+  a nepotřebuje. Proto `syDerive` odvozuje klíč **exportovatelný**. Klíče odvozené
+  před v120 exportovat nejdou: kód pak šifrování nenese a aplikace poradí zadat heslo
+  jednou znovu (`syKodBezKlice`). Heslo samo se dál nikde neukládá (test49).
+- **Kód jako text** pro zařízení bez kamery: *Zkopírovat párovací kód*
+  (`kalorie-par:` + base64 JSONu) a pole *Vložit* + *Připojit* (`syKodPouzij`).
+  `syQrUse` bere obojí a hned po spárování sladí.
+- QR se po minutě sám schová (`syQrSchovej`).
+- **Varování na Hlavní** (`syVarovani`, karta `#syVarovani`): trvalá chyba spojení
+  (401/403/404 — `syCfg.chyba`, přežije restart, smaže ji první úspěšné sladění)
+  nebo poslední úspěšné sladění starší než `SY_VAR_DNI` = 3 dny. Výpadek sítě
+  varování nespouští. Tlačítko vede rovnou do párování (`syJdiParovat`).
+- Karta *Začni tady* (prázdná aplikace) nabízí *Mám Kalorie i na jiném zařízení —
+  spárovat*; v osobní verzi (`data-osobni`).
+- Test `test83.js`; `test49` upravený — klíč už „nejde vyčíst" neplatí, hlídá se,
+  že v úložišti není heslo.
 
 ### Novinky ve v119 — poznámka ke dni
 
