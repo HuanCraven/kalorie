@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.07-121** (`APP_VERSION` v `index.html`, cache `kaltrack-v121` v `sw.js`).
+Aktuální verze: **2026.10.07-122** (`APP_VERSION` v `index.html`, cache `kaltrack-v122` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,27 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v122 — nabídka dlouhým stiskem, týdenní ohlédnutí, „Co ještě sníst"
+
+Druhá dávka z Huanova výběru (body 6, 7 a 3).
+
+- **Nabídka položky deníku** (`akOtevri`/`akce`, okno `#modAkce`): Upravit, Detail
+  potraviny (jen u skutečné), Duplikovat, Přesunout do chodu, Smazat. Spouští ji
+  událost **`contextmenu`** — na Androidu ji vyvolá dlouhý stisk, na počítači pravé
+  tlačítko; vlastní časovač by se pral s tahem pro smazání. Položky deníku mají
+  vypnutý výběr textu a systémovou bublinu. Duplikát je nový řádek bez id/uid/upd.
+- **Týdenní ohlédnutí** (`tydenKarta`, `#tydenKarta`): na Hlavní, **jen u dneška**,
+  za minulý pondělí–neděli (`tydenKonec`): průměr kcal proti průměrnému cíli (z `agg`,
+  tedy úplné dny a dynamické cíle po dnech), úplné dny, bílkoviny, váha od–do,
+  alkohol na den (ze všech 7 dnů, jako všude) a poznámky. Zavření uloží
+  `meta.tydenZavreno` = neděle toho týdne; další týden se karta ukáže znovu.
+  Bez známek a srovnávání — Huan je výslovně nechce.
+- **„Co ještě sníst"** (`coJesteSnist`) v okně „Proč" u bílkovin: až 5 potravin,
+  které člověk opravdu jí (`pouzitoKrat > 0`), v obvyklé porci, které se vejdou do
+  zbývajících kalorií a mají **aspoň 20 % energie z bílkovin** (jinak by nabízelo
+  i čokoládu). Řazení podle bílkovin na kcal. Vyčerpané kalorie → jen věta.
+- Test `test86.js`.
 
 ### Novinky ve v121 — detail potraviny, „Proč tohle číslo?", listování dny, náhled v kalendáři
 

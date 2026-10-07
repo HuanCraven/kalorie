@@ -149,6 +149,8 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
   font-weight:700;font-size:13px;opacity:0;transition:opacity .12s}
 .swrap.del::before{opacity:1}
 .swrap .item{position:relative;background:var(--card);transition:transform .16s;touch-action:pan-y}
+/* dlouhý stisk otevírá nabídku (v122) — bez výběru textu a systémové bubliny */
+#logList .item{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .swrap.drag .item{transition:none}
 #toast button{background:none;border:none;color:var(--acc);font-weight:700;
   padding:2px 4px 2px 12px;font-size:14px}
@@ -245,6 +247,8 @@ body.verejna [data-osobni]{display:none!important}
     <p class="tiny" style="margin:0 0 8px;color:var(--warn)" id="syVarTxt"></p>
     <button class="btn sm full" onclick="syJdiParovat()">Otevřít synchronizaci</button>
   </div>
+  <!-- Týdenní ohlédnutí (v122): minulý týden pondělí–neděle; po zavření do dalšího týdne mlčí. -->
+  <div class="card" id="tydenKarta" style="display:none"></div>
   <div class="card" id="obCard" style="display:none">
     <div class="row" style="justify-content:space-between;align-items:flex-start">
       <h3 style="margin-bottom:6px">Začni tady</h3>
@@ -1319,6 +1323,22 @@ data-lpignore="true" data-1p-ignore>
     <button class="btn full" style="margin-top:12px" onclick="closeMod('modProc')">Zavřít</button>
   </div>
 </div>
+<!-- Nabídka položky deníku (v122): dlouhý stisk / pravé tlačítko. -->
+<div class="mod" id="modAkce" onclick="if(event.target===this)closeMod('modAkce')">
+  <div class="sheet">
+    <h2 id="akNazev">—</h2>
+    <p class="tiny muted" id="akSub" style="margin:-4px 0 12px"></p>
+    <button class="btn full" style="margin-bottom:8px" onclick="akce('upravit')">Upravit</button>
+    <button class="btn full" style="margin-bottom:8px" id="akDetail" onclick="akce('detail')">Detail potraviny</button>
+    <button class="btn full" style="margin-bottom:8px" onclick="akce('duplikovat')">Duplikovat</button>
+    <div class="row" style="gap:6px;margin-bottom:8px">
+      <select id="akMeal" class="grow" aria-label="Přesunout do chodu"></select>
+      <button class="btn sm pri" onclick="akce('presun')">Přesunout</button>
+    </div>
+    <button class="btn dan full" style="margin-bottom:8px" onclick="akce('smazat')">Smazat</button>
+    <button class="btn full" onclick="closeMod('modAkce')">Zavřít</button>
+  </div>
+</div>
 <div class="mod" id="modPortion" onclick="if(event.target===this)closeMod('modPortion')">
   <div class="sheet">
     <h2 id="poName">—</h2>
@@ -1550,7 +1570,7 @@ data-lpignore="true" data-1p-ignore>
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.07-121';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.07-122';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -2603,8 +2623,7 @@ async function renderDay() {
   $('alcMonth').textContent = asum.budget === null ? ''
     : (asum.budget > 0 ? 'zbývá ' + r0(asum.budget) + ' g' : 'přes limit o ' + r0(-asum.budget) + ' g');
   $('alcMonth').style.color = (asum.budget !== null && asum.budget <= 0) ? C_SUR : 'var(--dim)';
-
-
+  tydenKarta();                // týdenní ohlédnutí (v122) — jen u dneška, dokud ho člověk nezavře
 }
 /* „Časté" se dřív plnilo z `products.uses`, což roste jen u potravin z databáze.
    Zápis přes fotku, popis nebo rychlý zápis žádnou potravinu nezaloží, takže komu
@@ -2742,6 +2761,45 @@ function denTahem(smer) {
   const el = $('p-day'); if (!el) return;
   el.classList.remove('listL', 'listR'); void el.offsetWidth;
   el.classList.add(smer > 0 ? 'listL' : 'listR');
+}
+
+/* ---- nabídka položky deníku (v122) ----
+   Dlouhý stisk na Androidu vyvolá `contextmenu`, na počítači pravé tlačítko —
+   jedna událost pro obojí, bez vlastního časovače, který by se pral s tahem. */
+let akId = null;
+document.addEventListener('contextmenu', e => {
+  const it = e.target.closest && e.target.closest('#logList .item[data-del]');
+  if (!it || e.target.closest('input,button,select')) return;
+  e.preventDefault();
+  akOtevri(Number(it.dataset.del));
+});
+async function akOtevri(id) {
+  const r = await dbGet('log', id); if (!r) return;
+  akId = id;
+  $('akNazev').textContent = r.name || '—';
+  $('akSub').textContent = r1(r.amount) + ' ' + (r.unit || 'g') + ' · ' + r0(r.kcal) + ' kcal · ' + mealName(r.meal || '');
+  $('akMeal').innerHTML = MEALS.map(m => '<option value="' + m.k + '">' + esc(m.n) + '</option>').join('');
+  $('akMeal').value = r.meal || defaultMeal();
+  $('akDetail').style.display = (!neniPotravina(r.productId) && potravina(r.productId)) ? '' : 'none';
+  if (navigator.vibrate) navigator.vibrate(15);
+  $('modAkce').classList.add('on');
+}
+async function akce(co) {
+  const r = akId && await dbGet('log', akId); if (!r) { closeMod('modAkce'); return; }
+  closeMod('modAkce');
+  if (co === 'upravit') { editLog(r.id); return; }
+  if (co === 'detail') { potrDetail(r.productId); return; }
+  if (co === 'smazat') { delLogUndo(r.id); return; }
+  if (co === 'duplikovat') {
+    // kopie = nový záznam: bez id/uid/upd, jinak by ho sloučení vzalo za tentýž řádek
+    const c = Object.assign({}, r); delete c.id; delete c.uid; delete c.upd; c.ts = Date.now();
+    await dbPut('log', c); toast('Duplikováno'); await renderDay(); return;
+  }
+  if (co === 'presun') {
+    const m = $('akMeal').value; if (m === r.meal) return;
+    r.meal = m; await dbPut('log', r);
+    toast('Přesunuto do ' + mealName(m).toLowerCase()); await renderDay(); scrollToMeal(m);
+  }
 }
 
 /* ---- swipe doleva = smazat (deník i alkohol) ---- */
@@ -3851,6 +3909,77 @@ function potrVDeniku() {
   }, 80);
 }
 
+/* „Co ještě sníst" (v122): z potravin, které opravdu jíš, v obvyklé porci, ty, které
+   doplní bílkoviny a vejdou se do zbývajících kalorií. Řadí podle bílkovin na kcal.
+   Žádné cizí návrhy — jen to, co už v deníku je. */
+function coJesteSnist(zbP, zbK) {
+  if (!(zbP > 10)) return '';
+  if (!(zbK > 50)) return '<p class="tiny muted" style="margin:12px 0 0">Bílkoviny chybí, ale kalorie na dnešek ' +
+    'už jsou vyčerpané.</p>';
+  const kand = [...dbVse().values()].filter(p => pouzitoKrat(p) > 0 && !neniPotravina(p.id) && (p.p || 0) > 0)
+    .map(p => {
+      const g = p.lastAmount || (dbPouziti[p.id] || {}).posl || p.serving || 100;
+      return { p, g, b: (p.p || 0) * g / 100, k: (p.kcal || 0) * g / 100 };
+    })
+    // aspoň 20 % energie z bílkovin — jinak by „na bílkoviny" nabízelo i čokoládu
+    .filter(x => x.b >= 5 && x.k > 0 && x.k <= zbK + 50 && x.b * 4 / x.k >= 0.2)
+    .sort((x, y) => (y.b / y.k) - (x.b / x.k) || y.b - x.b)
+    .slice(0, 5);
+  if (!kand.length) return '<p class="tiny muted" style="margin:12px 0 0">Mezi tvými potravinami není nic, ' +
+    'co by bílkoviny doplnilo a vešlo se do zbývajících ' + r0(zbK) + ' kcal.</p>';
+  return '<p class="tiny muted" style="margin:14px 0 6px">Co ještě sníst — z toho, co jíš, ' +
+    'vejde se do zbývajících ' + r0(zbK) + ' kcal:</p>' +
+    kand.map(x => '<div class="item" style="padding:7px 0"><div class="grow"><div class="nm">' + esc(x.p.name) + '</div>' +
+      '<div class="sub">' + r0(x.g) + ' ' + esc(x.p.unit || 'g') + ' · <b style="color:var(--mB)">+' + r0(x.b) + ' g B</b> · ' +
+      r0(x.k) + ' kcal</div></div><button class="btn sm pri" onclick="closeMod(\'modProc\');openPortion(\'' +
+      sid(x.p.id) + '\')">Zapsat</button></div>').join('');
+}
+
+/* ---------------- týdenní ohlédnutí (v122) ----------------
+   Jedna karta na Hlavní za minulý kalendářní týden: průměr proti cíli, kolik dnů
+   je úplných, váha, alkohol a poznámky. Bez známek, bez srovnání s kýmkoli.
+   Ukazuje se jen u dneška a jen dokud ji člověk pro ten týden nezavře. */
+function tydenKonec(dnes) {
+  const d = new Date(dnes + 'T12:00:00');
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 1);   // neděle minulého týdne
+  return dstr(d);
+}
+async function tydenKarta() {
+  const box = $('tydenKarta'); if (!box) return;
+  const dnes = dstr(new Date());
+  const konec = tydenKonec(dnes);
+  const zav = await dbGet('meta', 'tydenZavreno');
+  if (curDate !== dnes || (zav && zav.v === konec)) { box.style.display = 'none'; return; }
+  const list = denniRada(7, konec, await zdrojDnu());
+  const a = agg(list, await lastWeight(list[0].date));
+  if (!a.logged) { box.style.display = 'none'; return; }
+  const radky = [];
+  const pr = a.tK ? r0((a.avgK - a.tK) / a.tK * 100) : null;
+  radky.push('Průměr <b>' + r0(a.avgK) + ' kcal</b> · cíl ' + r0(a.tK) +
+    (pr !== null ? ' <span class="muted">(' + (pr > 0 ? '+' : '') + pr + ' %)</span>' : ''));
+  radky.push('Úplných dnů ' + a.logged + ' ze 7' + (a.neuplnych ? ' · nekompletních ' + a.neuplnych : ''));
+  radky.push('Bílkoviny ' + r0(a.avgP) + ' g/den · cíl ' + r0(a.tP));
+  const w = list.filter(d => d.weight !== null);
+  if (w.length >= 2) {
+    const dv = w[w.length - 1].weight - w[0].weight;
+    radky.push('Váha ' + r1(w[0].weight) + ' → ' + r1(w[w.length - 1].weight) + ' kg (' + (dv > 0 ? '+' : '') + r1(dv) + ')');
+  } else if (w.length) radky.push('Váha ' + r1(w[0].weight) + ' kg');
+  const alc = list.reduce((s, d) => s + (d.alc || 0), 0);
+  if (alc > 0) radky.push('Alkohol ' + r1(alc / 7) + ' g/den');
+  const pozn = list.filter(d => d.pozn);
+  if (pozn.length) radky.push('<span class="muted">Poznámky: ' + pozn.map(d => esc(czd(d.date)) + ' ' +
+    esc(d.pozn.length > 40 ? d.pozn.slice(0, 40) + '…' : d.pozn)).join(' · ') + '</span>');
+  box.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">' +
+    '<div class="lbl-s">Minulý týden · ' + esc(czd(list[0].date)) + '–' + esc(czd(konec)) + '</div>' +
+    '<button class="btn sm dotyk" onclick="tydenZavri()" aria-label="Zavřít">✕</button></div>' +
+    '<p class="tiny" style="margin:0;line-height:1.7">' + radky.join('<br>') + '</p>';
+  box.style.display = '';
+}
+async function tydenZavri() {
+  await dbPut('meta', { k: 'tydenZavreno', v: tydenKonec(dstr(new Date())) });
+  $('tydenKarta').style.display = 'none';
+}
+
 /* ---------------- „Proč tohle číslo?" (v121) ----------------
    Aplikace počítá cíle z výdeje, váhy a nastavení — a zpětně se to nedalo
    přečíst. Rozpad bere mezikroky přímo z cileZVydeje, takže ukazuje přesně
@@ -3873,7 +4002,7 @@ async function procCislo(co) {
     if (wk) tr('+ zapsaná cvičení', r0(wk) + ' kcal');
     tr('= výdej dne', r0(v.out || 0) + ' kcal', 1);
   };
-  let nadpis = '', pozn = '';
+  let nadpis = '', pozn = '', navrhy = null;
   const pevny = !TG.dyn;
   const pevnyText = 'Cíl je pevný z Nastavení → Já' + (!goals.dyn ? ' (dynamické cíle jsou vypnuté).'
     : !goals.rmr ? ' — chybí klidový výdej.' : ' — chybí váha nebo výdej dne.');
@@ -3915,6 +4044,7 @@ async function procCislo(co) {
     }
     tr('Snědeno', r1(sn[co]) + ' g');
     tr(sn[co] > TG[co] ? 'Nad cílem' : 'Zbývá', r1(Math.abs(TG[co] - sn[co])) + ' g', 1);
+    if (co === 'p') navrhy = coJesteSnist(TG.p - sn.p, TG.kcal - sn.k);
   } else if (co === 'bil') {
     nadpis = 'Bilance dne';
     if (!v.out) { tr('Výdej', 'neznámý'); pozn = 'Nastav klidový výdej v Nastavení, jinak nejde bilanci spočítat.'; }
@@ -3929,7 +4059,8 @@ async function procCislo(co) {
   $('prNadpis').textContent = nadpis;
   $('prBody').innerHTML = '<table class="procTab">' + R.map(([a, b, souc]) =>
     '<tr' + (souc ? ' class="souc"' : '') + '><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>' +
-    (pozn ? '<p class="tiny muted" style="margin:10px 0 0">' + esc(pozn) + '</p>' : '');
+    (pozn ? '<p class="tiny muted" style="margin:10px 0 0">' + esc(pozn) + '</p>' : '') +
+    (navrhy ? navrhy : '');
   $('modProc').classList.add('on');
 }
 function calcPortion() {
