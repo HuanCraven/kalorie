@@ -24,7 +24,11 @@ jsou archiv, nové se nevytvářejí.
 
 `gh` bývá přihlášené jako HuanCraven s právem `repo`, takže commit a push zvládneš
 sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je nasazení**
-(Pages servírují kořen větve), takže před pushem musí projít regrese.
+(Pages servírují kořen větve), takže před pushem musí projít regrese — i když
+stop hook připomíná nepushnutý commit. **Commituj jako `Claude <noreply@anthropic.com>`**
+(`git config user.email noreply@anthropic.com`, `user.name Claude`); commity s Huanovým
+e-mailem GitHub ukazuje jako neověřené. Zprávu commitu piš do souboru a předej přes
+`git commit -F` — české uvozovky „…" v `-m` rozbijí shell.
 
 ## Soubory v repozitáři
 
@@ -40,6 +44,8 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/extra.js` | suroviny chybějící v zaklad.js | ano |
 | `build/build-jidla.js` | generátor jidla.js (Atwater, výtěžnost) | zřídka |
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
+| `build/ikona-aplikace.py` | ikona aplikace: PNG do manifestu, favicon a `<symbol id="ikonaApp">` do index.html | zřídka |
+| `build/apk.sh`, `apk-zkouska.sh`, `apk-listy.py` | stavba APK, zkouška na emulátoru, kontrola barvy lišt ze snímku | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
 | `testy/` | 86 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
@@ -57,7 +63,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   81 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   86 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -232,13 +238,42 @@ Poučení, která se draze zaplatila a nemají se vracet:
 - **Datum ze snímku se ověřuje** (`rozumneDatum`: ne budoucnost, ne víc než 60 dní zpět).
   Zepp ukazuje datum bez roku, model si ho domýšlel a zápis skončil o rok vedle.
 
+## Vzhled a ovládání (v115–v122)
+
+- **Barvy jsou tokeny v `:root`**: `--bg #0e1116`, `--acc` modrá, `--ok` zelená, `--warn`
+  oranžová, `--bad` červená. **Makra mají barvy kruhu v ikoně**: `--mB` (bílkoviny =
+  `--acc`), `--mS` (sacharidy = `--warn`), `--mT` (tuky = `--ok`). Červená patří jen
+  překročení — tuky červené nebyly a být nemají. Nové místo s makry ber z `--mB/--mS/--mT`.
+- **Ikona se nikdy needituje ručně** v manifestu ani v index.html — uprav konstanty
+  v `build/ikona-aplikace.py` a spusť ho (zapíše PNG, favicon i SVG symbol).
+- **Lišty Androidu (edge-to-edge, APK):** pruh `body::before` výšky
+  `env(safe-area-inset-top)`, `SystemBars.style DARK` a pozadí okna = `--bg` v `build/apk.sh`.
+  Zkouška APK běží na Androidu 15 a barvu lišt kontroluje `apk-listy.py`.
+- **Vyskakovací okna** (`.mod` + `.sheet`): detail potraviny `potrDetail`, „Proč tohle
+  číslo?" `procCislo(co)`, nabídka položky deníku `akOtevri`. **`procCislo` bere mezikroky
+  z `cileZVydeje(...).proc`** — výpočet cílů se nikde neopakuje.
+- **Gesta:** tah doleva na položce deníku = smazat (pointer události); tah po Hlavní mimo
+  položky = jiný den (`denTahem`, **touch** události — pointer prohlížeč při vodorovném
+  pohybu zruší); dlouhý stisk = událost **`contextmenu`** (Android ji vyvolá sám, na PC
+  pravé tlačítko) — žádný vlastní časovač, pral by se s tahem.
+- **Kalendář:** první ťuknutí = náhled dne (`kalTuk`), druhé nebo *Otevřít* = přepnutí.
+- **Týdenní ohlédnutí** `#tydenOhled` (ne `tydenKarta` — to bylo id zrušené karty víkendu,
+  hlídá `test66`). Jen u dneška, za minulý po–ne, zavření v `meta.tydenZavreno`.
+- **Poznámka ke dni** `daily.pozn` (pole hned u „Nekompletní"), čte se jen přes
+  `poznDne()`, jde do kalendáře i do souhrnu pro Clauda jako kontext, ne pokyn.
+- **Párování** (v120): párovací kód (QR i text `kalorie-par:…`) nese repozitář, token
+  **a šifrovací klíč** (ne heslo) — Huan rozhodl, že pohodlí má přednost. Klíč se proto
+  odvozuje exportovatelný. Varování „Synchronizace neběží" na Hlavní při chybě
+  401/403/404 nebo 3 dnech bez sladění.
+
 ## Struktura stránek
 
 - **Hlavní** — den, bilance, alkohol. Položky mají zaškrtávátka (přesun mezi chody,
-  kopie na jiný den), chody jdou sbalit.
+  kopie na jiný den), chody jdou sbalit, dlouhý stisk otevře nabídku.
 - **Zadat** — jen zápis dnešního jídla: Časté (z deníku, po chodech), Hledat, Popsat.
 - **Alkohol**, **Pohyb** (snímek hodinek, cvičení), **Statistiky** (lišta kotev,
-  klikatelné postřehy), **Jídla** (databáze + Recept + Přidat), **Nastavení**.
+  klikatelné postřehy, hledání v deníku), **Jídla** (databáze — ťuknutí otevře detail;
+  Recept, Přidat), **Nastavení** (Já, Propojení, Data, Nápověda).
 
 ## Co vědomě chybí (nezavádět bez zadání)
 
@@ -247,6 +282,9 @@ Poučení, která se draze zaplatila a nemají se vracet:
 - zrušení zástupných `productId` — prověřeno, třída chyb je uzavřená jinak
   (`neniPotravina`, `saveProduct`, `opravZastupnaId`); přepis všech řádků deníku
   by byl riskantní bez užitku
+- **Huan výslovně nechce** (nenavrhovat znovu): šablony chodů a kopii celého dne
+  (gramáže se mu pořád mění), připomínky a notifikace, widget na ploše, hlasový zápis,
+  srovnávání s jinými lidmi, odznaky a soutěže
 
 ## Pracovní postup
 
