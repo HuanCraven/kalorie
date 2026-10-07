@@ -66,7 +66,9 @@ const PROSTREDI = require('./prostredi');
   await p.fill('#dbSearch', 'guláš'); await p.waitForTimeout(300);
   ck('hledání najde guláš', (await p.textContent('#dbList')).toLowerCase().includes('guláš'));
   await p.click('#dbList .item .grow >> nth=0'); await p.waitForTimeout(400);
-  ck('klepnutí na jídlo otevře porci', await p.locator('#modPortion').isVisible());
+  ck('klepnutí na jídlo otevře detail', await p.locator('#modPotr').isVisible());
+  await p.click('#ptBody button:has-text("Zapsat")'); await p.waitForTimeout(400);
+  ck('a Zapsat v detailu otevře porci', await p.locator('#modPortion').isVisible());
   await p.evaluate(() => closeMod('modPortion'));
 
   /* ---- staré záložky už nejsou ---------------------------------------- */

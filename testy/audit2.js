@@ -104,7 +104,9 @@ const num=v=>parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(',','.'));
     products = await dbAll('products');
   });
   await p.click('nav button[data-p="db"]'); await p.waitForTimeout(400);
+  // od v121 ťuknutí v Jídlech otevře detail, zápis je přes jeho tlačítko Zapsat
   await p.click('#dbList .item .grow >> nth=0'); await p.waitForTimeout(400);
+  await p.click('#ptBody button:has-text("Zapsat")'); await p.waitForTimeout(400);
   await p.fill('#poAmt','100'); await p.click('#poAdd'); await p.waitForTimeout(700);
   await p.click('nav button[data-p="db"]'); await p.waitForTimeout(400);
   await p.click('#dbList .item .btn >> nth=0'); await p.waitForTimeout(400);

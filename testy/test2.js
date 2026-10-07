@@ -62,6 +62,7 @@ Dej vědět, jestli mám něco upřesnit.`;
   // reuse recipe with one tap -> portion prefilled with total weight
   await p.click('#dbList .item .grow');
   await p.waitForTimeout(300);
+  await p.click('#ptBody button:has-text("Zapsat")'); await p.waitForTimeout(400);  // od v121 přes detail
   console.log('10. recipe reuse:', await p.textContent('#poName'), '| porce', await p.inputValue('#poAmt'),
               'g =', await p.textContent('#poK'));
   await p.click('#modPortion >> text=Přidat');
