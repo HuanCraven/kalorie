@@ -60,7 +60,7 @@ Druhá dávka z Huanova výběru (body 6, 7 a 3).
   událost **`contextmenu`** — na Androidu ji vyvolá dlouhý stisk, na počítači pravé
   tlačítko; vlastní časovač by se pral s tahem pro smazání. Položky deníku mají
   vypnutý výběr textu a systémovou bublinu. Duplikát je nový řádek bez id/uid/upd.
-- **Týdenní ohlédnutí** (`tydenKarta`, `#tydenKarta`): na Hlavní, **jen u dneška**,
+- **Týdenní ohlédnutí** (`tydenOhled`, `#tydenOhled` — ne `tydenKarta`: to bylo id zrušené karty víkendu a `test66` hlídá, že se nevrátí): na Hlavní, **jen u dneška**,
   za minulý pondělí–neděli (`tydenKonec`): průměr kcal proti průměrnému cíli (z `agg`,
   tedy úplné dny a dynamické cíle po dnech), úplné dny, bílkoviny, váha od–do,
   alkohol na den (ze všech 7 dnů, jako všude) a poznámky. Zavření uloží

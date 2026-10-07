@@ -248,7 +248,7 @@ body.verejna [data-osobni]{display:none!important}
     <button class="btn sm full" onclick="syJdiParovat()">Otevřít synchronizaci</button>
   </div>
   <!-- Týdenní ohlédnutí (v122): minulý týden pondělí–neděle; po zavření do dalšího týdne mlčí. -->
-  <div class="card" id="tydenKarta" style="display:none"></div>
+  <div class="card" id="tydenOhled" style="display:none"></div>
   <div class="card" id="obCard" style="display:none">
     <div class="row" style="justify-content:space-between;align-items:flex-start">
       <h3 style="margin-bottom:6px">Začni tady</h3>
@@ -2623,7 +2623,7 @@ async function renderDay() {
   $('alcMonth').textContent = asum.budget === null ? ''
     : (asum.budget > 0 ? 'zbývá ' + r0(asum.budget) + ' g' : 'přes limit o ' + r0(-asum.budget) + ' g');
   $('alcMonth').style.color = (asum.budget !== null && asum.budget <= 0) ? C_SUR : 'var(--dim)';
-  tydenKarta();                // týdenní ohlédnutí (v122) — jen u dneška, dokud ho člověk nezavře
+  tydenOhled();                // týdenní ohlédnutí (v122) — jen u dneška, dokud ho člověk nezavře
 }
 /* „Časté" se dřív plnilo z `products.uses`, což roste jen u potravin z databáze.
    Zápis přes fotku, popis nebo rychlý zápis žádnou potravinu nezaloží, takže komu
@@ -3944,8 +3944,8 @@ function tydenKonec(dnes) {
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 1);   // neděle minulého týdne
   return dstr(d);
 }
-async function tydenKarta() {
-  const box = $('tydenKarta'); if (!box) return;
+async function tydenOhled() {
+  const box = $('tydenOhled'); if (!box) return;
   const dnes = dstr(new Date());
   const konec = tydenKonec(dnes);
   const zav = await dbGet('meta', 'tydenZavreno');
@@ -3977,7 +3977,7 @@ async function tydenKarta() {
 }
 async function tydenZavri() {
   await dbPut('meta', { k: 'tydenZavreno', v: tydenKonec(dstr(new Date())) });
-  $('tydenKarta').style.display = 'none';
+  $('tydenOhled').style.display = 'none';
 }
 
 /* ---------------- „Proč tohle číslo?" (v121) ----------------
