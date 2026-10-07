@@ -105,7 +105,15 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 
 /* --- hierarchie a nové komponenty --- */
 .card{position:relative}
-.card.hero{background:linear-gradient(180deg,#1b2333 0%,var(--card) 60%);border-color:#33405a}
+.card.hero{background:linear-gradient(180deg,#1b2333 0%,var(--card) 60%);border-color:#33405a;position:relative}
+/* „Proč tohle číslo?" (v121): ⓘ u kruhu, pruhy maker a bilance jdou ťuknout */
+.procBtn{position:absolute;top:8px;right:8px;width:28px;height:28px;padding:0;border-radius:50%;
+  font-size:14px;line-height:1;color:var(--dim)}
+.procKlik{cursor:pointer}
+.procTab{width:100%;border-collapse:collapse;font-size:13px}
+.procTab td{padding:5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.procTab td+td{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:10px}
+.procTab tr.souc td{font-weight:700;border-bottom:none}
 .card.compact{padding:11px 14px}
 .lbl-s{font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;
   letter-spacing:.07em;margin-bottom:8px;display:flex;align-items:center;gap:7px}
@@ -191,6 +199,13 @@ nav button.on::before{content:"";position:absolute;top:0;left:50%;transform:tran
 .kal button.dnes{border-color:var(--acc)}
 .kal button.vybrany{background:var(--acc);color:#0b0d10}
 .kal button.vybrany .k{color:#0b0d10}
+.kal button.nahled{border-color:var(--fg)}
+/* listování dny tahem (v121) — krátké posunutí, ať je vidět, kam se šlo */
+@keyframes listL{from{transform:translateX(28px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes listR{from{transform:translateX(-28px);opacity:.4}to{transform:none;opacity:1}}
+#p-day.listL{animation:listL .18s ease-out}
+#p-day.listR{animation:listR .18s ease-out}
+@media (prefers-reduced-motion:reduce){#p-day.listL,#p-day.listR{animation:none}}
 .kal button:disabled{opacity:.3;cursor:default}
 /* den s poznámkou: tečka v rohu (v119) */
 .kal button{position:relative}
@@ -253,7 +268,8 @@ body.verejna [data-osobni]{display:none!important}
   </div>
 
   <div class="card hero">
-    <p class="tiny muted" id="dynLine" style="display:none;margin:0 0 10px"></p>
+    <button class="btn procBtn" id="procKcal" onclick="procCislo('kcal')" aria-label="Jak se počítá cíl kalorií">ⓘ</button>
+    <p class="tiny muted" id="dynLine" style="display:none;margin:0 0 10px;padding-right:30px"></p>
     <div class="tot">
       <div class="ring" id="ringBox" onclick="toggleRing()" style="cursor:pointer">
         <svg width="88" height="88" viewBox="0 0 88 88">
@@ -264,11 +280,11 @@ body.verejna [data-osobni]{display:none!important}
         <div class="lbl"><b id="kcalNow" class="mono">0</b><span class="tiny muted" id="kcalGoal">/ 0</span></div>
       </div>
       <div class="bars">
-        <div class="bar"><div class="t"><span>Bílkoviny</span><span class="mono" id="pTxt">0 g</span></div>
+        <div class="bar procKlik" onclick="procCislo('p')"><div class="t"><span>Bílkoviny</span><span class="mono" id="pTxt">0 g</span></div>
           <div class="track"><div class="fill" id="pBar" style="background:var(--mB);width:0"></div></div></div>
-        <div class="bar"><div class="t"><span>Sacharidy</span><span class="mono" id="cTxt">0 g</span></div>
+        <div class="bar procKlik" onclick="procCislo('c')"><div class="t"><span>Sacharidy</span><span class="mono" id="cTxt">0 g</span></div>
           <div class="track"><div class="fill" id="cBar" style="background:var(--mS);width:0"></div></div></div>
-        <div class="bar"><div class="t"><span>Tuky</span><span class="mono" id="fTxt">0 g</span></div>
+        <div class="bar procKlik" onclick="procCislo('f')"><div class="t"><span>Tuky</span><span class="mono" id="fTxt">0 g</span></div>
           <div class="track"><div class="fill" id="fBar" style="background:var(--mT);width:0"></div></div></div>
       </div>
     </div>
@@ -320,7 +336,7 @@ body.verejna [data-osobni]{display:none!important}
     <div class="fld"><label>Váha (kg)</label>
       <input id="dWeight" type="number" inputmode="decimal" step="0.1" placeholder="—" onchange="saveDaily()"></div>
     <p class="tiny muted" style="margin:-4px 0 10px">Aktivní kcal z hodinek se zapisují na záložce Pohyb.</p>
-    <div class="row" style="justify-content:space-between">
+    <div class="row procKlik" style="justify-content:space-between" onclick="procCislo('bil')">
       <span class="tiny muted" id="balExp">—</span>
       <b class="mono" id="balVal">—</b>
     </div>
@@ -1291,6 +1307,18 @@ data-lpignore="true" data-1p-ignore>
 </nav>
 
 <!-- portion sheet -->
+<!-- Detail potraviny (v121): co to je, kolik čeho má, jak často to jím. -->
+<div class="mod" id="modPotr" onclick="if(event.target===this)closeMod('modPotr')">
+  <div class="sheet" id="ptBody"></div>
+</div>
+<!-- „Proč tohle číslo?" (v121): rozpad cíle, makra nebo bilance po krocích. -->
+<div class="mod" id="modProc" onclick="if(event.target===this)closeMod('modProc')">
+  <div class="sheet">
+    <h2 id="prNadpis">—</h2>
+    <div id="prBody"></div>
+    <button class="btn full" style="margin-top:12px" onclick="closeMod('modProc')">Zavřít</button>
+  </div>
+</div>
 <div class="mod" id="modPortion" onclick="if(event.target===this)closeMod('modPortion')">
   <div class="sheet">
     <h2 id="poName">—</h2>
@@ -1317,7 +1345,10 @@ data-lpignore="true" data-1p-ignore>
       <button class="btn grow" onclick="closeMod('modPortion')">Zrušit</button>
       <button class="btn pri grow" id="poAdd" onclick="addPortion()">Přidat</button>
     </div>
-    <button class="btn sm full" style="margin-top:10px" onclick="editCurrent()">Upravit potravinu</button>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="btn sm grow" id="poDetail" onclick="potrDetail(curProduct.id)">Detail</button>
+      <button class="btn sm grow" onclick="editCurrent()">Upravit potravinu</button>
+    </div>
     <button class="btn dan sm full" id="poDel" style="margin-top:8px;display:none"
       onclick="closeMod('modPortion');delLogUndo(editLogId);editLogId=null">Smazat záznam</button>
   </div>
@@ -1497,10 +1528,13 @@ data-lpignore="true" data-1p-ignore>
       <button class="btn sm dotyk" id="kalDalsi" onclick="kalMesic(1)" aria-label="Další měsíc">›</button>
     </div>
     <div class="kal" id="kalMrizka"></div>
+    <!-- náhled dne (v121): první ťuknutí ukáže, druhé přepne -->
+    <div class="card" id="kalNahled" style="display:none;margin:10px 0 0;background:var(--card2)"></div>
     <div class="row tiny muted" style="gap:14px;margin:10px 0 12px;flex-wrap:wrap">
       <span><b style="color:var(--acc)">1850</b> úplný den</span>
       <span><b style="color:var(--warn)">1200</b> nekompletní</span>
-      <span>bez čísla = nic nezapsáno</span>
+      <span>• poznámka</span>
+      <span>ťukni pro náhled, podruhé pro otevření</span>
     </div>
     <div class="row" style="gap:8px">
       <button class="btn grow" onclick="kalDnes()">Dnes</button>
@@ -1516,7 +1550,7 @@ data-lpignore="true" data-1p-ignore>
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.05-120';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.07-121';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -2330,7 +2364,10 @@ function cileZVydeje(w, vydej) {
   const soucet = 4 * p + 9 * f;
   if (soucet > strop) { const k = strop / soucet; p = r0(p * k); f = r0(f * k); }
   const c = Math.max(0, r0((kcal - 4 * p - 9 * f) / 4));
-  return { kcal, p, c, f, omezeno };
+  // mezikroky pro vysvětlení „Proč tohle číslo?" (procCislo) — nic jiného je nečte
+  const proc = { prani, def, podlaha, pKg: goals.pKg || BILK_KG_DEF, pStrop: r0(kcal * BILK_MAX / 4),
+    fKg: goals.fKg || 0.9, fPodil: r0(kcal * FAT_PCT / 9), zmenseno: soucet > strop };
+  return { kcal, p, c, f, omezeno, proc };
 }
 async function dayTargets(date, vydej) {
   if (!goals.dyn || !goals.rmr) return fixTargets();
@@ -2338,7 +2375,7 @@ async function dayTargets(date, vydej) {
   if (!w || !(vydej > 0)) return fixTargets();
   const out = vydej;
   const t = cileZVydeje(w, out);
-  return { kcal: t.kcal, p: t.p, c: t.c, f: t.f, omezeno: t.omezeno,
+  return { kcal: t.kcal, p: t.p, c: t.c, f: t.f, omezeno: t.omezeno, proc: t.proc,
            dyn: true, w, out, burn: Math.max(0, out - zakladniVydej()) };
 }
 
@@ -2379,6 +2416,8 @@ function kalMesic(k) {
   return kalKresli();
 }
 async function kalKresli() {
+  kalVybrany = null;
+  if ($('kalNahled')) $('kalNahled').style.display = 'none';
   const [y, m] = kalMes.split('-').map(Number);
   const dnes = dstr(new Date());
   $('kalNazev').textContent = MES[m - 1] + ' ' + y;
@@ -2403,14 +2442,46 @@ async function kalKresli() {
     const tr = [ma ? (neu[ds] ? 'neu' : 'upl') : '', ds === dnes ? 'dnes' : '',
                 ds === curDate ? 'vybrany' : '', pozn[ds] ? 'pozn' : ''].join(' ').trim();
     h += '<button class="' + tr + '"' + (ds > dnes ? ' disabled' : '') +
-      ' data-den="' + ds + '" onclick="kalVyber(this.dataset.den)" aria-label="' + czd(ds) + (ma ? ', ' + r0(kc[ds]) + ' kcal' : '') +
+      ' data-den="' + ds + '" onclick="kalTuk(this.dataset.den)" aria-label="' + czd(ds) + (ma ? ', ' + r0(kc[ds]) + ' kcal' : '') +
       (pozn[ds] ? ', poznámka: ' + esc(pozn[ds]) : '') + '"' + (pozn[ds] ? ' title="' + esc(pozn[ds]) + '"' : '') + '>' +
       '<span class="d">' + den + '</span><span class="k">' + (ma ? r0(kc[ds]) : '&nbsp;') + '</span></button>';
   }
   $('kalMrizka').innerHTML = h;
 }
+/* Náhled dne (v121). Dřív každé ťuknutí přepnulo celý den — kvůli nahlédnutí
+   „kolik jsem měl v úterý" se člověk musel přepnout a zase vrátit. */
+let kalVybrany = null;
+async function kalTuk(den) {
+  if (!jeDatumTvar(den)) return;
+  if (kalVybrany === den) { kalVybrany = null; kalVyber(den); return; }
+  kalVybrany = den;
+  document.querySelectorAll('#kalMrizka button.nahled').forEach(b => b.classList.remove('nahled'));
+  const b = document.querySelector('#kalMrizka button[data-den="' + den + '"]');
+  if (b) b.classList.add('nahled');
+  const rows = await dbByIdx('log', 'date', den);
+  const dd = await dbGet('daily', den) || {};
+  const t = rows.reduce((a, r) => ({ k: a.k + (r.kcal || 0), p: a.p + (r.p || 0), c: a.c + (r.c || 0),
+    f: a.f + (r.f || 0), alc: a.alc + (r.alc || 0) }), { k: 0, p: 0, c: 0, f: 0, alc: 0 });
+  const pozn = poznDne(dd);
+  const radky = [];
+  if (rows.length) radky.push('<b class="mono">' + r0(t.k) + ' kcal</b> <span class="tiny muted">· B ' + r0(t.p) +
+    ' · S ' + r0(t.c) + ' · T ' + r0(t.f) + ' g</span>');
+  else radky.push('<span class="muted">Nic nezapsáno.</span>');
+  const dalsi = [];
+  if (t.alc > 0) dalsi.push('alkohol ' + r1(t.alc) + ' g');
+  if (typeof dd.weight === 'number') dalsi.push('váha ' + r1(dd.weight) + ' kg');
+  if (dd.neuplny) dalsi.push('<span style="color:var(--warn)">nekompletní</span>');
+  if (dalsi.length) radky.push('<span class="tiny">' + dalsi.join(' · ') + '</span>');
+  if (pozn) radky.push('<span class="tiny muted">„' + esc(pozn) + '"</span>');
+  const box = $('kalNahled');
+  box.innerHTML = '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">' +
+    '<div><div class="tiny muted" style="margin-bottom:4px">' + esc(czdR(den)) + '</div>' + radky.join('<br>') + '</div>' +
+    '<button class="btn sm pri" style="flex:none" onclick="kalVyber(\'' + den + '\')">Otevřít</button></div>';
+  box.style.display = '';
+}
 function kalVyber(den) {
   if (!jeDatumTvar(den)) return;
+  kalVybrany = null;
   curDate = den;
   closeMod('modKal');
   syncAddDate();
@@ -2644,6 +2715,35 @@ async function delLogUndo(id) {
   });
 }
 
+/* ---- tah prstem na Hlavní = jiný den (v121) ----
+   Doleva = další den, doprava = předchozí, jako listování. Nesmí se plést se
+   smazáním tahem (to začíná na položce deníku), s poli a s otevřeným oknem.
+   Touch události, ne pointer: u vodorovného pohybu prohlížeč pointer zruší. */
+let dnX = null, dnY = 0, dnT = 0;
+function dnSmiTah(t) {
+  if (!t || !t.closest) return false;
+  if (!t.closest('#p-day')) return false;
+  if (document.querySelector('.mod.on')) return false;
+  return !t.closest('input,select,textarea,button,.swrap,[data-del],.kotvy');
+}
+document.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1 || !dnSmiTah(e.target)) { dnX = null; return; }
+  dnX = e.touches[0].clientX; dnY = e.touches[0].clientY; dnT = Date.now();
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  if (dnX === null) return;
+  const t = e.changedTouches[0], dx = t.clientX - dnX, dy = t.clientY - dnY;
+  dnX = null;
+  if (Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy) || Date.now() - dnT > 700) return;
+  denTahem(dx < 0 ? 1 : -1);
+}, { passive: true });
+function denTahem(smer) {
+  shiftDay(smer);
+  const el = $('p-day'); if (!el) return;
+  el.classList.remove('listL', 'listR'); void el.offsetWidth;
+  el.classList.add(smer > 0 ? 'listL' : 'listR');
+}
+
 /* ---- swipe doleva = smazat (deník i alkohol) ---- */
 let swEl = null, swX = 0, swY = 0, swDx = 0, swAxis = null, swSup = false;
 function swFind(t) {
@@ -2747,7 +2847,7 @@ function renderDb() {
   $('dbList').innerHTML = list.slice(0, 150).map(p => {
     const zn = znackaZobraz(p);
     return `<div class="item">
-      <div class="grow" onclick="openPortion('${sid(p.id)}')">
+      <div class="grow" onclick="potrDetail('${sid(p.id)}')" style="cursor:pointer">
         <div class="nm">${esc(p.name)}</div>
         <div class="sub">${zn ? esc(zn) + ' · ' : ''}${r0(p.kcal)} kcal/100 ${esc(p.unit)} · B ${r1(p.p)} · S ${r1(p.c)} · T ${r1(p.f)}</div>
       </div>
@@ -3680,8 +3780,162 @@ function rychleGramaze(p) {
   });
 }
 function setAmt(v) { $('poAmt').value = v; calcPortion(); }
+
+/* ---------------- detail potraviny (v121) ----------------
+   Dřív ťuknutí na potravinu rovnou otevřelo zápis porce a „co to vlastně je"
+   nebylo kde vidět. Detail ukáže živiny na 100 g i na obvyklou porci, podíl
+   maker na energii a jak často a v jaké gramáži se potravina jí. */
+async function potrDetail(id) {
+  const p = potravina(id);
+  if (!p) { toast('Produkt nenalezen'); return; }
+  const zaz = (await dbAll('log')).filter(r => r.productId === p.id);
+  const kolik = zaz.length;
+  const posl = zaz.reduce((a, r) => (r.date && r.date > a ? r.date : a), '');
+  const prum = kolik ? zaz.reduce((a, r) => a + (r.amount || 0), 0) / kolik : 0;
+  const porce = p.lastAmount || (dbPouziti[p.id] || {}).posl || p.serving || 0;
+  const jd = esc(p.unit || 'g');
+  // podíl maker na energii — koláč z kcal, ne z gramů (gram tuku má dvakrát víc)
+  const eB = 4 * (p.p || 0), eS = 4 * (p.c || 0), eT = 9 * (p.f || 0), eSum = eB + eS + eT;
+  const O = 2 * Math.PI * 15.9;
+  let ofs = 0;
+  const vysec = (e, barva) => {
+    if (!eSum || !e) return '';
+    const d = e / eSum * O, h = '<circle cx="21" cy="21" r="15.9" fill="none" stroke="' + barva +
+      '" stroke-width="7" stroke-dasharray="' + d.toFixed(2) + ' ' + (O - d).toFixed(2) +
+      '" stroke-dashoffset="' + (-ofs).toFixed(2) + '" transform="rotate(-90 21 21)"/>';
+    ofs += d; return h;
+  };
+  const kolac = eSum ? '<svg width="84" height="84" viewBox="0 0 42 42" aria-hidden="true">' +
+    vysec(eB, 'var(--mB)') + vysec(eS, 'var(--mS)') + vysec(eT, 'var(--mT)') + '</svg>' : '';
+  const pct = e => eSum ? r0(e / eSum * 100) + ' %' : '—';
+  const radek = (nm, v, jed, des) => '<tr><td>' + nm + '</td><td>' + (des ? r1(v) : r0(v)) + ' ' + jed + '</td>' +
+    (porce ? '<td>' + (des ? r1(v * porce / 100) : r0(v * porce / 100)) + ' ' + jed + '</td>' : '') + '</tr>';
+  const zn = znackaZobraz(p);
+  $('ptBody').innerHTML =
+    '<h2 style="margin-bottom:2px">' + esc(p.name) + '</h2>' +
+    '<p class="tiny muted" style="margin:0 0 12px">' + [zn ? esc(zn) : '', p.kat ? esc(p.kat) : '',
+      druhPotraviny(p) === 'jidlo' ? 'hotové jídlo' : ''].filter(Boolean).join(' · ') + '</p>' +
+    '<div class="row" style="gap:14px;align-items:center;margin-bottom:12px">' + kolac +
+      '<div class="tiny" style="line-height:1.7">' +
+      '<span style="color:var(--mB)">●</span> bílkoviny ' + pct(eB) + '<br>' +
+      '<span style="color:var(--mS)">●</span> sacharidy ' + pct(eS) + '<br>' +
+      '<span style="color:var(--mT)">●</span> tuky ' + pct(eT) + '<br>' +
+      '<span class="muted">podíl na energii</span></div></div>' +
+    '<table class="procTab"><tr><td></td><td class="muted">100 ' + jd + '</td>' +
+      (porce ? '<td class="muted">porce ' + r0(porce) + ' ' + jd + '</td>' : '') + '</tr>' +
+      radek('Energie', p.kcal || 0, 'kcal') + radek('Bílkoviny', p.p || 0, 'g', 1) +
+      radek('Sacharidy', p.c || 0, 'g', 1) + radek('Tuky', p.f || 0, 'g', 1) +
+      radek('Vláknina', p.fib || 0, 'g', 1) + radek('Sůl', p.salt || 0, 'g', 1) +
+      (p.abv > 0 ? '<tr><td>Alkohol</td><td>' + r1(p.abv) + ' % obj.</td>' + (porce ? '<td></td>' : '') + '</tr>' : '') +
+    '</table>' +
+    '<p class="tiny muted" style="margin:12px 0">' + (kolik
+      ? 'Zapsáno ' + kolik + '× · naposledy ' + czd(posl) + ' · průměrná porce ' + r0(prum) + ' ' + jd
+      : 'Zatím jsi ji nezapsal.') + '</p>' +
+    '<div class="row" style="gap:8px">' +
+      '<button class="btn pri grow" onclick="closeMod(\'modPotr\');closeMod(\'modPortion\');openPortion(\'' + sid(p.id) + '\')">Zapsat</button>' +
+      '<button class="btn grow" onclick="closeMod(\'modPotr\');closeMod(\'modPortion\');openEdit(\'' + sid(p.id) + '\')">Upravit</button>' +
+    '</div>' +
+    (kolik ? '<button class="btn sm full" style="margin-top:8px" onclick="potrVDeniku()">Najít v deníku</button>' : '') +
+    '<button class="btn sm full" style="margin-top:8px" onclick="closeMod(\'modPotr\')">Zavřít</button>';
+  potrNazev = p.name;
+  $('modPotr').classList.add('on');
+}
+let potrNazev = '';
+function potrVDeniku() {
+  closeMod('modPotr'); closeMod('modPortion');
+  go('stats');
+  setTimeout(() => {
+    const q = $('denikQ'); if (!q) return;
+    q.value = potrNazev; denikRun();
+    q.scrollIntoView({ block: 'center' });
+  }, 80);
+}
+
+/* ---------------- „Proč tohle číslo?" (v121) ----------------
+   Aplikace počítá cíle z výdeje, váhy a nastavení — a zpětně se to nedalo
+   přečíst. Rozpad bere mezikroky přímo z cileZVydeje, takže ukazuje přesně
+   ta čísla, se kterými aplikace počítala; nic se tu nepočítá podruhé. */
+async function procCislo(co) {
+  const dd = await dbGet('daily', curDate) || {};
+  const wk = await workoutSum(curDate);
+  const v = vydejDne(dd, wk);
+  const TG = await dayTargets(curDate, v.out);
+  const rows = await dbByIdx('log', 'date', curDate);
+  const sn = rows.reduce((a, r) => ({ k: a.k + (r.kcal || 0), p: a.p + (r.p || 0), c: a.c + (r.c || 0), f: a.f + (r.f || 0) }),
+    { k: 0, p: 0, c: 0, f: 0 });
+  const R = [];                              // [popis, hodnota, součet?]
+  const tr = (a, b, souc) => R.push([a, b, souc]);
+  const vydejRadky = () => {
+    if (v.celkovy) { tr('Celkový výdej z hodinek (má v sobě klid i pohyb)', r0(v.out) + ' kcal', 1); return; }
+    tr('Klidový výdej', r0(goals.rmr || 0) + ' kcal');
+    if ((goals.pal || 1) !== 1) tr('× běžný pohyb mimo cvičení', '× ' + r1(goals.pal));
+    tr('+ aktivní kcal z hodinek', r0(typeof dd.burn === 'number' ? dd.burn : 0) + ' kcal');
+    if (wk) tr('+ zapsaná cvičení', r0(wk) + ' kcal');
+    tr('= výdej dne', r0(v.out || 0) + ' kcal', 1);
+  };
+  let nadpis = '', pozn = '';
+  const pevny = !TG.dyn;
+  const pevnyText = 'Cíl je pevný z Nastavení → Já' + (!goals.dyn ? ' (dynamické cíle jsou vypnuté).'
+    : !goals.rmr ? ' — chybí klidový výdej.' : ' — chybí váha nebo výdej dne.');
+  if (co === 'kcal') {
+    nadpis = 'Cíl kalorií';
+    if (pevny) { tr('Pevný cíl', r0(TG.kcal) + ' kcal', 1); pozn = pevnyText; }
+    else {
+      vydejRadky();
+      const P = TG.proc;
+      tr('− deficit' + (P.def < P.prani ? ' (chtěný ' + r0(P.prani) + ', strop 25 % výdeje)' : ''), r0(P.def) + ' kcal');
+      tr('= cíl', r0(TG.kcal) + ' kcal', 1);
+      if (r0(v.out - P.def) < P.podlaha) pozn = 'Cíl je zvednutý na spodní mez ' + P.podlaha + ' kcal, aby nešel do hladovění.';
+    }
+    tr('Snědeno', r0(sn.k) + ' kcal');
+    tr(sn.k > TG.kcal ? 'Nad cílem' : 'Zbývá', r0(Math.abs(TG.kcal - sn.k)) + ' kcal', 1);
+  } else if (co === 'p' || co === 'c' || co === 'f') {
+    const nm = { p: 'Bílkoviny', c: 'Sacharidy', f: 'Tuky' }[co];
+    nadpis = 'Cíl — ' + nm.toLowerCase();
+    if (pevny) { tr('Pevný cíl', r0(TG[co]) + ' g', 1); pozn = pevnyText; }
+    else {
+      const P = TG.proc, w = TG.w;
+      if (co === 'p') {
+        tr(r1(P.pKg) + ' g na kilo × ' + r1(w) + ' kg', r0(P.pKg * w) + ' g');
+        tr('strop 35 % energie', r0(P.pStrop) + ' g');
+      } else if (co === 'f') {
+        tr(r1(P.fKg) + ' g na kilo × ' + r1(w) + ' kg', r0(P.fKg * w) + ' g');
+        tr('30 % energie z cíle ' + r0(TG.kcal) + ' kcal', r0(P.fPodil) + ' g');
+        pozn = 'Platí větší z obou čísel.';
+      } else {
+        tr('Cíl energie', r0(TG.kcal) + ' kcal');
+        tr('− bílkoviny ' + r0(TG.p) + ' g × 4', r0(TG.p * 4) + ' kcal');
+        tr('− tuky ' + r0(TG.f) + ' g × 9', r0(TG.f * 9) + ' kcal');
+        tr('zbytek ÷ 4 kcal na gram', '');
+        pozn = 'Sacharidy dopočítávají, co zbude po bílkovinách a tucích.';
+      }
+      if (P.zmenseno && co !== 'c') pozn = (pozn ? pozn + ' ' : '') +
+        'Bílkoviny a tuky jsou úměrně zmenšené, aby sacharidům zbylo aspoň 15 % energie.';
+      tr('= cíl', r0(TG[co]) + ' g', 1);
+    }
+    tr('Snědeno', r1(sn[co]) + ' g');
+    tr(sn[co] > TG[co] ? 'Nad cílem' : 'Zbývá', r1(Math.abs(TG[co] - sn[co])) + ' g', 1);
+  } else if (co === 'bil') {
+    nadpis = 'Bilance dne';
+    if (!v.out) { tr('Výdej', 'neznámý'); pozn = 'Nastav klidový výdej v Nastavení, jinak nejde bilanci spočítat.'; }
+    else {
+      tr('Příjem (snědeno)', r0(sn.k) + ' kcal');
+      vydejRadky();
+      tr('= příjem − výdej', (sn.k - v.out > 0 ? '+' : '') + r0(sn.k - v.out) + ' kcal', 1);
+      pozn = 'Záporná bilance = deficit, hubne se. 7700 kcal je zhruba kilo.' +
+        (dd.neuplny ? ' Den je nekompletní, číslo je jen orientační.' : '');
+    }
+  }
+  $('prNadpis').textContent = nadpis;
+  $('prBody').innerHTML = '<table class="procTab">' + R.map(([a, b, souc]) =>
+    '<tr' + (souc ? ' class="souc"' : '') + '><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>' +
+    (pozn ? '<p class="tiny muted" style="margin:10px 0 0">' + esc(pozn) + '</p>' : '');
+  $('modProc').classList.add('on');
+}
 function calcPortion() {
   if (!curProduct) return;
+  // detail má smysl jen u skutečné potraviny, ne u zápisu z fotky či popisu
+  $('poDetail').style.display = (!neniPotravina(curProduct.id) && potravina(curProduct.id)) ? '' : 'none';
   const a = n($('poAmt').value) / 100;
   $('poK').textContent = r0(curProduct.kcal * a) + ' kcal';
   $('poM').textContent = r1(curProduct.p * a) + ' / ' + r1(curProduct.c * a) + ' / ' + r1(curProduct.f * a) + ' g';

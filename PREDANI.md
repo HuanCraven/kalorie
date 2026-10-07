@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.05-120** (`APP_VERSION` v `index.html`, cache `kaltrack-v120` v `sw.js`).
+Aktuální verze: **2026.10.07-121** (`APP_VERSION` v `index.html`, cache `kaltrack-v121` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,31 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v121 — detail potraviny, „Proč tohle číslo?", listování dny, náhled v kalendáři
+
+První dávka z Huanova výběru vylepšení (body 1, 2, 5 a 4; inspirace Cronometer,
+MacroFactor, Yazio). Výslovně odmítnuté: šablony chodů a kopie celého dne (gramáže
+se mu pořád mění), připomínky, widget, hlasový zápis — **nezavádět**.
+
+- **Detail potraviny** (`potrDetail`, okno `#modPotr`): živiny na 100 g i na obvyklou
+  porci (`lastAmount` → `dbPouziti.posl` → `serving`), koláč podílu maker **na energii**
+  (z kcal, ne z gramů), kolikrát a kdy naposledy se jedla a průměrná porce; tlačítka
+  Zapsat, Upravit a Najít v deníku (přepne na Statistiky s dotazem v `#denikQ`).
+  V Jídlech ho otevře ťuknutí na položku (dřív rovnou okno porce). V okně porce je
+  odkaz *Detail* jen u skutečné potraviny — u zápisu z fotky či popisu ne.
+- **„Proč tohle číslo?"** (`procCislo(co)`, okno `#modProc`): ⓘ v rohu karty s kruhem
+  (kalorie), ťuknutí na pruh makra a na řádek bilance. Rozpad po krocích — výdej,
+  deficit, g/kg × váha, stropy — bere **mezikroky z `cileZVydeje`** (`proc` v jejím
+  výsledku), nic se nepočítá podruhé. Pevné cíle řeknou, že jsou pevné a proč.
+  Ťuknutí na kruh dál přepíná snědeno/zbývá.
+- **Tah prstem na Hlavní** = jiný den (doleva další, doprava předchozí; `denTahem`).
+  Touch události, ne pointer (u vodorovného pohybu prohlížeč pointer zruší). Nezačíná
+  na položce deníku (tam je tah doleva = smazat), na polích, tlačítkách ani při
+  otevřeném okně; krátký nebo šikmý tah nic nedělá.
+- **Náhled dne v kalendáři** (`kalTuk`): první ťuknutí ukáže kcal, makra, alkohol,
+  váhu, nekompletnost a poznámku; druhé (nebo *Otevřít*) den přepne. Upraven `test78`.
+- Testy `test84.js`, `test85.js`.
 
 ### Novinky ve v120 — jednodušší párování, varování o odpojení
 

@@ -42,7 +42,7 @@ sám — uživatel o to stojí, šetří mu to klikání. **Push na `main` je na
 | `build/ikony-zkratek.py` | generátor ikon pro zkratky v manifest.json | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 83 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 85 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |

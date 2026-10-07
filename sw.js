@@ -1,4 +1,4 @@
-const CACHE = 'kaltrack-v120';
+const CACHE = 'kaltrack-v121';
 const SHELL = ['./', './index.html', './manifest.json', './zxing.js', './zaklad.js', './jidla.js',
                './katalog.json'];
 

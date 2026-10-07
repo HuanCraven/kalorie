@@ -88,8 +88,13 @@ const PROSTREDI = require('./prostredi');
   });
   ck('prázdný den je bez čísla', bPrazdny === '', JSON.stringify(bPrazdny));
 
-  /* ---- 3. ťuknutí na den přepne Hlavní -------------------------------- */
+  /* ---- 3. první ťuknutí ukáže náhled, druhé přepne Hlavní (v121) ------ */
   await najdi(d3);
+  await p.evaluate(d => document.querySelector('#kalMrizka button[data-den="' + d + '"]').click(), d3);
+  await p.waitForTimeout(400);
+  ck('první ťuknutí ukáže náhled dne', await p.isVisible('#kalNahled') &&
+     /kcal/.test(await p.textContent('#kalNahled')), await p.textContent('#kalNahled'));
+  ck('a kalendář zůstane otevřený', await p.isVisible('#modKal'));
   await p.evaluate(d => document.querySelector('#kalMrizka button[data-den="' + d + '"]').click(), d3);
   await p.waitForTimeout(700);
   ck('po výběru se kalendář zavře', !(await p.isVisible('#modKal')));
