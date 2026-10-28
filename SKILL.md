@@ -48,7 +48,7 @@ e-mailem GitHub ukazuje jako neověřené. Zprávu commitu piš do souboru a př
 | `build/apk.sh`, `apk-zkouska.sh`, `apk-listy.py` | stavba APK, zkouška na emulátoru, kontrola barvy lišt ze snímku | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 86 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 87 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -63,7 +63,7 @@ e-mailem GitHub ukazuje jako neověřené. Zprávu commitu piš do souboru a př
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   86 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   87 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -126,8 +126,8 @@ Kdo to poruší, rozdrobí ji zpátky.
 - **`alc` se nefiltruje NIKDY.** Počítá se i z nekompletních dnů a den bez zápisu je
   nula, ne chybějící údaj. Uživatel si alkohol hlídá vždycky, jídlo ne — je to vědomá
   výjimka, na které trval, a snadno se setře.
-- **Jedno období (`period`) pro celou aplikaci**, přepínatelné na Statistikách
-  i na Alkoholu. Pevná okna zůstávají jen tam, kde odpovídají na jinou otázku
+- **Jedno období (`period`) pro celou aplikaci** — 7, 30, 90 nebo 180 dní,
+  přepínatelné na Statistikách i na Alkoholu. Pevná okna zůstávají jen tam, kde odpovídají na jinou otázku
   (kalendářní měsíc, „od začátku měření", limit jako 30denní průměr) — a mají to
   napsané v popisku.
 - **Do `daily` se zapisuje výhradně přes `zapisDen(datum, vlastnik, hodnoty)`.**

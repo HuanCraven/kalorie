@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.07-122** (`APP_VERSION` v `index.html`, cache `kaltrack-v122` v `sw.js`).
+Aktuální verze: **2026.10.28-123** (`APP_VERSION` v `index.html`, cache `kaltrack-v123` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,20 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v123 — období 180 dní
+
+Huan chtěl delší historii než 90 dní. **Data se nikdy nemazala** — 90 dní byla jen
+nejdelší volba období. Přibyla volba **180 dní** ve Statistikách (`#per180`) i na
+Alkoholu (`#alcSeg`). Jedno období pro celou aplikaci platí dál (`setPeriod`).
+
+- Alkohol bral natvrdo nejvýš 90 dní (`long.slice(-90)`) a řadu jen 150 dní — při
+  půlroce by tiše počítal z kratšího okna. Teď `ALC_OBDOBI_MAX = 180` a
+  `ALC_RADA = 2 × 180`, aby klouzavý 180denní průměr měl celé okno. Křivka se kreslí
+  jen tam, kde celé okno je, takže s kratší historií začíná později — správně.
+- Řada tlačítek období ve Statistikách se nezalamuje (`.obdobi`).
+- Souhrn pro Clauda za 180 dní má ~210 řádků, to je v pořádku.
+- Test `test87.js`.
 
 ### Novinky ve v122 — nabídka dlouhým stiskem, týdenní ohlédnutí, „Co ještě sníst"
 

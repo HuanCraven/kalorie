@@ -110,6 +110,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 .procBtn{position:absolute;top:8px;right:8px;width:28px;height:28px;padding:0;border-radius:50%;
   font-size:14px;line-height:1;color:var(--dim)}
 .procKlik{cursor:pointer}
+.obdobi .btn{white-space:nowrap;padding-left:6px;padding-right:6px}
 .procTab{width:100%;border-collapse:collapse;font-size:13px}
 .procTab td{padding:5px 0;border-bottom:1px solid var(--line);vertical-align:top}
 .procTab td+td{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:10px}
@@ -580,6 +581,7 @@ body.verejna [data-osobni]{display:none!important}
     <button data-a="7" onclick="setPeriod(7)">7 dní</button>
     <button data-a="30" class="on" onclick="setPeriod(30)">30 dní</button>
     <button data-a="90" onclick="setPeriod(90)">90 dní</button>
+    <button data-a="180" onclick="setPeriod(180)">180 dní</button>
   </div>
 
   <div class="row" style="gap:10px;margin:0 0 10px">
@@ -756,10 +758,12 @@ body.verejna [data-osobni]{display:none!important}
 
   <div class="kotvy" id="stKotvy"></div>
 
-  <div class="row" style="margin-bottom:12px">
+  <!-- čtyři období v jedné řadě: bez zalomení a s užším okrajem, ať se vejde i 180 dní (v123) -->
+  <div class="row obdobi" style="margin-bottom:12px">
     <button class="btn grow" id="per7" onclick="setPeriod(7)">7 dní</button>
     <button class="btn grow" id="per30" onclick="setPeriod(30)">30 dní</button>
     <button class="btn grow" id="per90" onclick="setPeriod(90)">90 dní</button>
+    <button class="btn grow" id="per180" onclick="setPeriod(180)">180 dní</button>
   </div>
 
   <div class="card">
@@ -1570,7 +1574,7 @@ data-lpignore="true" data-1p-ignore>
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.07-122';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.28-123';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -5432,7 +5436,7 @@ function limitBlock(s) {
 /* Vývoj klouzavého 30denního průměru — jediné číslo srovnatelné s limitem. */
 // „dělí se vždycky třiceti" — číslovka musí sedět na zvolené okno, jinak text
 // tvrdí něco jiného než graf
-const ALC_CIS = { 7: 'sedmi', 30: 'třiceti', 90: 'devadesáti' };
+const ALC_CIS = { 7: 'sedmi', 30: 'třiceti', 90: 'devadesáti', 180: 'sto osmdesáti' };
 function svgAlcTrend(long, trend, lim, okno) {
   const pts = [];
   for (let i = 0; i < long.length; i++) if (trend[i] !== null) pts.push({ d: long[i].d, v: trend[i] });
@@ -5573,7 +5577,7 @@ function bublina(btn) {
 function setPeriod(p) {
   period = p;
   document.querySelectorAll('#alcSeg button').forEach(b => b.classList.toggle('on', +b.dataset.a === p));
-  ['per7', 'per30', 'per90'].forEach(id =>
+  ['per7', 'per30', 'per90', 'per180'].forEach(id =>
     $(id) && $(id).classList.toggle('pri', id === 'per' + p));
   if ($('p-stats').classList.contains('on')) renderStats();
   if ($('p-alc').classList.contains('on')) renderAlc();
@@ -5696,7 +5700,7 @@ async function renderStats() {
   const list = denniRada(period, curDate, zdroj);
   const a = agg(list, await lastWeight(list[0].date));
   statCache = { list, a };
-  ['per7', 'per30', 'per90'].forEach(id =>
+  ['per7', 'per30', 'per90', 'per180'].forEach(id =>
     $(id).classList.toggle('pri', id === 'per' + period));
   const dnes = dstr(new Date());
   $('stDayLabel').textContent = curDate === dnes ? 'Dnes' : dayTxt(curDate);
@@ -7157,7 +7161,10 @@ async function importAlc() {
 
 /* Kolik dnů zpět se drží řada pro křivku trendu. Devadesátidenní okno z ní udělá
    nejvýš 61 bodů; kdyby bylo potřeba víc historie, je to tohle jedno číslo. */
-const ALC_RADA = 150;
+/* Řada musí pokrýt nejdelší období (180, od v123) a k němu ještě jedno okno klouzavého
+   průměru — jinak by křivka 180denního průměru na začátku počítala z neúplných dat. */
+const ALC_OBDOBI_MAX = 180;
+const ALC_RADA = 2 * ALC_OBDOBI_MAX;
 /* Alkohol vychází z téže denní řady jako zbytek aplikace (`denniRada`), aby
    „průměr za období" znamenal všude totéž. Jediný rozdíl je záměrný: gramy se
    NEFILTRUJÍ podle `logged`, takže se počítají i z nekompletních dnů a den bez
@@ -7166,7 +7173,7 @@ async function alcStats(z) {
   const zdroj = z || await zdrojDnu();
   const all = zdroj.all;
   const long = denniRada(ALC_RADA, curDate, zdroj).map(d => ({ d: d.date, g: d.alc }));
-  const days = long.slice(-90);
+  const days = long.slice(-ALC_OBDOBI_MAX);
   const sum = k => days.slice(-k).reduce((a, x) => a + x.g, 0);
   // měsíc a „od začátku" jdou mimo okno, ty se počítají z celého deníku
   const byDay = {};
