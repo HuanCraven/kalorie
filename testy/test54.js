@@ -84,7 +84,7 @@ const PROSTREDI = require('./prostredi');
 
   /* ---- 3. období u alkoholu --------------------------------------- */
   await p.click('nav button[data-p="alc"]'); await p.waitForTimeout(700);
-  ck('nahoře je přepínač období', (await p.locator('#alcSeg button').count()) === 3);
+  ck('nahoře je přepínač období', (await p.locator('#alcSeg button').count()) === 4);   // 7/30/90/180 od v123
   ck('výchozí je 30 dní', await p.evaluate(() =>
     document.querySelector('#alcSeg button[data-a="30"]').classList.contains('on')));
   ck('dlaždice uvádí rozsah', (await p.textContent('#alcDryOf')) === 'z 30');

@@ -83,12 +83,15 @@ const JPEG_1PX = '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB
   ck('a nic se nezapíše', (await p.evaluate(async () => (await dbAll('workout')).length)) === 1);
 
   /* ---- 6. datum ze snímku se respektuje ---------------------------- */
-  claude.odpoved = '{"zaznamy":[{"nazev":"Kolo","minuty":90,"kcal":700,"datum":"2026-08-09","kcal_typ":"aktivni"}],"pozn":""}';
+  // datum relativně k dnešku: natvrdo zapsané se časem dostalo za 60 dní zpět a aplikace ho
+  // (správně, rozumneDatum) odmítla — test pak padal, aniž by se v aplikaci cokoli změnilo
+  const dKolo = PROSTREDI.den(-5);
+  claude.odpoved = '{"zaznamy":[{"nazev":"Kolo","minuty":90,"kcal":700,"datum":"' + dKolo + '","kcal_typ":"aktivni"}],"pozn":""}';
   await nahraj();
   await p.click('text=Zapsat do deníku');
   await p.waitForTimeout(800);
   const kolo = await p.evaluate(async () => (await dbAll('workout')).find(w => w.name === 'Kolo'));
-  ck('trénink se zapíše na datum ze snímku', kolo && kolo.date === '2026-08-09',
+  ck('trénink se zapíše na datum ze snímku', kolo && kolo.date === dKolo,
      kolo && kolo.date);
 
   /* ---- 7. denní souhrn ze Zeppu nahradí výpočet výdeje ------------- */
