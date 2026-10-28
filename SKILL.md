@@ -288,7 +288,8 @@ Poučení, která se draze zaplatila a nemají se vracet:
   by byl riskantní bez užitku
 - **Huan výslovně nechce** (nenavrhovat znovu): šablony chodů a kopii celého dne
   (gramáže se mu pořád mění), připomínky a notifikace, widget na ploše, hlasový zápis,
-  srovnávání s jinými lidmi, odznaky a soutěže
+  srovnávání s jinými lidmi, odznaky a soutěže; automatické ukládání odhadnutých
+  položek z rozboru do Jídel (zaplnilo by je odhady — ukládá se ručně, `ulozJidlo`)
 
 ## Pracovní postup
 

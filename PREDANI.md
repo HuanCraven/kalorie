@@ -69,6 +69,8 @@ Teď i dodatečně z deníku, jedinou funkcí `ulozJidlo(nazev, zaznamy)`:
 - **Duplicitu nedovolí**: stejný název (bez diakritiky a mezer navíc) už v Jídlech →
   neuloží a otevře detail existujícího. Dvě vlastní položky stejného jména by jinak
   `dbVse` slila do jedné a druhá by zmizela z očí.
+- **Odhadnuté položky z rozboru se do Jídel samy neukládají** — Huan to tak chce
+  (Jídla by se zaplnila odhady typu „trocha smetany"); kdo chce, uloží položku ručně.
 - Test `test88.js`. Při tom opraven `test64` — natvrdo zapsané datum snímku se časem
   dostalo za 60 dní zpět a `rozumneDatum` ho správně odmítlo; teď je relativní.
 
