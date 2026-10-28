@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.28-123** (`APP_VERSION` v `index.html`, cache `kaltrack-v123` v `sw.js`).
+Aktuální verze: **2026.10.28-124** (`APP_VERSION` v `index.html`, cache `kaltrack-v124` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,27 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v124 — uložit zapsané jídlo do Jídel
+
+Huan si chtěl včerejší dýňovou polévku (rozepsanou Claudem z popisu) dát znovu bez
+nového popisu. Uložit šlo jen v okamžiku rozboru (*Přidat + uložit jako recept*).
+Teď i dodatečně z deníku, jedinou funkcí `ulozJidlo(nazev, zaznamy)`:
+
+- **Dlouhý stisk → Uložit do Jídel** (`#akUlozit`) u zápisu bez potraviny (popis,
+  fotka, rychlý zápis; ne nápoj). Zápis se pak na nové jídlo **napojí** (`productId`),
+  takže má detail a počítá se do četnosti.
+- **Výběr víc položek → název + Uložit jako jídlo** (`vybrUlozJidlo`) pro jídlo
+  zapsané po položkách. Uloží součet jako jedno jídlo se surovinami v `ing` (stejný
+  tvar jako recept z rozboru); položky v deníku zůstanou, jak byly.
+- Ukládá se jako hotové jídlo (`source: 'recipe'`, značka `recept`), hodnoty na 100 g
+  ze součtu, **výchozí porce = snědené gramy** — u jídla po položkách tedy porce, ne
+  celý hrnec; na 100 g to sedí.
+- **Duplicitu nedovolí**: stejný název (bez diakritiky a mezer navíc) už v Jídlech →
+  neuloží a otevře detail existujícího. Dvě vlastní položky stejného jména by jinak
+  `dbVse` slila do jedné a druhá by zmizela z očí.
+- Test `test88.js`. Při tom opraven `test64` — natvrdo zapsané datum snímku se časem
+  dostalo za 60 dní zpět a `rozumneDatum` ho správně odmítlo; teď je relativní.
 
 ### Novinky ve v123 — období 180 dní
 

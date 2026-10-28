@@ -45,7 +45,7 @@ const PROSTREDI = require('./prostredi');
   await p.click('#akUlozit');
   await p.waitForTimeout(500);
   const pol = await p.evaluate(() => products.find(x => x.name === 'Dýňová polévka'));
-  ck('uloží se jako hotové jídlo', pol && pol.source === 'recipe' && druhPotraviny(pol) === 'jidlo', JSON.stringify(pol));
+  ck('uloží se jako hotové jídlo', pol && pol.source === 'recipe' && await p.evaluate(x => druhPotraviny(x) === 'jidlo', pol), JSON.stringify(pol));
   ck('hodnoty na 100 g a porce = snědeno', pol && pol.kcal === 80 && pol.p === 2 && pol.c === 9 && pol.f === 4 &&
     pol.serving === 400, JSON.stringify(pol));
   ck('zápis v deníku se na něj napojí', await p.evaluate(([id, pid]) => dbGet('log', id).then(r => r.productId === pid),

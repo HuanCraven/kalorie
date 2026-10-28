@@ -316,9 +316,15 @@ body.verejna [data-osobni]{display:none!important}
         <input type="date" id="vybrDatum" class="grow">
         <button class="btn sm pri" onclick="vybrKopiruj()">Kopírovat</button>
       </div>
+      <!-- jídlo zapsané po položkách jde dodatečně uložit jako celek (v124) -->
+      <div class="row" style="gap:6px;margin-top:6px">
+        <input id="vybrNazev" class="grow" maxlength="80" placeholder="Název, např. Dýňová polévka" aria-label="Název jídla">
+        <button class="btn sm pri" onclick="vybrUlozJidlo()">Uložit jako jídlo</button>
+      </div>
       <p class="tiny muted" style="margin:8px 0 0">Přesun položku posune, kopie ji nechá být
         a vytvoří druhou. Kopie míří na dnešek — den jde změnit. Na starší den se dostaneš
-        ťuknutím na datum nahoře.</p>
+        ťuknutím na datum nahoře. Uložit jako jídlo sečte vybrané položky do jednoho jídla
+        v Jídlech — příště ho najdeš v Hledat.</p>
     </div>
     <div class="hr"></div>
     <!-- Poznámka stojí hned u „nekompletního dne": nejčastěji se do ní píše právě
@@ -1334,6 +1340,7 @@ data-lpignore="true" data-1p-ignore>
     <p class="tiny muted" id="akSub" style="margin:-4px 0 12px"></p>
     <button class="btn full" style="margin-bottom:8px" onclick="akce('upravit')">Upravit</button>
     <button class="btn full" style="margin-bottom:8px" id="akDetail" onclick="akce('detail')">Detail potraviny</button>
+    <button class="btn full" style="margin-bottom:8px" id="akUlozit" onclick="akce('ulozit')">Uložit do Jídel</button>
     <button class="btn full" style="margin-bottom:8px" onclick="akce('duplikovat')">Duplikovat</button>
     <div class="row" style="gap:6px;margin-bottom:8px">
       <select id="akMeal" class="grow" aria-label="Přesunout do chodu"></select>
@@ -1574,7 +1581,7 @@ data-lpignore="true" data-1p-ignore>
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.28-123';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.10.28-124';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -2785,6 +2792,8 @@ async function akOtevri(id) {
   $('akMeal').innerHTML = MEALS.map(m => '<option value="' + m.k + '">' + esc(m.n) + '</option>').join('');
   $('akMeal').value = r.meal || defaultMeal();
   $('akDetail').style.display = (!neniPotravina(r.productId) && potravina(r.productId)) ? '' : 'none';
+  // uložit jde jen zápis, který potravinu v databázi nemá (popis, fotka, rychlý zápis) — ne nápoj
+  $('akUlozit').style.display = (neniPotravina(r.productId) && r.productId !== 'alk' && r.amount > 0) ? '' : 'none';
   if (navigator.vibrate) navigator.vibrate(15);
   $('modAkce').classList.add('on');
 }
@@ -2794,6 +2803,7 @@ async function akce(co) {
   if (co === 'upravit') { editLog(r.id); return; }
   if (co === 'detail') { potrDetail(r.productId); return; }
   if (co === 'smazat') { delLogUndo(r.id); return; }
+  if (co === 'ulozit') { await ulozJidlo(r.name, [r]); return; }
   if (co === 'duplikovat') {
     // kopie = nový záznam: bez id/uid/upd, jinak by ho sloučení vzalo za tentýž řádek
     const c = Object.assign({}, r); delete c.id; delete c.uid; delete c.upd; c.ts = Date.now();
@@ -2804,6 +2814,53 @@ async function akce(co) {
     r.meal = m; await dbPut('log', r);
     toast('Přesunuto do ' + mealName(m).toLowerCase()); await renderDay(); scrollToMeal(m);
   }
+}
+
+/* ---- uložit zapsané jídlo do Jídel (v124) ----
+   Jídlo z popisu nebo fotky se dřív dalo uložit jen v okamžiku rozboru (Přidat +
+   uložit jako recept). Huan si včerejší dýňovou polévku chtěl dát znovu a musel by
+   ji popisovat odznova. Tohle uloží už zapsané záznamy: jeden (z nabídky dlouhým
+   stiskem) nebo víc vybraných (jídlo zapsané po položkách) jako jedno hotové jídlo.
+   Hodnoty na 100 g se spočítají ze součtu, výchozí porce = snědené gramy. */
+async function ulozJidlo(nazev, zaz) {
+  nazev = String(nazev || '').trim().slice(0, 80);
+  zaz = (zaz || []).filter(r => r && r.amount > 0);
+  if (!nazev) { toast('Napiš název jídla'); return null; }
+  if (!zaz.length) { toast('Není co uložit'); return null; }
+  // stejný název už v Jídlech je → neukládat dvakrát, ukázat tu existující
+  const klic = norm(nazev).replace(/\s+/g, ' ').trim();
+  const uz = [...dbVse().values()].find(x => !x.skryto && norm(x.name).replace(/\s+/g, ' ').trim() === klic);
+  if (uz) { toast('V Jídlech už je „' + uz.name + '“'); potrDetail(uz.id); return null; }
+  const s = zaz.reduce((a, r) => ({ g: a.g + r.amount, k: a.k + (r.kcal || 0), p: a.p + (r.p || 0), c: a.c + (r.c || 0),
+    f: a.f + (r.f || 0), fib: a.fib + (r.fib || 0), salt: a.salt + (r.salt || 0) }),
+    { g: 0, k: 0, p: 0, c: 0, f: 0, fib: 0, salt: 0 });
+  const na100 = v => r1(v / s.g * 100);
+  const pr = {
+    id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), barcode: null,
+    name: nazev, brand: 'recept', unit: 'g', source: 'recipe',
+    kcal: na100(s.k), p: na100(s.p), c: na100(s.c), f: na100(s.f), fib: na100(s.fib), salt: na100(s.salt),
+    serving: r0(s.g), lastAmount: r0(s.g), uses: 1, createdAt: Date.now(), updatedAt: Date.now()
+  };
+  // suroviny (jen u víc záznamů) ve stejném tvaru jako recept z rozboru — na 100 g
+  if (zaz.length > 1) pr.ing = zaz.map(r => ({ nazev: r.name, mn: r.amount,
+    kcal: r.kcal / r.amount * 100, b: r.p / r.amount * 100, s: r.c / r.amount * 100, t: r.f / r.amount * 100 }));
+  await dbPut('products', pr);
+  products = await dbAll('products');
+  // jediný zápis se na nové jídlo napojí — pak má detail a počítá se do četnosti
+  if (zaz.length === 1) { const r = zaz[0]; r.productId = pr.id; await dbPut('log', r); }
+  renderDb();
+  toast('Uloženo do Jídel: ' + nazev);
+  return pr;
+}
+async function vybrUlozJidlo() {
+  const ids = [...vybrane];
+  if (!ids.length) return;
+  const zaz = (await Promise.all(ids.map(id => dbGet('log', id)))).filter(Boolean);
+  const pr = await ulozJidlo($('vybrNazev').value, zaz);
+  if (!pr) return;
+  $('vybrNazev').value = '';
+  vybrane.clear();
+  renderDay();
 }
 
 /* ---- swipe doleva = smazat (deník i alkohol) ---- */

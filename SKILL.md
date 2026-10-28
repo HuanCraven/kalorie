@@ -48,7 +48,7 @@ e-mailem GitHub ukazuje jako neověřené. Zprávu commitu piš do souboru a př
 | `build/apk.sh`, `apk-zkouska.sh`, `apk-listy.py` | stavba APK, zkouška na emulátoru, kontrola barvy lišt ze snímku | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 87 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 88 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -63,7 +63,7 @@ e-mailem GitHub ukazuje jako neověřené. Zprávu commitu piš do souboru a př
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   87 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   88 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -256,6 +256,10 @@ Poučení, která se draze zaplatila a nemají se vracet:
   položky = jiný den (`denTahem`, **touch** události — pointer prohlížeč při vodorovném
   pohybu zruší); dlouhý stisk = událost **`contextmenu`** (Android ji vyvolá sám, na PC
   pravé tlačítko) — žádný vlastní časovač, pral by se s tahem.
+- **Uložit zapsané jídlo do Jídel** (`ulozJidlo`, v124): z nabídky dlouhým stiskem
+  nebo z výběru víc položek. Stejný název se neuloží podruhé — `dbVse` by dvě vlastní
+  položky stejného jména slila. **V testech nepoužívej pevná data** blíž než pár let
+  zpátky: `rozumneDatum` odmítá snímek hodinek starší 60 dní a test pak časem spadne.
 - **Kalendář:** první ťuknutí = náhled dne (`kalTuk`), druhé nebo *Otevřít* = přepnutí.
 - **Týdenní ohlédnutí** `#tydenOhled` (ne `tydenKarta` — to bylo id zrušené karty víkendu,
   hlídá `test66`). Jen u dneška, za minulý po–ne, zavření v `meta.tydenZavreno`.
