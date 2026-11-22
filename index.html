@@ -7458,7 +7458,7 @@ async function renderAlc() {
   $('alcAvgP').textContent = r1(sumObd / nObd);
   $('alcSumP').textContent = r0(sumObd);
   $('alcDryOf').textContent = 'z ' + nObd;
-  $('alcChartHead').textContent = 'Kdy a kolik — ' + dnu(nObd) + (nObd < period ? ' (od začátku období)' : '');
+  $('alcChartHead').textContent = 'Kdy a kolik — ' + nObd + ' dní' + (nObd < period ? ' (od začátku období)' : '');
   $('alcAM').textContent = r1(s.avgM);
   $('alcMName').textContent = s.mName;
   $('alcAAll').textContent = r1(s.avgAll);
