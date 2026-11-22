@@ -248,6 +248,8 @@ body.verejna [data-osobni]{display:none!important}
     <p class="tiny" style="margin:0 0 8px;color:var(--warn)" id="syVarTxt"></p>
     <button class="btn sm full" onclick="syJdiParovat()">Otevřít synchronizaci</button>
   </div>
+  <!-- Návrat po pauze (v125): nabídne nové období, nic nezakládá samo. -->
+  <div class="card" id="navratKarta" style="display:none;border-color:#33405a"></div>
   <!-- Týdenní ohlédnutí (v122): minulý týden pondělí–neděle; po zavření do dalšího týdne mlčí. -->
   <div class="card" id="tydenOhled" style="display:none"></div>
   <div class="card" id="obCard" style="display:none">
@@ -764,6 +766,12 @@ body.verejna [data-osobni]{display:none!important}
 
   <div class="kotvy" id="stKotvy"></div>
 
+  <!-- období sledování (v125): ukáže se, až nějaké existuje -->
+  <div class="row" id="stObdobiRow" style="gap:6px;margin-bottom:10px;display:none">
+    <select id="stObdobi" class="grow" onchange="statVyberObdobi(this.value)" aria-label="Období sledování"></select>
+    <button class="btn sm" onclick="go('set');setSetMode('data');setTimeout(()=>document.getElementById('obdKarta').scrollIntoView({block:'start'}),60)">Nové</button>
+  </div>
+
   <!-- čtyři období v jedné řadě: bez zalomení a s užším okrajem, ať se vejde i 180 dní (v123) -->
   <div class="row obdobi" style="margin-bottom:12px">
     <button class="btn grow" id="per7" onclick="setPeriod(7)">7 dní</button>
@@ -1180,6 +1188,19 @@ data-lpignore="true" data-1p-ignore>
     <div id="hodinkyList"></div>
   </div>
 
+  <div class="card" id="obdKarta">
+    <h3>Období sledování</h3>
+    <p class="tiny muted" style="margin:0 0 10px">Po pauze začni nové období — statistiky, průměry,
+      alkohol i rozbor od Clauda se pak počítají od jeho začátku. Staré záznamy zůstávají
+      v deníku a ve Statistikách je najdeš pod výběrem období. Cíle platí pro všechna stejné.</p>
+    <div class="row" style="gap:6px;margin-bottom:6px">
+      <input type="date" id="obdOd" style="flex:0 0 150px" aria-label="Začátek období">
+      <input id="obdNazev" class="grow" maxlength="60" placeholder="Název (nepovinný)" aria-label="Název období">
+    </div>
+    <button class="btn pri full" style="margin-bottom:10px" onclick="obdobiZacniZFormu()">Začít nové období</button>
+    <div id="obdSeznam"></div>
+  </div>
+
   <div class="card">
     <h3>Verze a aktualizace</h3>
     <div class="row" style="gap:12px;margin-bottom:10px">
@@ -1581,7 +1602,7 @@ data-lpignore="true" data-1p-ignore>
 <script>
 'use strict';
 
-const APP_VERSION = '2026.10.28-124';   // zvyš při každé změně index.html
+const APP_VERSION = '2026.11.22-125';   // zvyš při každé změně index.html
 
 /* Veřejná verze k rozdávání. Jeden zdroj kódu pro obě podoby aplikace — dvě
    kopie po 6600 řádcích by se do půl roku rozešly a každá oprava by se dělala
@@ -1741,7 +1762,7 @@ const SYNC_STORES = ['log', 'workout', 'products', 'daily'];
    Bez tohohle seznamu by je sloučení považovalo za „neznámé z novější verze"
    a přenášelo dokola beze změny (viz mergeState). */
 const ZRUSENE_STORY = ['ext'];
-const SYNC_META = ['goals', 'drinks'];        // klíč `api` se vědomě nesynchronizuje
+const SYNC_META = ['goals', 'drinks', 'obdobi'];        // klíč `api` se vědomě nesynchronizuje
 const GEN_UID = ['log', 'workout'];           // stores, kde uid musíme vyrobit
 const TOMB_KEEP = 180 * 86400000;             // náhrobky starší než půl roku zahodíme
 
@@ -1895,6 +1916,7 @@ async function reloadAfterSync() {
   extFoods = await dbAll('ext');
   const g = await dbGet('meta', 'goals'); if (g && g.v) goals = Object.assign(goals, g.v);
   const d = await dbGet('meta', 'drinks'); if (d && Array.isArray(d.v) && d.v.length) drinks = d.v;
+  await obdobiNacti();
   fillGoals(); renderDrinkBtns(); renderDrinkEdit(); renderDb(); renderDay(); info(); extInfoTxt();
   if ($('p-fit') && $('p-fit').classList.contains('on')) renderFit();
   if ($('p-alc').classList.contains('on')) renderAlc();
@@ -1987,6 +2009,7 @@ function offCachePut(k, v) {
   delete goals.alc;                      // starý týdenní limit už se nepoužívá
   const dk = await dbGet('meta', 'drinks');
   if (dk && Array.isArray(dk.v) && dk.v.length) drinks = dk.v;
+  await obdobiNacti();
   products = await dbAll('products');
   await opravZastupnaId();
   try { extFoods = await dbAll('ext'); } catch (e) { extFoods = []; }
@@ -2634,6 +2657,7 @@ async function renderDay() {
   $('alcMonth').textContent = asum.budget === null ? ''
     : (asum.budget > 0 ? 'zbývá ' + r0(asum.budget) + ' g' : 'přes limit o ' + r0(-asum.budget) + ' g');
   $('alcMonth').style.color = (asum.budget !== null && asum.budget <= 0) ? C_SUR : 'var(--dim)';
+  navratKarta();               // návrat po pauze (v125)
   tydenOhled();                // týdenní ohlédnutí (v122) — jen u dneška, dokud ho člověk nezavře
 }
 /* „Časté" se dřív plnilo z `products.uses`, což roste jen u potravin z databáze.
@@ -2918,6 +2942,7 @@ function setSetMode(m) {
     if (box) box.style.display = x === m ? '' : 'none';
   });
   document.querySelectorAll('#setSeg button').forEach(b => b.classList.toggle('on', b.dataset.t === m));
+  if (m === 'data') obdobiUi();
   window.scrollTo(0, 0);
 }
 function setDbMode(m) {
@@ -4011,14 +4036,16 @@ async function tydenOhled() {
   const konec = tydenKonec(dnes);
   const zav = await dbGet('meta', 'tydenZavreno');
   if (curDate !== dnes || (zav && zav.v === konec)) { box.style.display = 'none'; return; }
-  const list = denniRada(7, konec, await zdrojDnu());
+  const odObd = (obdobiDne(dnes) || {}).od || '';
+  if (odObd && odObd > konec) { box.style.display = 'none'; return; }   // týden patří před nové období
+  const list = denniRada(7, konec, await zdrojDnu()).filter(d => !odObd || d.date >= odObd);
   const a = agg(list, await lastWeight(list[0].date));
   if (!a.logged) { box.style.display = 'none'; return; }
   const radky = [];
   const pr = a.tK ? r0((a.avgK - a.tK) / a.tK * 100) : null;
   radky.push('Průměr <b>' + r0(a.avgK) + ' kcal</b> · cíl ' + r0(a.tK) +
     (pr !== null ? ' <span class="muted">(' + (pr > 0 ? '+' : '') + pr + ' %)</span>' : ''));
-  radky.push('Úplných dnů ' + a.logged + ' ze 7' + (a.neuplnych ? ' · nekompletních ' + a.neuplnych : ''));
+  radky.push('Úplných dnů ' + a.logged + ' ze ' + list.length + (a.neuplnych ? ' · nekompletních ' + a.neuplnych : ''));
   radky.push('Bílkoviny ' + r0(a.avgP) + ' g/den · cíl ' + r0(a.tP));
   const w = list.filter(d => d.weight !== null);
   if (w.length >= 2) {
@@ -4026,7 +4053,7 @@ async function tydenOhled() {
     radky.push('Váha ' + r1(w[0].weight) + ' → ' + r1(w[w.length - 1].weight) + ' kg (' + (dv > 0 ? '+' : '') + r1(dv) + ')');
   } else if (w.length) radky.push('Váha ' + r1(w[0].weight) + ' kg');
   const alc = list.reduce((s, d) => s + (d.alc || 0), 0);
-  if (alc > 0) radky.push('Alkohol ' + r1(alc / 7) + ' g/den');
+  if (alc > 0) radky.push('Alkohol ' + r1(alc / list.length) + ' g/den');
   const pozn = list.filter(d => d.pozn);
   if (pozn.length) radky.push('<span class="muted">Poznámky: ' + pozn.map(d => esc(czd(d.date)) + ' ' +
     esc(d.pozn.length > 40 ? d.pozn.slice(0, 40) + '…' : d.pozn)).join(' · ') + '</span>');
@@ -4402,7 +4429,7 @@ async function exportData() {
      které tam člověk zpravidla nemá. Tady jde o vlastní telefon téhož člověka,
      takže licence předání nebrání; jinému člověku se dává `exportPotraviny`. */
   const data = {
-    v: 5, exported: new Date().toISOString(), goals, drinks,
+    v: 5, exported: new Date().toISOString(), goals, drinks, obdobi,
     products: await dbAll('products'), log: await dbAll('log'), daily: await dbAll('daily'),
     workout: await dbAll('workout'), tomb: await dbAll('tomb'), ext: await dbAll('ext'),
     extNazvy: extNazvy
@@ -4519,6 +4546,7 @@ function importData(inp) {
       const selfSt = await collectState();
       await applyState(mergeState(selfSt, selfSt));
       if (d.goals) { goals = Object.assign(goals, d.goals); await dbPut('meta', { k: 'goals', v: goals }); fillGoals(); }
+      if (Array.isArray(d.obdobi)) { obdobi = obdobiCisti(d.obdobi); await dbPut('meta', { k: 'obdobi', v: obdobi }); }
       if (Array.isArray(d.drinks) && d.drinks.length) {
         drinks = d.drinks; await dbPut('meta', { k: 'drinks', v: drinks });
         renderDrinkBtns(); renderDrinkEdit();
@@ -5347,6 +5375,138 @@ function denniRada(days, konec, z) {
   }
   return list;
 }
+/* ---------------- období sledování (v125) ----------------
+   Huan aplikaci občas na týdny odloží a pak se vrátí (hubnutí, sledování). Prázdné
+   dny pauzy statistiky kazily: alkohol počítá den bez zápisu jako nulu, váha se
+   srovnávala přes pauzu, „od začátku" i souhrn pro Clauda pauzu zahrnovaly.
+
+   Období = seznam začátků v `meta.obdobi` [{id, od, nazev}], synchronizuje se jako
+   cíle. Období trvá do dne před začátkem dalšího; data před prvním začátkem tvoří
+   „dřívější" období. Nic se nemaže — deník, kalendář a hledání ukazují všechno.
+   Statistiky, Alkohol, týdenní karta a souhrn pro Clauda se ořezávají jedinou
+   funkcí `oknoObdobi`. Cíle jsou pro všechna období společné (Huanovo rozhodnutí). */
+let obdobi = [];
+let statObdobiId = null;          // vybrané ve Statistikách; null = to, kam patří prohlížený den
+function obdobiCisti(arr) {
+  return (Array.isArray(arr) ? arr : [])
+    .filter(o => o && jeDatumTvar(o.od))
+    .map(o => ({ id: String(o.id || o.od).slice(0, 40), od: o.od,
+                 nazev: typeof o.nazev === 'string' ? o.nazev.slice(0, 60) : '' }))
+    .sort((a, b) => a.od.localeCompare(b.od))
+    .filter((o, i, a) => !i || o.od !== a[i - 1].od);
+}
+async function obdobiNacti() {
+  const m = await dbGet('meta', 'obdobi');
+  obdobi = obdobiCisti(m && m.v);
+}
+const denPred = d => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() - 1); return dstr(x); };
+const dnyMezi = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5);
+/* Všechna období včetně „dřívějšího" (od začátku deníku do prvního začátku). */
+function obdobiVse() {
+  if (!obdobi.length) return [];
+  const out = [{ id: '_drive', od: null, nazev: 'Dřívější záznamy', do: denPred(obdobi[0].od) }];
+  obdobi.forEach((o, i) => out.push(Object.assign({}, o,
+    { do: obdobi[i + 1] ? denPred(obdobi[i + 1].od) : null })));
+  return out;
+}
+const obdobiNazev = o => o.nazev || (o.od ? 'Od ' + czdR(o.od) : 'Dřívější záznamy');
+/* Období, do kterého patří den `d`. */
+function obdobiDne(d) {
+  const v = obdobiVse();
+  return v.find(o => (!o.od || d >= o.od) && (!o.do || d <= o.do)) || null;
+}
+/* Okno pro statistiky: období vybrané ve Statistikách, jinak to, kam patří prohlížený
+   den. Konec se nepřehoupne za konec období, počet dnů ne před jeho začátek. */
+function oknoObdobi(konec, dni) {
+  if (!obdobi.length) return { konec, dni, o: null };
+  let o = statObdobiId ? obdobiVse().find(x => x.id === statObdobiId) : null;
+  if (!o || (o.od && konec < o.od) || (o.do && konec > o.do && !statObdobiId)) o = obdobiDne(konec);
+  if (!o) return { konec, dni, o: null };
+  let k = konec;
+  if (o.do && k > o.do) k = o.do;
+  if (o.od && k < o.od) k = o.od;
+  const max = o.od ? dnyMezi(o.od, k) + 1 : dni;
+  return { konec: k, dni: Math.max(1, Math.min(dni, max)), o };
+}
+async function obdobiZacni(od, nazev) {
+  od = jeDatumTvar(od) ? od : dstr(new Date());
+  obdobi = obdobiCisti(obdobi.filter(o => o.od !== od).concat([{ id: 'o' + Date.now().toString(36), od,
+    nazev: String(nazev || '').trim() }]));
+  await dbPut('meta', { k: 'obdobi', v: obdobi });
+  statObdobiId = null;
+  toast('Nové období od ' + czdR(od));
+  obdobiUi();
+  if ($('p-stats').classList.contains('on')) renderStats();
+  renderDay();
+}
+async function obdobiSmaz(id) {
+  const o = obdobi.find(x => x.id === id); if (!o) return;
+  if (!confirm('Smazat začátek období ' + obdobiNazev(o) + '?\nZáznamy zůstanou, jen se období spojí s předchozím.')) return;
+  obdobi = obdobi.filter(x => x.id !== id);
+  await dbPut('meta', { k: 'obdobi', v: obdobi });
+  if (statObdobiId === id) statObdobiId = null;
+  obdobiUi();
+  if ($('p-stats').classList.contains('on')) renderStats();
+  renderDay();
+}
+function obdobiZacniZFormu() { obdobiZacni($('obdOd').value, $('obdNazev').value); $('obdNazev').value = ''; }
+/* Výběr ve Statistikách a seznam v Nastavení. */
+function obdobiUi() {
+  const v = obdobiVse();
+  const sel = $('stObdobi');
+  if (sel) {
+    $('stObdobiRow').style.display = v.length ? '' : 'none';
+    sel.innerHTML = '<option value="">Aktuální období</option>' + v.slice().reverse().map(o =>
+      '<option value="' + esc(o.id) + '">' + esc(obdobiNazev(o)) + ' · ' +
+      (o.od ? czd(o.od) : 'začátek') + '–' + (o.do ? czd(o.do) : 'dnes') + '</option>').join('');
+    sel.value = statObdobiId || '';
+  }
+  const box = $('obdSeznam');
+  if (box) box.innerHTML = obdobi.length ? obdobi.slice().reverse().map(o => {
+    const x = v.find(y => y.id === o.id);
+    return '<div class="item"><div class="grow"><div class="nm">' + esc(obdobiNazev(o)) + '</div>' +
+      '<div class="sub">' + czdR(o.od) + ' – ' + (x && x.do ? czdR(x.do) : 'dosud') + '</div></div>' +
+      '<button class="btn sm" onclick="obdobiSmaz(\'' + esc(o.id) + '\')" aria-label="Smazat začátek">✕</button></div>';
+  }).join('') : '<p class="tiny muted" style="margin:0">Zatím žádné — statistiky se počítají od prvního zápisu.</p>';
+  if ($('obdOd') && !$('obdOd').value) $('obdOd').value = dstr(new Date());
+}
+function statVyberObdobi(id) {
+  statObdobiId = id || null;
+  // starší období se prohlíží od jeho konce — jinak by okno sahalo do dnešního
+  renderStats();
+}
+
+/* Návrat po pauze: poslední zápis před dneškem je 7 a víc dní starý a od té doby
+   nezačalo nové období → nabídnout ho. Nic se nezakládá samo. */
+const NAVRAT_DNI = 7;
+async function navratKarta() {
+  const box = $('navratKarta'); if (!box) return;
+  const dnes = dstr(new Date());
+  if (curDate !== dnes) { box.style.display = 'none'; return; }
+  const posl = (await dbAll('log')).reduce((a, r) => (r.date && r.date < dnes && r.date > a ? r.date : a), '');
+  const zav = await dbGet('meta', 'navratZavreno');
+  const pauza = posl ? dnyMezi(posl, dnes) - 1 : 0;
+  const uzZacato = obdobi.some(o => o.od > posl);
+  if (!posl || pauza < NAVRAT_DNI || uzZacato || (zav && zav.v === posl)) { box.style.display = 'none'; return; }
+  box.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">' +
+    '<div class="lbl-s">Vítej zpátky</div>' +
+    '<button class="btn sm dotyk" onclick="navratZavri()" aria-label="Zavřít">✕</button></div>' +
+    '<p class="tiny" style="margin:0 0 8px">Poslední zápis je z ' + esc(czdR(posl)) + ' — ' + dnu(pauza) +
+    ' bez zápisu. Začít nové období? Statistiky a průměry se pak počítají od dneška, ' +
+    'staré zůstanou ve Statistikách pod výběrem období.</p>' +
+    '<div class="row" style="gap:6px"><input id="navratNazev" class="grow" maxlength="60" ' +
+    'placeholder="Název (nepovinný)" aria-label="Název období">' +
+    '<button class="btn sm pri" onclick="navratAno()">Začít nové období</button></div>';
+  box.style.display = '';
+}
+async function navratAno() { await obdobiZacni(dstr(new Date()), ($('navratNazev') || {}).value); }
+async function navratZavri() {
+  const dnes = dstr(new Date());
+  const posl = (await dbAll('log')).reduce((a, r) => (r.date && r.date < dnes && r.date > a ? r.date : a), '');
+  await dbPut('meta', { k: 'navratZavreno', v: posl });
+  $('navratKarta').style.display = 'none';
+}
+
 async function statsData(days) {
   return denniRada(days, curDate, await zdrojDnu());
 }
@@ -5754,9 +5914,11 @@ async function renderStats() {
   // jedno čtení databáze pro statistiky i alkohol — obojí staví z téže řady
   const zdroj = await zdrojDnu();
   alcCache = await alcStats(zdroj);
-  const list = denniRada(period, curDate, zdroj);
+  const okno = oknoObdobi(curDate, period);
+  const list = denniRada(okno.dni, okno.konec, zdroj);
   const a = agg(list, await lastWeight(list[0].date));
-  statCache = { list, a };
+  statCache = { list, a, obd: okno.o };
+  obdobiUi();
   ['per7', 'per30', 'per90', 'per180'].forEach(id =>
     $(id).classList.toggle('pri', id === 'per' + period));
   const dnes = dstr(new Date());
@@ -5764,7 +5926,8 @@ async function renderStats() {
   $('stDnes').style.display = curDate === dnes ? 'none' : '';
   $('stRange').textContent = czd(list[0].date) + ' – ' + czd(list[list.length - 1].date) +
     ' · záznam za ' + a.logged + ' z ' + dnu(a.days) +
-    (curDate === dnes ? '' : ' · období končí prohlíženým dnem, pozdější dny se nezapočítávají');
+    (okno.o ? ' · ' + obdobiNazev(okno.o) + (okno.dni < period ? ' (od začátku období)' : '') : '') +
+    (curDate === dnes || (okno.o && okno.o.do) ? '' : ' · období končí prohlíženým dnem, pozdější dny se nezapočítávají');
   $('stKcal').textContent = a.logged ? r0(a.avgK) : '—';
   $('stBurn').textContent = a.rmr ? r0(a.avgOut) : '—';
   $('stBal').textContent = (a.rmr && a.logged) ? ((a.avgBal > 0 ? '+' : '') + r0(a.avgBal)) : '—';
@@ -5911,6 +6074,8 @@ function summaryText() {
   const { list, a } = statCache, L = [];
   const pct = (v, t) => t ? r0(v / t * 100) + ' %' : '—';
   L.push('KALORIE — souhrn za ' + a.days + ' dní (' + list[0].date + ' až ' + list[list.length - 1].date + ')');
+  if (statCache.obd) L.push('Období sledování: ' + obdobiNazev(statCache.obd) +
+    (statCache.obd.od ? ' (od ' + statCache.obd.od + ')' : '') + ' — dřívější data sem nepatří.');
   const bezZap = Math.max(0, a.days - a.logged - a.neuplnych);
   L.push('Úplných dnů: ' + a.logged + '/' + a.days +
     (a.neuplnych ? ', nekompletních: ' + a.neuplnych : '') +
@@ -6042,7 +6207,7 @@ async function rozborRun() {
   if (!statCache.a.logged) { rozborNote('✕ Za tohle období nejsou žádné záznamy.'); return; }
   const btn = $('rozborBtn');
   btn.disabled = true; btn.textContent = 'Přemýšlím…';
-  rozborNote('Posílám souhrn za ' + period + ' dní…');
+  rozborNote('Posílám souhrn za ' + statCache.a.days + ' dní…');
   try {
     const txt = await apiText(rozborPrompt());
     rozborShow(txt);
@@ -7229,38 +7394,44 @@ const ALC_RADA = 2 * ALC_OBDOBI_MAX;
 async function alcStats(z) {
   const zdroj = z || await zdrojDnu();
   const all = zdroj.all;
-  const long = denniRada(ALC_RADA, curDate, zdroj).map(d => ({ d: d.date, g: d.alc }));
-  const days = long.slice(-ALC_OBDOBI_MAX);
+  // období sledování (v125): okno končí s obdobím a nesahá před jeho začátek
+  const okno = oknoObdobi(curDate, ALC_OBDOBI_MAX);
+  const konec = okno.konec, od = okno.o && okno.o.od ? okno.o.od : '';
+  const long = denniRada(ALC_RADA, konec, zdroj).map(d => ({ d: d.date, g: d.alc }));
+  const days = long.slice(-ALC_OBDOBI_MAX).filter(x => !od || x.d >= od);
   const sum = k => days.slice(-k).reduce((a, x) => a + x.g, 0);
+  const nDni = k => Math.max(1, Math.min(k, days.length));  // dělí se jen dny v období
   // měsíc a „od začátku" jdou mimo okno, ty se počítají z celého deníku
   const byDay = {};
   all.forEach(r => { if (r.alc) byDay[r.date] = (byDay[r.date] || 0) + r.alc; });
 
   // kalendářní měsíc prohlíženého dne — dělí se počtem dnů, které už uplynuly
-  const cur = new Date(curDate + 'T12:00:00'), now = new Date();
-  const pref = curDate.slice(0, 7);
+  const cur = new Date(konec + 'T12:00:00'), now = new Date();
+  const pref = konec.slice(0, 7);
   const sameMonth = cur.getFullYear() === now.getFullYear() && cur.getMonth() === now.getMonth();
   const dnyVMesici = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
-  const mDays = sameMonth ? cur.getDate() : dnyVMesici;
+  let mDays = sameMonth ? cur.getDate() : dnyVMesici;
+  // začalo-li období v tomhle měsíci, dny před ním se nepočítají
+  if (od && od.slice(0, 7) === pref) mDays = Math.max(1, mDays - (Number(od.slice(8, 10)) - 1));
   const mSum = Object.entries(byDay)
-    .filter(([k]) => k.startsWith(pref) && k <= curDate)
+    .filter(([k]) => k.startsWith(pref) && k <= konec && (!od || k >= od))
     .reduce((a, [, v]) => a + v, 0);
 
   // celkově od prvního záznamu v deníku (i dny bez alkoholu se počítají)
-  const dates = all.map(r => r.date).filter(d => d <= curDate).sort();
-  const first = dates[0] || curDate;
+  const dates = all.map(r => r.date).filter(d => d <= konec && (!od || d >= od)).sort();
+  const first = dates[0] || od || konec;
   const allDays = Math.max(1, Math.round(
-    (new Date(curDate + 'T12:00:00') - new Date(first + 'T12:00:00')) / 86400000) + 1);
+    (new Date(konec + 'T12:00:00') - new Date(first + 'T12:00:00')) / 86400000) + 1);
   const allSum = Object.entries(byDay)
-    .filter(([k]) => k <= curDate).reduce((a, [, v]) => a + v, 0);
+    .filter(([k]) => k <= konec && (!od || k >= od)).reduce((a, [, v]) => a + v, 0);
 
   return {
     days, d7: sum(7), d30: sum(30), dry: days.slice(-period).filter(x => x.g === 0).length,
-    avg7: sum(7) / 7, avg30: sum(30) / 30,
+    avg7: sum(7) / nDni(7), avg30: sum(30) / nDni(30), od,
     mSum, mDays, avgM: mSum / mDays, mName: MES[cur.getMonth()],
     long,
     lim: goals.alcDay || 0,
-    budget: goals.alcDay ? goals.alcDay * 30 - sum(30) : null,
+    budget: goals.alcDay ? goals.alcDay * nDni(30) - sum(30) : null,
     allSum, allDays, avgAll: allSum / allDays, first
   };
 }
@@ -7282,21 +7453,23 @@ async function renderAlc() {
   const s = await alcStats();
   $('alc7').textContent = r0(s.d7); $('alc30').textContent = r0(s.d30); $('alcDry').textContent = s.dry;
   const obd = s.days.slice(-period);
+  const nObd = Math.max(1, obd.length);        // v krátkém období méně dnů než zvolené okno
   const sumObd = obd.reduce((a, x) => a + x.g, 0);
-  $('alcAvgP').textContent = r1(sumObd / period);
+  $('alcAvgP').textContent = r1(sumObd / nObd);
   $('alcSumP').textContent = r0(sumObd);
-  $('alcDryOf').textContent = 'z ' + period;
-  $('alcChartHead').textContent = 'Kdy a kolik — ' + period + ' dní';
+  $('alcDryOf').textContent = 'z ' + nObd;
+  $('alcChartHead').textContent = 'Kdy a kolik — ' + dnu(nObd) + (nObd < period ? ' (od začátku období)' : '');
   $('alcAM').textContent = r1(s.avgM);
   $('alcMName').textContent = s.mName;
   $('alcAAll').textContent = r1(s.avgAll);
   $('alcAvgNote').textContent = s.mName + ': ' + r0(s.mSum) + ' g za ' + dnu(s.mDays) +
-    ' · celkem ' + r0(s.allSum) + ' g za ' + dnu(s.allDays) + ' od ' + czd(s.first) +
+    ' · celkem ' + r0(s.allSum) + ' g za ' + dnu(s.allDays) + ' od ' + czd(s.first) + (s.od ? ' (začátek období)' : '') +
     ' (dny bez alkoholu se do průměru počítají)';
   $('alcLimitBar').innerHTML = s.lim ? limitBlock(s) : '<p class="tiny muted" style="margin:0">' +
     'Limit není nastavený (Nastavení → Já → Alkohol).</p>';
   $('alcTrendHead').textContent = 'Vývoj ' + period + 'denního průměru';
-  $('alcTrend').innerHTML = svgAlcTrend(s.long, alcKlouzavy(s.long, period, s.first), s.lim, period);
+  const oknoT = Math.min(period, nObd);
+  $('alcTrend').innerHTML = svgAlcTrend(s.long, alcKlouzavy(s.long, oknoT, s.first), s.lim, oknoT);
   document.querySelectorAll('#alcSeg button').forEach(b => b.classList.toggle('on', +b.dataset.a === period));
   $('alcChart').innerHTML = svgAlcBars(obd);
   syncAddDate();

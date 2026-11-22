@@ -48,7 +48,7 @@ e-mailem GitHub ukazuje jako neověřené. Zprávu commitu piš do souboru a př
 | `build/apk.sh`, `apk-zkouska.sh`, `apk-listy.py` | stavba APK, zkouška na emulátoru, kontrola barvy lišt ze snímku | zřídka |
 | `build/off-export.js` | z hromadného exportu Open Food Facts vytáhne české produkty | zřídka |
 | `build/off-cz.js` | totéž přes API — jen na malé výběry, server hromadné odmítá | zřídka |
-| `testy/` | 88 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
+| `testy/` | 89 sad Playwright testů + `runall.sh` + `make-fixtures.py` | ano |
 | `testy/prostredi.js` | najde prohlížeč a složku pro fixtures (`KAL_CHROME`, `KAL_DIR`) | zřídka |
 | `PREDANI.md` | aktuální stav projektu a novinky po verzích | ano |
 | `README.md` | uživatelská dokumentace | ano |
@@ -63,7 +63,7 @@ e-mailem GitHub ukazuje jako neověřené. Zprávu commitu piš do souboru a př
    a spusť `node build/build-jidla.js`. Skript hlásí neznámé suroviny, nemožnou
    výtěžnost a nesoulad energie se živinami (Atwater 4/4/9 + vláknina 2, tolerance 12 %).
 3. **Před nasazením (= před pushem na `main`) regrese**: `bash runall.sh` v `testy/`,
-   88 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
+   89 sad, ~20 minut. Aplikace musí běžet na `http://127.0.0.1:8811`
    (`python -m http.server 8811 --bind 127.0.0.1` z kořene repa) — ne přes `file://`,
    service worker a IndexedDB potřebují origin. Testy mockují Open Food Facts
    i Claude API, takže neposílají dotazy ven. Jednorázová příprava v novém prostředí:
@@ -135,6 +135,11 @@ Kdo to poruší, rozdrobí ji zpátky.
   (total, kroky, tep, hrv, spanek, hluboky, rem, skore). Pole, o kterém volající mlčí,
   zůstane nedotčené. Neznámý vlastník vyhodí chybu. Přidáváš-li do dne údaj, zapiš ho
   do jednoho z těch seznamů, jinak se neuloží.
+- **Období sledování** (v125): statistiky, alkohol, týdenní karta a souhrn pro Clauda
+  počítají jen od začátku aktuálního (nebo ve Statistikách vybraného) období —
+  **vždy přes `oknoObdobi`**, nikdy vlastním ořezem. Začátky v `meta.obdobi`
+  (synchronizované). Deník a kalendář ukazují vše. Po 7+ dnech bez zápisu Hlavní
+  nové období nabídne; cíle jsou pro všechna období společné.
 - **`maloDat(co, chybi)`** je jediná podoba hlášky „ještě nemám dost dat". Prahy se
   sjednocovat nemají (reálný výdej potřebuje jiný počet dnů než křivka), jejich
   vyjádření ano. Není-li k tématu ani jeden údaj, karta se neukáže; je-li něco, ale

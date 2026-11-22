@@ -17,7 +17,7 @@ Repozitář: `HuanCraven/kalorie`. Data žijí v telefonu (IndexedDB). Od v46 je
 synchronizovat mezi zařízeními přes **jeden soubor v uživatelově privátním repozitáři** na
 GitHubu — nikam jinam neodcházejí a dají se zašifrovat heslem.
 
-Aktuální verze: **2026.10.28-124** (`APP_VERSION` v `index.html`, cache `kaltrack-v124` v `sw.js`).
+Aktuální verze: **2026.11.22-125** (`APP_VERSION` v `index.html`, cache `kaltrack-v125` v `sw.js`).
 
 ## Jak je aplikace poskládaná
 
@@ -50,6 +50,34 @@ jako 30denní průměr. Všechna to mají v popisku.
 
 Nezávislá analýza soudržnosti, ze které sjednocení vzešlo, je popsaná ve verzích
 v87–v90 níže.
+
+### Novinky ve v125 — období sledování (nový začátek po pauze)
+
+Huan aplikaci občas na týdny odloží a pak se vrátí. Prázdné dny pauzy kazily
+statistiky: alkohol počítá den bez zápisu jako nulu (pauza mu uměle snížila průměr
+i 30denní limit), váha a reálný výdej se srovnávaly přes pauzu, „od začátku",
+týdenní karta i souhrn pro Clauda pauzu zahrnovaly.
+
+- **Období = seznam začátků** v `meta.obdobi` `[{id, od, nazev}]` — synchronizuje se
+  (`SYNC_META`), je v záloze a čte se jen přes `obdobiCisti`. Období trvá do dne před
+  dalším začátkem; data před prvním začátkem tvoří „Dřívější záznamy" (`_drive`).
+  **Nic se nemaže** — deník, kalendář a hledání ukazují všechno.
+- **Jediná funkce `oknoObdobi(konec, dni)`** ořízne okno: konec nepřeskočí konec
+  období, počet dnů nesahá před jeho začátek. Používají ji `renderStats` (tím i
+  `summaryText`, postřehy, váha, reálný výdej) a `alcStats` (tím i Alkohol a karta
+  alkoholu na Hlavní). Týdenní karta bere jen dny období a před ním mlčí.
+- Alkohol v krátkém období dělí **jen dny v období** (`nDni`) — „30denní" průměr
+  po třech dnech je průměr tří dnů, ne součet ÷ 30 s nulami z pauzy.
+- **Statistiky**: výběr období `#stObdobi` (jen když nějaké je); starší období se
+  prohlíží od svého konce. Výběr platí i pro Alkohol (jedno období v aplikaci).
+- **Návrat po pauze** (`navratKarta`): poslední zápis před dneškem je **7+ dní** starý
+  (`NAVRAT_DNI`, Huanovo rozhodnutí) a od té doby nezačalo období → karta na Hlavní
+  s polem pro název a *Začít nové období*. Zavření platí pro tu pauzu
+  (`meta.navratZavreno` = datum posledního zápisu). Nic se nezakládá samo.
+- **Nastavení → Data → Období sledování**: datum, název, seznam; smazání začátku
+  období spojí s předchozím.
+- Cíle jsou pro všechna období společné (Huanovo rozhodnutí), dají se měnit jako dřív.
+- Test `test89.js`.
 
 ### Novinky ve v124 — uložit zapsané jídlo do Jídel
 
